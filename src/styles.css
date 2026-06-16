@@ -1,0 +1,36 @@
+:root {
+  --ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --warm: #ffd9a0;
+  --warm-deep: #e8a86b;
+  --night: #1a1730;
+  --glass: rgba(28, 22, 46, 0.55);
+  --glass-border: rgba(255, 222, 170, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0c0a18;
+  font-family: var(--ui-font);
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* Disable text selection across the experience */
+#root {
+  user-select: none;
+}
