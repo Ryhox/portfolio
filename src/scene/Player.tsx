@@ -3,9 +3,10 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useWorld } from '../state/useWorld'
+import { BOAT_STEP_H, BOAT_X, BOAT_Z } from './boatConfig'
 import { buildColliders, buildSteps } from './placement'
 import { setLockFn } from './pointerLock'
-import { PLAYER_SPAWN, SHORE_LIMIT, getHeight } from './terrain'
+import { SHORE_LIMIT, getHeight } from './terrain'
 
 const EYE = 1.7
 const SPEED = 9
@@ -44,11 +45,13 @@ export function Player() {
     return () => setLockFn(null)
   }, [])
 
-  // Drop the camera onto the spawn beach when entering.
+  // Spawn on the boat deck; pre-apply the deck step height so there's no
+  // single-frame drop before the ground-follow loop picks it up.
   useEffect(() => {
     if (!started) return
-    camera.position.set(PLAYER_SPAWN.x, getHeight(PLAYER_SPAWN.x, PLAYER_SPAWN.z) + EYE, PLAYER_SPAWN.z)
-    camera.lookAt(PLAYER_SPAWN.look.x, 3, PLAYER_SPAWN.look.z)
+    const spawnY = Math.max(getHeight(BOAT_X, BOAT_Z), 0.15) + BOAT_STEP_H + EYE
+    camera.position.set(BOAT_X, spawnY, BOAT_Z)
+    camera.lookAt(0, 3, 0)   // look north toward the island
   }, [started, camera])
 
   useFrame((_, dtRaw) => {

@@ -22,10 +22,22 @@ let gBirds: GainNode
 let gOwl: GainNode
 let gMusic: GainNode
 let musicDelay: DelayNode
+let musicSource: AudioBufferSourceNode | null = null
+let musicBuffer: AudioBuffer | null = null
 
 let dayAmt = 0.5
 let nightAmt = 0.5
 let morning = 0
+
+let _volMaster = 1, _volMusic = 0.5, _volWaves = 0.5, _volWind = 0.5, _volAmbient = 0.5
+
+export function setVol(key: 'master' | 'music' | 'waves' | 'wind' | 'ambient', v: number) {
+  if (key === 'master') _volMaster = v
+  else if (key === 'music') _volMusic = v
+  else if (key === 'waves') _volWaves = v
+  else if (key === 'wind') _volWind = v
+  else if (key === 'ambient') _volAmbient = v
+}
 
 function noiseBuffer(seconds: number): AudioBuffer {
   const len = ctx!.sampleRate * seconds
@@ -183,27 +195,25 @@ function hoot() {
   }
 }
 
-// gentle generative music in a warm pentatonic scale
-const SCALE = [0, 2, 4, 7, 9, 12, 16] // C major pentatonic across two octaves
-const ROOT = 261.63 / 2 // C3
-function note() {
-  if (!ctx) return
-  const now = ctx.currentTime
-  const semis = SCALE[Math.floor(Math.random() * SCALE.length)] + (Math.random() < 0.3 ? 12 : 0)
-  const freq = ROOT * Math.pow(2, semis / 12)
-  const o = ctx.createOscillator()
-  o.type = Math.random() < 0.5 ? 'triangle' : 'sine'
-  o.frequency.value = freq
-  const g = ctx.createGain()
-  const peak = 0.18 * (0.7 + dayAmt * 0.3)
-  g.gain.setValueAtTime(0, now)
-  g.gain.linearRampToValueAtTime(peak, now + 0.4)
-  g.gain.exponentialRampToValueAtTime(0.001, now + 2.6)
-  o.connect(g)
-  g.connect(gMusic)
-  g.connect(musicDelay) // spacious echo
-  o.start(now)
-  o.stop(now + 2.8)
+async function loadAndPlayMusic() {
+  if (!ctx || musicBuffer) return
+  try {
+    const res = await fetch('/audio/music.mp3')
+    const arrayBuf = await res.arrayBuffer()
+    musicBuffer = await ctx.decodeAudioData(arrayBuf)
+    playMusicLoop()
+  } catch (e) {
+    console.warn('Could not load music.mp3', e)
+  }
+}
+
+function playMusicLoop() {
+  if (!ctx || !musicBuffer) return
+  musicSource = ctx.createBufferSource()
+  musicSource.buffer = musicBuffer
+  musicSource.loop = true
+  musicSource.connect(gMusic)
+  musicSource.start()
 }
 
 function scheduleLoop(fn: () => void, min: number, max: number, gate: () => number) {
@@ -257,7 +267,7 @@ export async function startAmbience(): Promise<void> {
 
   scheduleLoop(chirp, 3, 7, () => dayAmt * (0.3 + morning * 0.5))
   scheduleLoop(hoot, 7, 16, () => (nightAmt > 0.45 ? 0.8 : 0))
-  scheduleLoop(note, 1.8, 3.6, () => 0.8)
+  loadAndPlayMusic()
 
   started = true
   // fade in
@@ -275,17 +285,11 @@ export function updateAmbience(t: number, muted: boolean, shoreAmt = 1, windStre
   const set = (g: GainNode, target: number) => {
     g.gain.value += (target - g.gain.value) * k
   }
-  // sea wash only swells up as you approach the shore (silent up on the hill)
-  set(gWaves, clamp01(shoreAmt) * 0.22)
-  // a subtle breeze that tracks the live wind strength (heavy gusts a little
-  // louder than calm spells), trimmed further at night — kept well back so it's
-  // ambience, not a focus
-  set(gWind, (0.006 + windStrength * 0.026) * (0.6 + 0.4 * dayAmt))
-  // crickets swell in slow waves rather than chirping non-stop all night, and
-  // sit well back in the mix
+  set(gWaves, clamp01(shoreAmt) * 0.50 * _volWaves)
+  set(gWind, (0.018 + windStrength * 0.075) * (0.6 + 0.4 * dayAmt) * _volWind)
   const cricketWave = Math.max(0, Math.sin(ctx.currentTime * 0.42))
-  set(gCrickets, nightAmt * 0.03 * cricketWave)
-  set(gBirds, dayAmt * (0.5 + morning * 0.8))
-  set(gMusic, 0.32)
-  master.gain.value += ((muted ? 0 : 0.9) - master.gain.value) * 0.08
+  set(gCrickets, nightAmt * 0.07 * cricketWave * _volAmbient)
+  set(gBirds, dayAmt * (0.7 + morning * 1.1) * _volAmbient)
+  set(gMusic, 0.16 * _volMusic)
+  master.gain.value += ((muted ? 0 : 0.9 * _volMaster) - master.gain.value) * 0.08
 }

@@ -60,7 +60,7 @@ export function windStrengthAt(timeSec: number): number {
   w += 0.3 * Math.sin(timeSec * 0.035 + 1.3) // very slow weather drift
   w += 0.2 * Math.sin(timeSec * 0.19 + 4.1) // a new mood every ~33s
   w += 0.1 * Math.sin(timeSec * 0.42 + 0.7) // shorter gusts
-  return w < 0 ? 0 : w > 1 ? 1 : w
+  return w < 0 ? 0 : w > 0.62 ? 0.62 : w
 }
 
 let cache: NatureMap | null = null

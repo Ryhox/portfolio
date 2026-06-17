@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { BOAT_COLLIDERS, BOAT_STEP } from './boatConfig'
 import { HEART, ISLAND_RADIUS, NOOK, PATH_DENSE, PATH_WAYPOINTS, REGIONS } from './layout'
 import { type Placed, getHeight, sampleDisc } from './terrain'
 
@@ -276,6 +277,7 @@ export function buildColliders(): Collider[] {
     else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: base * it.scale })
   }
+  out.push(...BOAT_COLLIDERS)
   return out
 }
 
@@ -300,5 +302,6 @@ export function buildSteps(): Step[] {
     } else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: rk * it.scale, h: hk * it.scale })
   }
+  out.push(BOAT_STEP)
   return out
 }

@@ -14,6 +14,7 @@ import { Postfx } from './Postfx'
 import { NatureField } from './Scatter'
 import { Water } from './Water'
 import { Campfire } from './Campfire'
+import { RowingBoat } from './RowingBoat'
 
 // Advances time-of-day. Kept out of React render — just mutates the store.
 function TimeDriver() {
@@ -58,6 +59,9 @@ export function Experience() {
       <Island />
       <Water />
       <Campfire />
+      <Suspense fallback={null}>
+        <RowingBoat />
+      </Suspense>
       <GlowProps />
       <Particles />
       {/* Props stream in without blocking the terrain/sky from showing. */}

@@ -7,12 +7,20 @@ import type { Mesh } from 'three'
 // High-frequency animation reads `t` imperatively via useWorld.getState() inside
 // useFrame (no React re-render). UI that needs to display the time subscribes
 // through the hook as usual.
+export type VolKey = 'master' | 'music' | 'waves' | 'wind' | 'ambient'
+
 export type WorldState = {
   t: number
   paused: boolean
   dayLengthSec: number
   started: boolean
   muted: boolean
+  menuOpen: boolean
+  volMaster: number
+  volMusic: number
+  volWaves: number
+  volWind: number
+  volAmbient: number
   // The sun billboard mesh, shared so the post-processing GodRays effect can use
   // it as its light source. Set by DayNight once mounted.
   sunMesh: Mesh | null
@@ -23,9 +31,16 @@ export type WorldState = {
   setStarted: (s: boolean) => void
   toggleMuted: () => void
   setSunMesh: (m: Mesh | null) => void
+  setMenuOpen: (open: boolean) => void
+  setVol: (key: VolKey, v: number) => void
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
+
+const VOL_KEY_MAP: Record<VolKey, keyof WorldState> = {
+  master: 'volMaster', music: 'volMusic', waves: 'volWaves',
+  wind: 'volWind', ambient: 'volAmbient',
+}
 
 export const useWorld = create<WorldState>((set) => ({
   t: 0.27, // begin in a gentle morning
@@ -33,6 +48,12 @@ export const useWorld = create<WorldState>((set) => ({
   dayLengthSec: 140,
   started: false,
   muted: false,
+  menuOpen: false,
+  volMaster: 1,
+  volMusic: 0.5,
+  volWaves: 0.5,
+  volWind: 0.5,
+  volAmbient: 0.5,
   sunMesh: null,
   setT: (t) => set({ t: wrap01(t) }),
   setPaused: (paused) => set({ paused }),
@@ -41,6 +62,8 @@ export const useWorld = create<WorldState>((set) => ({
   setStarted: (started) => set({ started }),
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
   setSunMesh: (sunMesh) => set({ sunMesh }),
+  setMenuOpen: (menuOpen) => set({ menuOpen }),
+  setVol: (key, v) => set({ [VOL_KEY_MAP[key]]: v } as Partial<WorldState>),
 }))
 
 // Dev convenience: lets the screenshot harness drive time/started from JS.

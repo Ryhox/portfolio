@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Experience } from './scene/Experience'
 import { LITE } from './scene/config'
+import { EscMenu } from './ui/EscMenu'
 import { Hud } from './ui/Hud'
 import { StartOverlay } from './ui/StartOverlay'
 
@@ -20,6 +21,7 @@ export default function App() {
         </Suspense>
       </Canvas>
       <StartOverlay />
+      <EscMenu />
       <Hud />
     </>
   )
