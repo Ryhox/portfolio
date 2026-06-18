@@ -59,22 +59,26 @@ export function getHeight(x: number, z: number): number {
   // --- macro: the smooth, intentional shape ---
   let macro = mask * 3.2
   const dHill = Math.hypot(x - HEART.x, z - HEART.z)
-  macro += Math.exp(-(dHill * dHill) / (2 * (HEART.r * 0.6) ** 2)) * HEART.height * (0.45 + 0.55 * mask)
+  // Clamped Gaussian: plateau at the summit so the hilltop is a proper flat
+  // chilling spot rather than a sharp peak. Cap kicks in within ~12 units of
+  // center, giving a generous flat crown before the slope falls away.
+  const hillGauss = Math.exp(-(dHill * dHill) / (2 * (HEART.r * 0.6) ** 2))
+  const hillShape = Math.min(hillGauss * 1.5, 1.0)
+  macro += hillShape * HEART.height * (0.45 + 0.55 * mask)
   macro -= smoothstep(0.9, 1.5, edge) * 18 // seabed
 
   // --- detail: rolling bumps, smoothed out in cleared areas ---
-  // The worn path flattens the rolling detail over a WIDE band (matching the
-  // dirt), and only dips a hair, so it blends evenly into the hill instead of
-  // cutting a trench that reads as "down then up".
   const onPath = smoothstep(7.0, 3.0, distToPath(x, z))
   const dNook = Math.hypot(x - NOOK.x, z - NOOK.z)
   const inNook = smoothstep(NOOK.r, NOOK.r * 0.4, dNook)
-  const flatten = Math.max(onPath * 0.92, inNook * 0.88)
+  // Flat summit clearing — suppresses bumpy detail on the hilltop plateau
+  const inHilltop = smoothstep(9.0, 4.0, dHill)
+  const flatten = Math.max(onPath * 0.92, inNook * 0.88, inHilltop * 0.85)
 
   const detail = mask * fbm(x, z, 4, 0.015) * 4.0 * (1 - flatten)
 
   let h = macro + detail
-  h -= onPath * 0.08 // a faint worn dip — gentle enough to stay even with the hill
+  h -= onPath * 0.08
   return h
 }
 

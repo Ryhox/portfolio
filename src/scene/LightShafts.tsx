@@ -16,7 +16,7 @@ import { useWorld } from '../state/useWorld'
 // Soft, wide beam: brightest through the mid-lower length (down among the trees)
 // and feathered away at the top so it melts into the sky rather than streaking
 // across it, and soft at the sides.
-function useShaftTexture() {
+export function useShaftTexture() {
   return useMemo(() => {
     const W = 96
     const H = 256

@@ -13,6 +13,7 @@ export type WorldState = {
   t: number
   paused: boolean
   dayLengthSec: number
+  loaded: boolean
   started: boolean
   muted: boolean
   menuOpen: boolean
@@ -21,13 +22,12 @@ export type WorldState = {
   volWaves: number
   volWind: number
   volAmbient: number
-  // The sun billboard mesh, shared so the post-processing GodRays effect can use
-  // it as its light source. Set by DayNight once mounted.
   sunMesh: Mesh | null
   setT: (t: number) => void
   setPaused: (p: boolean) => void
   togglePaused: () => void
   setDayLength: (s: number) => void
+  setLoaded: (b: boolean) => void
   setStarted: (s: boolean) => void
   toggleMuted: () => void
   setSunMesh: (m: Mesh | null) => void
@@ -43,9 +43,10 @@ const VOL_KEY_MAP: Record<VolKey, keyof WorldState> = {
 }
 
 export const useWorld = create<WorldState>((set) => ({
-  t: 0.27, // begin in a gentle morning
-  paused: false,
+  t: 0.20,   // just before dawn — deep night
+  paused: true, // time is frozen until the player enters the world
   dayLengthSec: 140,
+  loaded: false,
   started: false,
   muted: false,
   menuOpen: false,
@@ -59,12 +60,20 @@ export const useWorld = create<WorldState>((set) => ({
   setPaused: (paused) => set({ paused }),
   togglePaused: () => set((s) => ({ paused: !s.paused })),
   setDayLength: (dayLengthSec) => set({ dayLengthSec }),
+  setLoaded: (loaded) => set({ loaded }),
   setStarted: (started) => set({ started }),
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
   setSunMesh: (sunMesh) => set({ sunMesh }),
   setMenuOpen: (menuOpen) => set({ menuOpen }),
   setVol: (key, v) => set({ [VOL_KEY_MAP[key]]: v } as Partial<WorldState>),
 }))
+
+// Mutable object GSAP can animate — drives the cinematic fly-in in Experience.tsx.
+// startPos overrides the orbit position as the fly-in origin (set before animating progress).
+export const FLY = {
+  progress: 0,
+  startPos: null as { x: number; y: number; z: number } | null,
+}
 
 // Dev convenience: lets the screenshot harness drive time/started from JS.
 if (import.meta.env.DEV && typeof window !== 'undefined') {

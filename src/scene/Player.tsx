@@ -3,7 +3,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useWorld } from '../state/useWorld'
-import { BOAT_STEP_H, BOAT_X, BOAT_Z } from './boatConfig'
 import { buildColliders, buildSteps } from './placement'
 import { setLockFn } from './pointerLock'
 import { SHORE_LIMIT, getHeight } from './terrain'
@@ -29,7 +28,17 @@ export function Player() {
   const move = useRef(new THREE.Vector3())
 
   useEffect(() => {
-    const dn = (e: KeyboardEvent) => (keys.current[e.code] = true)
+    const dn = (e: KeyboardEvent) => {
+      keys.current[e.code] = true
+      
+      // Auto-lock pointer on any WASD / arrow movement key once the game is started.
+      // E.g., user scrolls all the way in to reveal the game, then starts walking.
+      if (useWorld.getState().started && !document.pointerLockElement) {
+        if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+          controls.current?.lock?.()
+        }
+      }
+    }
     const up = (e: KeyboardEvent) => (keys.current[e.code] = false)
     window.addEventListener('keydown', dn)
     window.addEventListener('keyup', up)
@@ -45,13 +54,14 @@ export function Player() {
     return () => setLockFn(null)
   }, [])
 
-  // Spawn on the boat deck; pre-apply the deck step height so there's no
-  // single-frame drop before the ground-follow loop picks it up.
+  // Spawn on the south beach looking north toward the hill.
   useEffect(() => {
     if (!started) return
-    const spawnY = Math.max(getHeight(BOAT_X, BOAT_Z), 0.15) + BOAT_STEP_H + EYE
-    camera.position.set(BOAT_X, spawnY, BOAT_Z)
-    camera.lookAt(0, 3, 0)   // look north toward the island
+    const spawnX = 2
+    const spawnZ = 54
+    const spawnY = Math.max(getHeight(spawnX, spawnZ), 0.15) + EYE
+    camera.position.set(spawnX, spawnY, spawnZ)
+    camera.lookAt(0, 3, 0)
   }, [started, camera])
 
   useFrame((_, dtRaw) => {
@@ -118,5 +128,5 @@ export function Player() {
     camera.position.y += (groundY - camera.position.y) * Math.min(1, dt * 12)
   })
 
-  return <PointerLockControls ref={controls} makeDefault />
+  return <PointerLockControls ref={controls} makeDefault selector="canvas" />
 }

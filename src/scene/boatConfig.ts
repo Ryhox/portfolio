@@ -1,41 +1,43 @@
 // Shared boat constants — consumed by RowingBoat.tsx (render),
 // placement.ts (collision + step), and Player.tsx (spawn).
+//
+// Internal node transforms in the GLB (scale 0.01 + axis swap) make the mesh
+// appear inverted and tiny.  Applying scale=7 and rotation=[PI, ROT_Y, 0]
+// corrects both issues:
+//   • scale 7 → boat ~5.8 m long, ~2.9 m wide, ~1.7 m tall
+//   • PI flip → keel at +0.142 m above pivot (bottom), gunwale at +1.695 m (top)
 
 export const BOAT_X     = 0
 export const BOAT_Z     = 58
-export const BOAT_SCALE = 0.15
-export const BOAT_ROT_Y = 0.4   // radians, Y-axis
+export const BOAT_SCALE = 7
+export const BOAT_ROT_Y = 0.4   // radians, Y-axis (angled on beach)
 
-// GLB bounding box: Y min=2.03 (hull keel), scale 0.15 → keel is 0.305 m above pivot
-export const BOAT_Y_HULL_MIN  = 2.03 * BOAT_SCALE   // 0.305 m
-export const BOAT_Y_HULL_SINK = 0.15                 // how deep we bed into sand
+// After flip: keel sits 0.142 m above pivot; sink 0.20 m into sand.
+export const BOAT_Y_HULL_MIN  = 0.142
+export const BOAT_Y_HULL_SINK = 0.20
 
-// Deck estimate: model Y≈6 × scale (gunwale rim, not the tall oar tips)
-const DECK_MODEL_Y          = 6
-export const DECK_ABOVE_PIVOT = DECK_MODEL_Y * BOAT_SCALE  // 0.90 m
+// Player stands ~30 cm above terrain when inside the hull.
+export const BOAT_STEP_H = 0.30
 
-// Step-system offset so the player stands on the deck.
-// = DECK_ABOVE_PIVOT − HULL_MIN − HULL_SINK  (terrain cancels out)
-export const BOAT_STEP_H =
-  DECK_ABOVE_PIVOT - BOAT_Y_HULL_MIN - BOAT_Y_HULL_SINK  // ≈ 0.45 m
+// World-space positions of the three hull cylinders.
+// After the PI flip + ROT_Y rotation the boat's axis direction is:
+//   dx = -sin(ROT_Y), dz = -cos(ROT_Y)
+// Local Z extents (at scale 7): -2.565 m … +3.270 m from pivot.
+const SX = -Math.sin(BOAT_ROT_Y)   // ≈ -0.389
+const SZ = -Math.cos(BOAT_ROT_Y)   // ≈ -0.921
 
-// Three hull cylinders (stern / amidships / bow) in world XZ.
-// Local model Z: stern ≈ -40, mid ≈ -5, bow ≈ +25 (model units)
-const _c = Math.cos(BOAT_ROT_Y)
-const _s = Math.sin(BOAT_ROT_Y)
-function cyl(lz: number, r: number) {
-  return { x: BOAT_X + lz * BOAT_SCALE * _s, z: BOAT_Z + lz * BOAT_SCALE * _c, r }
+function wpt(lz: number) {
+  return { x: BOAT_X + lz * SX, z: BOAT_Z + lz * SZ }
 }
+
 export const BOAT_COLLIDERS = [
-  cyl(-40, 1.8),   // stern
-  cyl( -5, 2.5),   // amidships (widest)
-  cyl( 25, 1.8),   // bow
+  { ...wpt( 3.0), r: 1.1 },   // one end
+  { ...wpt( 0.0), r: 1.5 },   // amidships
+  { ...wpt(-2.4), r: 1.1 },   // other end
 ]
 
-// Single deck step centred at amidships
 export const BOAT_STEP = {
-  x: BOAT_X + (-5) * BOAT_SCALE * _s,
-  z: BOAT_Z + (-5) * BOAT_SCALE * _c,
-  r: 3.0,
+  ...wpt(0.0),
+  r: 2.5,
   h: BOAT_STEP_H,
 }

@@ -5,7 +5,7 @@ import { Experience } from './scene/Experience'
 import { LITE } from './scene/config'
 import { EscMenu } from './ui/EscMenu'
 import { Hud } from './ui/Hud'
-import { StartOverlay } from './ui/StartOverlay'
+import { IntroOverlay } from './ui/IntroOverlay'
 
 export default function App() {
   return (
@@ -20,7 +20,7 @@ export default function App() {
           <Experience />
         </Suspense>
       </Canvas>
-      <StartOverlay />
+      <IntroOverlay />
       <EscMenu />
       <Hud />
     </>

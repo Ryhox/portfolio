@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { NOOK } from './layout'
+import { HEART } from './layout'
 import { getSky } from './palette'
 import { getHeight } from './terrain'
 import { useWorld } from '../state/useWorld'
@@ -144,20 +144,20 @@ const FIRE_CFG: FieldCfg = {
   additive: true,
 }
 const SMOKE_CFG: FieldCfg = {
-  count: 48,
+  count: 90,
   baseY: 0.95,
-  spread: 0.22,
-  rise: 2.6,
-  expand: 0.7, // billow outward
-  size: 0.7,
-  shrink: 1.7, // grow as it rises
-  speed: [0.18, 0.34],
+  spread: 0.28,
+  rise: 40,
+  expand: 2.4,
+  size: 1.1,
+  shrink: 2.0,
+  speed: [0.05, 0.10],
   colorA: new THREE.Color(0.34, 0.32, 0.31),
-  colorB: new THREE.Color(0.1, 0.1, 0.11),
-  alpha: 0.24,
+  colorB: new THREE.Color(0.12, 0.12, 0.13),
+  alpha: 0.18,
   fade: 1,
-  wobbleFreq: 1.4,
-  wobbleAmp: 0.3,
+  wobbleFreq: 0.8,
+  wobbleAmp: 1.4,
   additive: false,
 }
 const EMBER_CFG: FieldCfg = {
@@ -193,8 +193,12 @@ function bar(ax: number, ay: number, az: number, bx: number, by: number, bz: num
   }
 }
 
+// Wild campfire on the secluded west shore — no path leads here.
+const CAMP_X = -46
+const CAMP_Z = 30
+
 export function Campfire() {
-  const base: [number, number, number] = [NOOK.x, getHeight(NOOK.x, NOOK.z), NOOK.z]
+  const base: [number, number, number] = [CAMP_X, getHeight(CAMP_X, CAMP_Z), CAMP_Z]
 
   // materials
   const rockMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x787a82, roughness: 0.95, flatShading: true }), [])
@@ -256,14 +260,6 @@ export function Campfire() {
       legs.push(bar(Math.cos(a) * 0.62, 0.0, Math.sin(a) * 0.62, 0, 1.5, 0))
     }
     return legs
-  }, [])
-
-  const benches = useMemo(() => {
-    // three rustic benches around the fire, leaving the trail entrance open
-    return [0.5, Math.PI * 0.92, Math.PI * 1.46].map((a) => ({
-      pos: [Math.cos(a) * 2.5, 0, Math.sin(a) * 2.5] as [number, number, number],
-      rotY: -a + Math.PI / 2,
-    }))
   }, [])
 
   // animation
@@ -357,23 +353,42 @@ export function Campfire() {
         </mesh>
       </group>
 
-      {/* benches */}
-      {benches.map((b, i) => (
-        <group key={i} position={b.pos} rotation={[0, b.rotY, 0]}>
-          <mesh material={woodMat} position={[0, 0.42, 0]} castShadow receiveShadow>
-            <boxGeometry args={[1.3, 0.13, 0.4]} />
-          </mesh>
-          <mesh material={charMat} position={[-0.5, 0.2, 0]} castShadow>
-            <cylinderGeometry args={[0.11, 0.13, 0.4, 7]} />
-          </mesh>
-          <mesh material={charMat} position={[0.5, 0.2, 0]} castShadow>
-            <cylinderGeometry args={[0.11, 0.13, 0.4, 7]} />
-          </mesh>
-        </group>
-      ))}
-
       {/* warm firelight — burns day and night, with a lively flicker */}
       <pointLight ref={light} position={[0, 0.7, 0]} color={0xff7a2e} distance={13} decay={2} />
     </group>
+  )
+}
+
+// Two log benches on the hilltop plateau facing the view, placed near the
+// Heartwood tree. Heights are sampled per-bench so they never float.
+function aimAtHeart(x: number, z: number) {
+  return Math.atan2(HEART.x - x, HEART.z - z)
+}
+
+const BENCH_DEFS = [
+  { x: HEART.x - 2.5, z: HEART.z + 3 },
+  { x: HEART.x + 3, z: HEART.z + 2.5 },
+].map((b) => ({ ...b, rotY: aimAtHeart(b.x, b.z) }))
+
+export function HilltopBenches() {
+  const woodMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x5a3c22, roughness: 0.92 }), [])
+  const charMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.95 }), [])
+
+  return (
+    <>
+      {BENCH_DEFS.map((b, i) => (
+        <group key={i} position={[b.x, getHeight(b.x, b.z), b.z]} rotation={[0, b.rotY, 0]}>
+          <mesh material={woodMat} position={[0, 0.46, 0]} castShadow receiveShadow>
+            <boxGeometry args={[1.5, 0.14, 0.45]} />
+          </mesh>
+          <mesh material={charMat} position={[-0.55, 0.22, 0]} castShadow>
+            <cylinderGeometry args={[0.13, 0.15, 0.44, 8]} />
+          </mesh>
+          <mesh material={charMat} position={[0.55, 0.22, 0]} castShadow>
+            <cylinderGeometry args={[0.13, 0.15, 0.44, 8]} />
+          </mesh>
+        </group>
+      ))}
+    </>
   )
 }

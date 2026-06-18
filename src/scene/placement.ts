@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import { BOAT_COLLIDERS, BOAT_STEP } from './boatConfig'
 import { HEART, ISLAND_RADIUS, NOOK, PATH_DENSE, PATH_WAYPOINTS, REGIONS } from './layout'
 import { type Placed, getHeight, sampleDisc } from './terrain'
 
@@ -99,16 +98,17 @@ function pathStones(): PlacementEntry[] {
   const n = Math.max(16, Math.round(total / 3.8)) // closer together — proper stepping stones
   const r = rng(900)
   const items: Placed[] = []
-  for (let i = 0; i <= n; i++) {
-    const c = at((i / n) * total)
-    const side = Math.sin(i * 1.7) * 0.06 // barely any wander — keep it single-file
+  const startArc = 1.5
+  for (let i = 0; i < n; i++) {
+    const c = at(startArc + (i / n) * (total - startArc))
+    const side = Math.sin(i * 1.7) * 0.06
     const x = c.x - c.tz * side
     const z = c.z + c.tx * side
     items.push({
       x,
-      y: getHeight(x, z) - 0.14, // seated a touch deeper so edges never float
+      y: getHeight(x, z) - 0.22,
       z,
-      rotY: r() * Math.PI * 2, // single model, so vary the yaw to avoid repetition
+      rotY: 0,
       scale: 0.8 + r() * 0.45,
     })
   }
@@ -221,9 +221,11 @@ export function buildPlacements(): PlacementEntry[] {
   e.push(...variants(sampleDisc({ cx: spookyCorner.x, cz: spookyCorner.z, r: spookyCorner.r, count: 22, seed: 52, minScale: 0.9, maxScale: 1.7 }), MUSH, 113, 0.55))
 
   // ✦ Rocks — human-scale, a little overlook outcrop on the north shoulder.
+  // maxSlope raised to 0.65 so rocks only land on gently sloping ground — on
+  // steep faces an upright rock looks half-buried and half-floating.
   e.push(
     ...variants(
-      sampleDisc({ cx: rockOverlook.x, cz: rockOverlook.z, r: rockOverlook.r, count: 8, seed: 61, minScale: 0.9, maxScale: 1.8, minDist: 3, maxSlope: 0.35 }),
+      sampleDisc({ cx: rockOverlook.x, cz: rockOverlook.z, r: rockOverlook.r, count: 8, seed: 61, minScale: 0.9, maxScale: 1.8, minDist: 3, maxSlope: 0.65 }),
       ROCK,
       62,
       1.9,
@@ -232,9 +234,11 @@ export function buildPlacements(): PlacementEntry[] {
   )
 
   // ✦ Pebbles — strewn along the sandy shore.
+  // maxSlope raised to 0.75 (≈41° max) so align:true pebbles don't lie nearly
+  // horizontal and look like floating planks on steep cliff faces.
   e.push(
     ...variants(
-      sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS, innerR: ISLAND_RADIUS - 12, count: 110, seed: 63, zones: ['sand', 'grass'], maxSlope: 0.4, minScale: 0.7, maxScale: 1.5 }),
+      sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS, innerR: ISLAND_RADIUS - 12, count: 110, seed: 63, zones: ['sand', 'grass'], maxSlope: 0.75, minScale: 0.7, maxScale: 1.5 }),
       PEBBLE,
       64,
       0.4,
@@ -277,7 +281,6 @@ export function buildColliders(): Collider[] {
     else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: base * it.scale })
   }
-  out.push(...BOAT_COLLIDERS)
   return out
 }
 
@@ -302,6 +305,5 @@ export function buildSteps(): Step[] {
     } else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: rk * it.scale, h: hk * it.scale })
   }
-  out.push(BOAT_STEP)
   return out
 }

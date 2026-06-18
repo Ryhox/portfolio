@@ -73,7 +73,7 @@ let failure: unknown = null
 // material so shared kit materials compile a single program.
 const converted = new WeakMap<THREE.Material, THREE.Material>()
 
-function convertMaterial(src: THREE.Material): THREE.Material {
+export function convertMaterial(src: THREE.Material): THREE.Material {
   const hit = converted.get(src)
   if (hit) return hit
 
@@ -224,7 +224,7 @@ function splitByGroups(geometry: THREE.BufferGeometry, material: THREE.Material 
 
 // Per-vertex wind weight from normalized local height (0 base → 1 top), eased so
 // the base stays stiff. Read by the wind vertex shader as the `aSway` attribute.
-function addSway(geo: THREE.BufferGeometry) {
+export function addSway(geo: THREE.BufferGeometry) {
   const pos = geo.getAttribute('position') as THREE.BufferAttribute
   if (!geo.boundingBox) geo.computeBoundingBox()
   const minY = geo.boundingBox!.min.y

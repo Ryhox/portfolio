@@ -16,7 +16,7 @@ function rng(seed: number) {
   }
 }
 
-// A little hanging lantern that warms up after dusk, with a soft flicker.
+// A chunky low-poly street lamp — square post with a prominent lantern head.
 function Lantern({ pos }: { pos: [number, number, number] }) {
   const light = useRef<THREE.PointLight>(null!)
   const phase = useMemo(() => Math.random() * 6.28, [])
@@ -24,6 +24,8 @@ function Lantern({ pos }: { pos: [number, number, number] }) {
     () => new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb24d, emissiveIntensity: 0, toneMapped: false }),
     [],
   )
+  const post = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x5c4a3a, roughness: 0.8 }), [])
+  const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x2e2218, roughness: 0.85 }), [])
   useFrame((state) => {
     const nf = getSky(useWorld.getState().t).nightFactor
     const flick = 0.85 + Math.sin(state.clock.elapsedTime * 7 + phase) * 0.15
@@ -32,18 +34,35 @@ function Lantern({ pos }: { pos: [number, number, number] }) {
   })
   return (
     <group position={pos}>
-      <mesh castShadow position={[0, 0.6, 0]}>
-        <cylinderGeometry args={[0.035, 0.05, 1.2, 8]} />
-        <meshStandardMaterial color={0x3a2a1a} roughness={0.9} />
+      {/* base plate */}
+      <mesh castShadow material={post} position={[0, 0.08, 0]}>
+        <boxGeometry args={[0.36, 0.16, 0.36]} />
       </mesh>
-      <mesh material={glass} position={[0, 1.26, 0]}>
-        <boxGeometry args={[0.2, 0.26, 0.2]} />
+      {/* main square pole */}
+      <mesh castShadow material={post} position={[0, 1.0, 0]}>
+        <boxGeometry args={[0.16, 1.68, 0.16]} />
       </mesh>
-      <mesh position={[0, 1.46, 0]}>
-        <coneGeometry args={[0.18, 0.13, 4]} />
-        <meshStandardMaterial color={0x2a2018} roughness={0.85} />
+      {/* mid collar */}
+      <mesh castShadow material={post} position={[0, 0.7, 0]}>
+        <boxGeometry args={[0.24, 0.12, 0.24]} />
       </mesh>
-      <pointLight ref={light} position={[0, 1.26, 0]} color={0xffb86a} distance={9} decay={2} />
+      {/* under-lantern collar — sits flush on top of pole (pole top = 1.84) */}
+      <mesh castShadow material={dark} position={[0, 1.90, 0]}>
+        <boxGeometry args={[0.46, 0.12, 0.46]} />
+      </mesh>
+      {/* lantern glass body — bottom flush with collar top (1.90+0.06=1.96) */}
+      <mesh material={glass} position={[0, 2.24, 0]}>
+        <boxGeometry args={[0.52, 0.56, 0.52]} />
+      </mesh>
+      {/* lantern roof — bottom flush with glass top (2.24+0.28=2.52) */}
+      <mesh castShadow material={dark} position={[0, 2.58, 0]}>
+        <boxGeometry args={[0.56, 0.12, 0.56]} />
+      </mesh>
+      {/* finial — bottom flush with roof top (2.58+0.06=2.64) */}
+      <mesh castShadow material={post} position={[0, 2.73, 0]}>
+        <boxGeometry args={[0.09, 0.18, 0.09]} />
+      </mesh>
+      <pointLight ref={light} position={[0, 2.24, 0]} color={0xffb86a} distance={9} decay={2} />
     </group>
   )
 }
