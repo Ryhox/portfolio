@@ -236,6 +236,7 @@ const FLOWER_SPOTS = [
 type Models = { tree: THREE.Group; grassClones: THREE.Group[]; bush: THREE.Group; flowerClones: THREE.Group[] }
 
 function ForestScene({ onEnter }: { onEnter?: () => void }) {
+  const { gl } = useThree()
   const [models, setModels] = useState<Models | null>(null)
 
   useEffect(() => {
@@ -274,17 +275,25 @@ function ForestScene({ onEnter }: { onEnter?: () => void }) {
 
   if (!models) return null
 
-  const click = (e: { stopPropagation: () => void }) => { e.stopPropagation(); onEnter?.() }
+  const setOverlayCursor = (v: string) => {
+    const el = document.getElementById('iw-scene')
+    if (el) el.style.cursor = v
+  }
+
+  const click     = (e: { stopPropagation: () => void }) => { e.stopPropagation(); onEnter?.() }
+  const cursorOn  = (e: { stopPropagation: () => void }) => { e.stopPropagation(); setOverlayCursor('pointer') }
+  const cursorOff = () => setOverlayCursor('default')
 
   return (
     <>
       {/* Tree — clickable */}
-      <group position={[0, GY, 2]} scale={[0.9, 0.9, 0.9]} rotation={[0, Math.PI, -0.18]} onClick={click}>
+      <group position={[0, GY, 2]} scale={[0.9, 0.9, 0.9]} rotation={[0, Math.PI, -0.18]}
+        onClick={click} onPointerOver={cursorOn} onPointerOut={cursorOff}>
         <primitive object={models.tree} />
       </group>
       {/* Grass — clickable */}
       {models.grassClones.map((g, i) => (
-        <primitive key={i} object={g} onClick={click} />
+        <primitive key={i} object={g} onClick={click} onPointerOver={cursorOn} onPointerOut={cursorOff} />
       ))}
       {/* Bush + flowers — not clickable */}
       <primitive object={models.bush} />
@@ -312,14 +321,15 @@ function ConstantWind() {
 // ─── hover parallax camera (no drag) ─────────────────────────────────────────
 
 const CAM_LOOK  = new THREE.Vector3(0, -2, 0)
-const CAM_Y     = 6    // base height — change this to raise/lower the camera
-const CAM_Z     = 20   // base distance forward
 const HOVER_AMP = 0.10
+
+const CAM_Y = 6
+const CAM_Z = 20
 
 function DragCamera() {
   const { camera } = useThree()
-  const hoverTgt = useRef({ x: 0, y: 0 })
-  const curr     = useRef({ x: 0, y: 0 })
+  const hoverTgt  = useRef({ x: 0, y: 0 })
+  const curr      = useRef({ x: 0, y: 0 })
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -335,11 +345,7 @@ function DragCamera() {
   useFrame(() => {
     curr.current.x += (hoverTgt.current.x - curr.current.x) * 0.06
     curr.current.y += (hoverTgt.current.y - curr.current.y) * 0.06
-    camera.position.set(
-      curr.current.x,
-      CAM_Y + curr.current.y,
-      CAM_Z,
-    )
+    camera.position.set(curr.current.x, CAM_Y + curr.current.y, CAM_Z)
     camera.lookAt(CAM_LOOK)
   })
 
@@ -349,7 +355,7 @@ function DragCamera() {
 // ─── "CLICK TO START" billboard ──────────────────────────────────────────────
 // Canvas texture: Nunito 800 text + hand-drawn arrow + speaker icon + × marks.
 
-function ClickToStart() {
+function ClickToStart({ mobile }: { mobile?: boolean }) {
   const [tex, setTex] = useState<THREE.Texture | null>(null)
 
   useEffect(() => {
@@ -368,8 +374,7 @@ function ClickToStart() {
         ctx.shadowOffsetY = 3
       }
 
-      // Layout: arrow on LEFT, text on RIGHT, speaker below text
-      const textX = 390  // text centre x
+      const textX  = mobile ? 300 : 390  // centered on mobile, right-side on desktop
       const textY1 = 112, textY2 = 208
 
       // "CLICK TO" + "START" — Nunito 800
@@ -383,37 +388,38 @@ function ClickToStart() {
       ctx.fillText('START',    textX, textY2)
       ctx.restore()
 
-      // Curved arrow — starts right (near text), curves down-left, tip points LEFT (toward tree)
-      ctx.save()
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.90)'
-      ctx.lineWidth = 3.5
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      shadow()
-      const p0: [number, number] = [225, 158]
-      const p1: [number, number] = [242, 194]
-      const p2: [number, number] = [188, 234]
-      const p3: [number, number] = [72, 224]
-      ctx.beginPath()
-      ctx.moveTo(...p0)
-      ctx.bezierCurveTo(...p1, ...p2, ...p3)
-      ctx.stroke()
-      // Arrowhead — tangent at end from p2→p3 (points left toward tree)
-      const adx = p3[0] - p2[0], ady = p3[1] - p2[1]
-      const al = Math.sqrt(adx * adx + ady * ady)
-      const ux = adx / al, uy = ady / al
-      const ah = 14, sp = 0.42
-      const rotPt = (dx: number, dy: number, a: number): [number, number] =>
-        [dx * Math.cos(a) - dy * Math.sin(a), dx * Math.sin(a) + dy * Math.cos(a)]
-      const [lx, ly] = rotPt(-ux, -uy,  sp)
-      const [rx, ry] = rotPt(-ux, -uy, -sp)
-      ctx.beginPath()
-      ctx.moveTo(p3[0], p3[1]); ctx.lineTo(p3[0] + lx * ah, p3[1] + ly * ah)
-      ctx.moveTo(p3[0], p3[1]); ctx.lineTo(p3[0] + rx * ah, p3[1] + ry * ah)
-      ctx.stroke()
-      ctx.restore()
+      // Arrow only on desktop
+      if (!mobile) {
+        ctx.save()
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.90)'
+        ctx.lineWidth = 3.5
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        shadow()
+        const p0: [number, number] = [225, 158]
+        const p1: [number, number] = [242, 194]
+        const p2: [number, number] = [188, 234]
+        const p3: [number, number] = [72, 224]
+        ctx.beginPath()
+        ctx.moveTo(...p0)
+        ctx.bezierCurveTo(...p1, ...p2, ...p3)
+        ctx.stroke()
+        const adx = p3[0] - p2[0], ady = p3[1] - p2[1]
+        const al = Math.sqrt(adx * adx + ady * ady)
+        const ux = adx / al, uy = ady / al
+        const ah = 14, sp = 0.42
+        const rotPt = (dx: number, dy: number, a: number): [number, number] =>
+          [dx * Math.cos(a) - dy * Math.sin(a), dx * Math.sin(a) + dy * Math.cos(a)]
+        const [lx, ly] = rotPt(-ux, -uy,  sp)
+        const [rx, ry] = rotPt(-ux, -uy, -sp)
+        ctx.beginPath()
+        ctx.moveTo(p3[0], p3[1]); ctx.lineTo(p3[0] + lx * ah, p3[1] + ly * ah)
+        ctx.moveTo(p3[0], p3[1]); ctx.lineTo(p3[0] + rx * ah, p3[1] + ry * ah)
+        ctx.stroke()
+        ctx.restore()
+      }
 
-      // Speaker icon — below the text, manual paths
+      // Speaker icon — below the text
       ctx.save()
       ctx.fillStyle = 'rgba(255, 255, 255, 0.90)'
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.90)'
@@ -441,12 +447,17 @@ function ClickToStart() {
 
     paint()
     document.fonts.ready.then(paint)
-  }, [])
+  }, [mobile])
 
   if (!tex) return null
+
+  const pos: [number, number, number] = mobile ? [0, 3, 5]  : [7, 0, 3]
+  const rot: [number, number, number] = mobile ? [0, 0, 0]  : [0, -Math.PI / 4, 0]
+  const w   = mobile ? 5 : 8
+
   return (
-    <mesh position={[7, 0, 3]} rotation={[0, -Math.PI / 4, 0]} renderOrder={10}>
-      <planeGeometry args={[8, 8 * (300 / 600)]} />
+    <mesh position={pos} rotation={rot} renderOrder={10}>
+      <planeGeometry args={[w, w * (300 / 600)]} />
       <meshBasicMaterial
         map={tex} transparent depthWrite={false} depthTest={false}
         toneMapped={false} fog={false}
@@ -465,7 +476,6 @@ function SceneGroup({ onEnter }: { onEnter?: () => void }) {
   return (
     <group position={[0, 0, 0]}>
       <EntryShaft />
-      <FallingLeaves />
       <ForestScene onEnter={onEnter} />
     </group>
   )
@@ -474,6 +484,14 @@ function SceneGroup({ onEnter }: { onEnter?: () => void }) {
 // ─── canvas ───────────────────────────────────────────────────────────────────
 
 export function EntryScene({ onEnter }: { onEnter?: () => void }) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640)
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   return (
     <Canvas
       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
@@ -493,7 +511,7 @@ export function EntryScene({ onEnter }: { onEnter?: () => void }) {
       <Fireflies />
 
       <SceneGroup onEnter={onEnter} />
-      <ClickToStart />
+      <ClickToStart mobile={isMobile} />
     </Canvas>
   )
 }

@@ -114,7 +114,7 @@ export function IntroOverlay() {
 const CSS = `
   #iw { pointer-events: auto; }
   #iw * { pointer-events: none; }
-  #iw-scene { pointer-events: auto; cursor: pointer; }
+  #iw-scene { pointer-events: auto; cursor: default; }
 `
 
 const FONT = "'Nunito', sans-serif"
@@ -138,7 +138,7 @@ const sEntryBg: CSSProperties = {
   position: 'absolute',
   inset: 0,
   pointerEvents: 'auto',
-  cursor: 'pointer',
+  cursor: 'default',
 }
 
 const sLoadArea: CSSProperties = {
