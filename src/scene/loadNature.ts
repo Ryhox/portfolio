@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { NATURE_MODELS } from './natureManifest'
+import { patchReveal } from './patchReveal'
 
 // Loads the curated nature props once and caches them (Suspense-style). Each
 // model is reduced to a list of {geometry, material} "parts" with transforms
@@ -194,6 +195,7 @@ export function convertMaterial(src: THREE.Material): THREE.Material {
     }
   }
 
+  patchReveal(std)
   converted.set(src, std)
   return std
 }

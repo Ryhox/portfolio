@@ -5,6 +5,7 @@ import { NOOK, PATH_WAYPOINTS, REGIONS } from './layout'
 import { getSky } from './palette'
 import { getHeight } from './terrain'
 import { useWorld } from '../state/useWorld'
+import { patchReveal } from './patchReveal'
 
 function rng(seed: number) {
   let a = seed >>> 0
@@ -20,12 +21,12 @@ function rng(seed: number) {
 function Lantern({ pos }: { pos: [number, number, number] }) {
   const light = useRef<THREE.PointLight>(null!)
   const phase = useMemo(() => Math.random() * 6.28, [])
-  const glass = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb24d, emissiveIntensity: 0, toneMapped: false }),
-    [],
-  )
-  const post = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x5c4a3a, roughness: 0.8 }), [])
-  const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x2e2218, roughness: 0.85 }), [])
+  const glass = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb24d, emissiveIntensity: 0, toneMapped: false })
+    patchReveal(m); return m
+  }, [])
+  const post = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x5c4a3a, roughness: 0.8 }); patchReveal(m); return m }, [])
+  const dark = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x2e2218, roughness: 0.85 }); patchReveal(m); return m }, [])
   useFrame((state) => {
     const nf = getSky(useWorld.getState().t).nightFactor
     const flick = 0.85 + Math.sin(state.clock.elapsedTime * 7 + phase) * 0.15
@@ -85,11 +86,11 @@ function GlowMushrooms({
   light?: boolean
 }) {
   const lightRef = useRef<THREE.PointLight>(null!)
-  const cap = useMemo(
-    () => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0, roughness: 0.5, toneMapped: false }),
-    [color],
-  )
-  const stem = useMemo(() => new THREE.MeshStandardMaterial({ color: 0xe9e3d2, roughness: 0.9 }), [])
+  const cap = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0, roughness: 0.5, toneMapped: false })
+    patchReveal(m); return m
+  }, [color])
+  const stem = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0xe9e3d2, roughness: 0.9 }); patchReveal(m); return m }, [])
   const defs = useMemo(() => {
     const r = rng(seed)
     return Array.from({ length: count }, () => {

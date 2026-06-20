@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { TERRAIN_HALF, colorAt, getHeight } from './terrain'
+import { patchReveal } from './patchReveal'
 
 // Procedural landmass: a square grid displaced by getHeight and vertex-colored
 // by zone (underwater / sand / grass / rock). Smooth shading with a painterly
@@ -31,9 +32,13 @@ export function Island() {
     return g
   }, [])
 
+  const material = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0 })
+    patchReveal(m)
+    return m
+  }, [])
+
   return (
-    <mesh geometry={geometry} receiveShadow castShadow>
-      <meshStandardMaterial vertexColors roughness={0.96} metalness={0} />
-    </mesh>
+    <mesh geometry={geometry} receiveShadow castShadow material={material} />
   )
 }

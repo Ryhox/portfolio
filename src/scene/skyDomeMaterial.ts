@@ -23,6 +23,7 @@ const fragment = /* glsl */ `
   uniform float uTime;
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
+  uniform float uAlpha;
   varying vec3 vDir;
 
   // --- cheap value-noise fbm for the clouds ---
@@ -69,22 +70,37 @@ const fragment = /* glsl */ `
     col += uSunColor * pow(sd, 6.0) * uDayAmt * 0.55;
     col += uGlow * pow(sd, 2.0) * uGolden * 0.4;
 
-    // --- wispy cirrus clouds (day only) ---
+    // --- layered, voluminous clouds (day only) ---
     // Project the sky onto a plane; the natural horizon stretch makes the wisps
-    // converge toward the horizon. Anisotropic scale + drift = thin streaks.
-    vec2 sp = dir.xz / max(h, 0.12);
-    sp *= vec2(0.34, 0.9);
-    sp += uTime * vec2(0.012, 0.004);
-    float n = fbm(sp * 1.6 + 7.0);
-    float cover = smoothstep(0.52, 0.95, n);
-    float skyBand = smoothstep(0.04, 0.28, h);
-    float clouds = cover * skyBand * uDayAmt;
-    vec3 cloudCol = mix(vec3(1.0), uSunColor, 0.18);
-    // brighten the rim of clouds that face the sun a touch
-    cloudCol += uSunColor * pow(sd, 4.0) * 0.4;
-    col = mix(col, cloudCol, clamp(clouds, 0.0, 1.0) * 0.72);
+    // converge toward the horizon. Two layers (rounder low cumulus + thin high
+    // cirrus) drifting at different rates, with a shaded underside and sun-lit
+    // tops/rims so the puffs read as volume rather than flat fog.
+    float skyBand = smoothstep(0.02, 0.30, h);
+    vec2 base = dir.xz / max(h, 0.12);
+    vec2 sunProj = normalize(uSunDir.xz + vec2(1e-3));
 
-    gl_FragColor = vec4(col, 1.0);
+    // low cumulus — rounder, slower
+    vec2 sp1 = base * vec2(0.5, 0.85) + uTime * vec2(0.008, 0.0028);
+    float n1 = fbm(sp1 * 1.2 + 3.0);
+    float cumulus = smoothstep(0.55, 0.92, n1);
+    // sample a step toward the sun → lit top vs shadowed base (fake self-shadow)
+    float n1s = fbm((sp1 + sunProj * 0.28) * 1.2 + 3.0);
+    float lit = smoothstep(0.5, 0.95, n1s);
+
+    // high cirrus — thin, faster streaks
+    vec2 sp2 = base * vec2(0.32, 1.0) + uTime * vec2(0.02, 0.006);
+    float n2 = fbm(sp2 * 2.2 + 11.0);
+    float cirrus = smoothstep(0.6, 0.95, n2);
+
+    float clouds = (cumulus * 0.9 + cirrus * 0.5) * skyBand * uDayAmt;
+
+    vec3 cloudShadow = mix(uBottom * 1.05, vec3(1.0), 0.6); // sky-tinted underside
+    vec3 cloudLit = mix(vec3(1.0), uSunColor, 0.25);
+    vec3 cloudCol = mix(cloudShadow, cloudLit, clamp(lit + pow(sd, 2.0) * 0.5, 0.0, 1.0));
+    cloudCol += uSunColor * pow(sd, 4.0) * 0.5; // bright sun-facing rim
+    col = mix(col, cloudCol, clamp(clouds, 0.0, 1.0) * 0.8);
+
+    gl_FragColor = vec4(col, uAlpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -101,11 +117,13 @@ export function createSkyDomeMaterial() {
       uTime: { value: 0 },
       uSunDir: { value: new THREE.Vector3(0, 1, 0) },
       uSunColor: { value: new THREE.Color(0xfff4da) },
+      uAlpha: { value: 0 },
     },
     vertexShader: vertex,
     fragmentShader: fragment,
     side: THREE.BackSide,
     depthWrite: false,
     fog: false,
+    transparent: true,
   })
 }

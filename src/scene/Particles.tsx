@@ -6,6 +6,7 @@ import { getSky } from './palette'
 import { getHeight } from './terrain'
 import { WIND } from './loadNature'
 import { useWorld } from '../state/useWorld'
+import { WORLD_ALPHA, REVEAL_DIST, REVEAL_CENTER } from './revealUniforms'
 
 // Soft round sprite for every particle.
 function useDotTexture() {
@@ -42,6 +43,13 @@ function PointCloud({ count, center, area, color, size, mode, maxOpacity = 1, ad
   const points = useRef<THREE.Points>(null!)
   const mat = useRef<THREE.PointsMaterial>(null!)
 
+  // Distance from this cloud's center to the reveal ring origin — ring must
+  // sweep past this point before the cloud becomes visible.
+  const cloudDist = useMemo(() => {
+    const rc = REVEAL_CENTER.value
+    return Math.sqrt((center[0] - rc.x) ** 2 + (center[2] - rc.y) ** 2)
+  }, [center])
+
   const { geometry, base, phase } = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const base = new Float32Array(count * 3)
@@ -62,10 +70,13 @@ function PointCloud({ count, center, area, color, size, mode, maxOpacity = 1, ad
   }, [count, center, area])
 
   useFrame((state) => {
+    if (!useWorld.getState().worldVisible || REVEAL_DIST.value <= 0) { points.current.visible = false; return }
+    const ringReveal = THREE.MathUtils.smoothstep(REVEAL_DIST.value, cloudDist - 4, cloudDist + 6)
+    if (ringReveal <= 0.01) { points.current.visible = false; return }
     const s = getSky(useWorld.getState().t)
     const vis = mode === 'night' ? s.nightFactor : s.dayAmt
-    mat.current.opacity = vis * maxOpacity
-    points.current.visible = vis > 0.02
+    mat.current.opacity = vis * maxOpacity * WORLD_ALPHA.value * ringReveal
+    points.current.visible = vis > 0.02 && WORLD_ALPHA.value > 0.01
 
     if (points.current.visible) {
       const time = state.clock.elapsedTime
@@ -135,6 +146,11 @@ function FallingLeaves({
   const points = useRef<THREE.Points>(null!)
   const mat = useRef<THREE.PointsMaterial>(null!)
 
+  const cloudDist = useMemo(() => {
+    const rc = REVEAL_CENTER.value
+    return Math.sqrt((center[0] - rc.x) ** 2 + (center[1] - rc.y) ** 2)
+  }, [center])
+
   const data = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const bx = new Float32Array(count)
@@ -166,9 +182,12 @@ function FallingLeaves({
   }, [count, center, area, speed])
 
   useFrame((state, delta) => {
+    if (!useWorld.getState().worldVisible || REVEAL_DIST.value <= 0) { points.current.visible = false; return }
+    const ringReveal = THREE.MathUtils.smoothstep(REVEAL_DIST.value, cloudDist - 4, cloudDist + 6)
+    if (ringReveal <= 0.01) { points.current.visible = false; return }
     const s = getSky(useWorld.getState().t)
-    mat.current.opacity = 0.35 + s.dayAmt * 0.65
-    points.current.visible = s.dayAmt > 0.05
+    mat.current.opacity = (0.35 + s.dayAmt * 0.65) * WORLD_ALPHA.value * ringReveal
+    points.current.visible = s.dayAmt > 0.05 && WORLD_ALPHA.value > 0.01
     if (!points.current.visible) return
     const ws = WIND.strength.value
     const swayMul = 0.5 + ws // calmer or more tumbling with the wind

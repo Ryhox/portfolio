@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Mesh } from 'three'
+import type { Object3D } from 'three'
 
 // Time of day is normalized 0..1:
 //   0.00 = midnight   0.25 = sunrise   0.50 = noon   0.75 = sunset
@@ -22,7 +22,10 @@ export type WorldState = {
   volWaves: number
   volWind: number
   volAmbient: number
-  sunMesh: Mesh | null
+  sunMesh: Object3D | null
+  introProgress: number  // 0–1, tracks asset loading for the ring fill
+  introStep: number      // -1 idle | 0 loading complete | 1 clicked
+  worldVisible: boolean  // true once the ring starts expanding → fade-in sky/water/particles
   setT: (t: number) => void
   setPaused: (p: boolean) => void
   togglePaused: () => void
@@ -30,9 +33,12 @@ export type WorldState = {
   setLoaded: (b: boolean) => void
   setStarted: (s: boolean) => void
   toggleMuted: () => void
-  setSunMesh: (m: Mesh | null) => void
+  setSunMesh: (m: Object3D | null) => void
   setMenuOpen: (open: boolean) => void
   setVol: (key: VolKey, v: number) => void
+  setIntroProgress: (p: number) => void
+  setIntroStep: (s: number) => void
+  setWorldVisible: (v: boolean) => void
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
@@ -43,7 +49,7 @@ const VOL_KEY_MAP: Record<VolKey, keyof WorldState> = {
 }
 
 export const useWorld = create<WorldState>((set) => ({
-  t: 0.20,   // just before dawn — deep night
+  t: 0.33,   // morning (~8am) — the cozy idle mood; cycle resumes after start
   paused: true, // time is frozen until the player enters the world
   dayLengthSec: 140,
   loaded: false,
@@ -56,6 +62,9 @@ export const useWorld = create<WorldState>((set) => ({
   volWind: 0.5,
   volAmbient: 0.5,
   sunMesh: null,
+  introProgress: 0,
+  introStep: -1,
+  worldVisible: false,
   setT: (t) => set({ t: wrap01(t) }),
   setPaused: (paused) => set({ paused }),
   togglePaused: () => set((s) => ({ paused: !s.paused })),
@@ -66,6 +75,9 @@ export const useWorld = create<WorldState>((set) => ({
   setSunMesh: (sunMesh) => set({ sunMesh }),
   setMenuOpen: (menuOpen) => set({ menuOpen }),
   setVol: (key, v) => set({ [VOL_KEY_MAP[key]]: v } as Partial<WorldState>),
+  setIntroProgress: (introProgress) => set({ introProgress }),
+  setIntroStep: (introStep) => set({ introStep }),
+  setWorldVisible: (worldVisible) => set({ worldVisible }),
 }))
 
 // Mutable object GSAP can animate — drives the cinematic fly-in in Experience.tsx.

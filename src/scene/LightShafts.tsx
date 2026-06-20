@@ -66,26 +66,30 @@ export function LightShafts() {
   const shafts = useMemo(() => SPOTS.map(([x, z], i) => ({ x, y: getHeight(x, z), z, phase: i * 1.7 })), [])
   const mats = useMemo(
     () =>
-      shafts.map(
-        () =>
-          new THREE.MeshBasicMaterial({
-            map: tex,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            toneMapped: false,
-            fog: false,
-            side: THREE.DoubleSide,
-            color: new THREE.Color(0xfff0d6),
-            opacity: 0,
-          }),
-      ),
+      shafts.map(() => {
+        const m = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+          fog: false,
+          side: THREE.DoubleSide,
+          color: new THREE.Color(0xfff0d6),
+          opacity: 0,
+        })
+        // Clip to ring boundary but don't apply glow colour — shafts are
+        // additive overlays; baking glow into them doubles the effect.
+        ;(m as any).__revealGlowOff = true
+        return m
+      }),
     [tex, shafts],
   )
   const q = useMemo(() => new THREE.Quaternion(), [])
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), [])
 
   useFrame((state) => {
+    const started = useWorld.getState().started
     const s = getSky(useWorld.getState().t)
     // tilt every shaft to point up toward the sun (parallel light)
     q.setFromUnitVectors(up, s.sunDir)

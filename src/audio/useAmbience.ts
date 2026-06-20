@@ -1,4 +1,5 @@
 import { clamp01, smoothstep } from '../scene/palette'
+import { SWIM } from '../scene/swimState'
 
 // Procedural ambience — no audio files, generated entirely with the Web Audio
 // API and crossfaded by time of day:
@@ -15,6 +16,7 @@ let ctx: AudioContext | null = null
 let started = false
 
 let master: GainNode
+let lpf: BiquadFilterNode // master lowpass — swept down when underwater
 let gWaves: GainNode
 let gWind: GainNode
 let gCrickets: GainNode
@@ -235,8 +237,11 @@ export async function startAmbience(): Promise<void> {
 
   master = ctx.createGain()
   master.gain.value = 0.0
+  lpf = ctx.createBiquadFilter()
+  lpf.type = 'lowpass'
+  lpf.frequency.value = 20000 // open by default; closes when diving
   const comp = ctx.createDynamicsCompressor()
-  master.connect(comp).connect(ctx.destination)
+  master.connect(lpf).connect(comp).connect(ctx.destination)
 
   const mk = (v: number) => {
     const g = ctx!.createGain()
@@ -285,11 +290,15 @@ export function updateAmbience(t: number, muted: boolean, shoreAmt = 1, windStre
   const set = (g: GainNode, target: number) => {
     g.gain.value += (target - g.gain.value) * k
   }
-  set(gWaves, clamp01(shoreAmt) * 0.50 * _volWaves)
-  set(gWind, (0.018 + windStrength * 0.075) * (0.6 + 0.4 * dayAmt) * _volWind)
+  // Underwater muffle: roll the highs off the whole mix, duck the airy
+  // wind/birds, and let the low sea wash swell — sounds submerged.
+  const uw = clamp01(SWIM.depth)
+  if (lpf) lpf.frequency.value += (20000 - (20000 - 320) * uw - lpf.frequency.value) * 0.1
+  set(gWaves, clamp01(shoreAmt) * 0.5 * _volWaves * (1 + uw * 0.4))
+  set(gWind, (0.018 + windStrength * 0.075) * (0.6 + 0.4 * dayAmt) * _volWind * (1 - uw * 0.85))
   const cricketWave = Math.max(0, Math.sin(ctx.currentTime * 0.42))
-  set(gCrickets, nightAmt * 0.07 * cricketWave * _volAmbient)
-  set(gBirds, dayAmt * (0.7 + morning * 1.1) * _volAmbient)
+  set(gCrickets, nightAmt * 0.07 * cricketWave * _volAmbient * (1 - uw * 0.9))
+  set(gBirds, dayAmt * (0.7 + morning * 1.1) * _volAmbient * (1 - uw * 0.9))
   set(gMusic, 0.16 * _volMusic)
   master.gain.value += ((muted ? 0 : 0.9 * _volMaster) - master.gain.value) * 0.08
 }

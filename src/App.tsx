@@ -5,7 +5,11 @@ import { Experience } from './scene/Experience'
 import { LITE } from './scene/config'
 import { EscMenu } from './ui/EscMenu'
 import { Hud } from './ui/Hud'
-import { IntroOverlay } from './ui/IntroOverlay'
+import { IntroController } from './ui/intro/IntroController'
+import { IntroGrid } from './ui/intro/IntroGrid'
+import { IntroLabel } from './ui/intro/IntroLabel'
+import { LoadingScreen } from './ui/intro/LoadingScreen'
+import { WaterOverlay } from './ui/WaterOverlay'
 
 export default function App() {
   return (
@@ -14,15 +18,20 @@ export default function App() {
         shadows={LITE ? false : 'soft'}
         dpr={LITE ? 1 : [1, 2]}
         camera={{ fov: 60, near: 0.1, far: 2800, position: [100, 44, 0] }}
-        gl={{ antialias: true, toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.08 }}
+        gl={{ antialias: true, alpha: true, toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.08 }}
       >
+        {/* No <color> — canvas is transparent so CSS body #0c0a18 shows through */}
+        <IntroGrid />
         <Suspense fallback={null}>
           <Experience />
         </Suspense>
       </Canvas>
-      <IntroOverlay />
+      <LoadingScreen />
+      <IntroLabel />
+      <IntroController />
       <EscMenu />
       <Hud />
+      <WaterOverlay />
     </>
   )
 }

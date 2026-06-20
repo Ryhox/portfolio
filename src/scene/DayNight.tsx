@@ -6,6 +6,13 @@ import { getSky } from './palette'
 import { createSkyDomeMaterial } from './skyDomeMaterial'
 import { RIM, WIND, windStrengthAt } from './loadNature'
 import { useWorld } from '../state/useWorld'
+import { WORLD_ALPHA } from './revealUniforms'
+import { SWIM } from './swimState'
+
+// Reused temp so the per-frame underwater fog blend allocates nothing.
+const _fogTmp = new THREE.Color()
+// Bright, happy tropical-water tint for the underwater murk + light (not gloomy gray).
+const _AQUA = new THREE.Color(0x5fd4de)
 
 // All the sky & lighting. Reads time-of-day imperatively each frame and mutates
 // lights / sky / fog / moon / environment directly (no React re-renders for the
@@ -21,10 +28,62 @@ export function DayNight() {
   const amb = useRef<THREE.AmbientLight>(null!)
   const domeRef = useRef<THREE.Mesh>(null!)
   const starsRef = useRef<THREE.Points>(null!)
-  const moonMesh = useRef<THREE.Mesh>(null!)
-  const sunMesh = useRef<THREE.Mesh>(null!)
+  const moonMesh = useRef<THREE.Sprite>(null!)
+  const sunMesh = useRef<THREE.Sprite>(null!)
 
   const domeMat = useMemo(() => createSkyDomeMaterial(), [])
+
+  // Soft glowing sun disc (warm — recoloured each frame by the time-of-day sun
+  // colour, so it goes yellow at noon → deep orange at golden hour).
+  const sunTex = useMemo(() => {
+    const S = 128
+    const c = document.createElement('canvas')
+    c.width = c.height = S
+    const ctx = c.getContext('2d')!
+    const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2)
+    g.addColorStop(0, 'rgba(255,252,240,1)')
+    g.addColorStop(0.22, 'rgba(255,240,180,1)')
+    g.addColorStop(0.5, 'rgba(255,185,95,0.55)')
+    g.addColorStop(1, 'rgba(255,150,60,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, S, S)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [])
+
+  // Pale moon disc with a few soft craters.
+  const moonTex = useMemo(() => {
+    const S = 128
+    const c = document.createElement('canvas')
+    c.width = c.height = S
+    const ctx = c.getContext('2d')!
+    const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2)
+    g.addColorStop(0, 'rgba(248,250,255,1)')
+    g.addColorStop(0.6, 'rgba(228,234,252,1)')
+    g.addColorStop(0.9, 'rgba(200,210,240,0.6)')
+    g.addColorStop(1, 'rgba(200,210,240,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, S, S)
+    ctx.globalCompositeOperation = 'source-atop'
+    for (let i = 0; i < 7; i++) {
+      const a = Math.random() * Math.PI * 2
+      const r = Math.random() * S * 0.3
+      const cx = S / 2 + Math.cos(a) * r
+      const cy = S / 2 + Math.sin(a) * r
+      const rad = 2 + Math.random() * 7
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
+      cg.addColorStop(0, 'rgba(165,180,215,0.5)')
+      cg.addColorStop(1, 'rgba(165,180,215,0)')
+      ctx.fillStyle = cg
+      ctx.beginPath()
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [])
 
   // Procedural image-based lighting: a tiny scene holding a sky sphere (sharing
   // the dome material + uniforms) is captured into a PMREM environment map and
@@ -69,16 +128,24 @@ export function DayNight() {
     }
   }, [pmrem, scene])
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const t = useWorld.getState().t
     const started = useWorld.getState().started
+    const worldVisible = useWorld.getState().worldVisible
     const s = getSky(t)
 
-    // Keep crisp, high-resolution shadows where the viewer is looking: the sun's
-    // shadow camera follows the player (or the island centre during the intro
-    // orbit) while the light direction stays fixed.
-    const fx = started ? camera.position.x : 0
-    const fz = started ? camera.position.z : 0
+    // Quick fade-in for sky/horizon/particles so they're "present" almost at once
+    // (the water no longer fades — it's solid immediately — so keep everything else
+    // close behind to avoid a horizon seam); reset on dev reload
+    if (worldVisible) {
+      WORLD_ALPHA.value = Math.min(WORLD_ALPHA.value + delta / 1.2, 1)
+    } else {
+      WORLD_ALPHA.value = 0
+    }
+
+    // Shadow camera always follows wherever the viewer is — no hard switch at game start.
+    const fx = camera.position.x
+    const fz = camera.position.z
     sun.current.position.copy(s.sunDir).multiplyScalar(160)
     sun.current.position.x += fx
     sun.current.position.z += fz
@@ -98,12 +165,35 @@ export function DayNight() {
     amb.current.color.copy(s.ambColor)
     amb.current.intensity = s.ambIntensity
 
-    fog.color.copy(s.fog)
+    // Underwater: smoothly swap the airy haze for a dense blue-green murk as the
+    // eye dips below the surface (SWIM.depth ramps 0→1 just under the waterline).
+    const uw = THREE.MathUtils.clamp(THREE.MathUtils.smoothstep(SWIM.depth, -0.1, 1.0), 0, 1)
+    const under = uw > 0.5
+    // By DAY a bright, happy turquoise; by NIGHT a deep, moody night-water (the
+    // daytime aqua would look wrong in the dark), driven by sun elevation.
+    _fogTmp.copy(s.waterDeep).lerp(_AQUA, 0.15 + s.dayAmt * 0.55)
+    fog.color.copy(s.fog).lerp(_fogTmp, uw)
+    fog.near = 9 * (1 - uw) + 1.0 * uw
+    fog.far = 120 * (1 - uw) + (38 + s.dayAmt * 22) * uw // see further by day, murkier at night
+    // Fill the empty directions with the same water tone so you never see
+    // sky/stars through the water while diving (sky dome + stars hidden below).
+    if (under) scene.background = _fogTmp
+    else if (scene.background) scene.background = null
+    // Lift + cool the light underwater so the reef reads cheerful by day, while
+    // night stays only gently lifted (still dark and cozy).
+    if (uw > 0.001) {
+      const lift = 0.3 + s.dayAmt * 0.9
+      amb.current.intensity *= 1.0 + uw * lift
+      amb.current.color.lerp(_AQUA, uw * 0.45 * s.dayAmt)
+      hemi.current.intensity *= 1.0 + uw * lift * 0.7
+      hemi.current.color.lerp(_AQUA, uw * 0.4 * s.dayAmt)
+    }
 
     // Stylized sky-rim on solid props only (see loadNature.ts) — kept subtle.
     RIM.color.value.copy(s.hemiSky).lerp(s.sunColor, 0.3 + s.golden * 0.4)
     RIM.strength.value = (s.dayAmt * 0.5 + s.golden * 0.5) * 0.28
 
+    domeRef.current.visible = worldVisible && !under
     domeRef.current.position.copy(camera.position)
     const du = domeMat.uniforms
     du.uTop.value.copy(s.skyTop)
@@ -113,6 +203,7 @@ export function DayNight() {
     du.uTime.value = state.clock.elapsedTime
     du.uSunDir.value.copy(s.sunDir)
     du.uSunColor.value.copy(s.sunColor)
+    du.uAlpha.value = WORLD_ALPHA.value
 
     // Dynamic wind: the phase clock plus an overall strength that wanders
     // light→heavy over time. Strength feeds the (deliberately subtle) sway
@@ -133,7 +224,12 @@ export function DayNight() {
     const e = env.current
     e.frame++
     if (e.rt === null || (e.frame % 10 === 0 && Math.abs(t - e.lastT) > 0.004)) {
+      // Always capture PMREM with full sky opacity — keeps IBL consistent
+      // regardless of the WORLD_ALPHA fade-in, preventing a lighting pop at game start.
+      const savedAlpha = domeMat.uniforms.uAlpha.value
+      domeMat.uniforms.uAlpha.value = 1.0
       const next = pmrem.fromScene(envScene)
+      domeMat.uniforms.uAlpha.value = savedAlpha
       if (e.rt) e.rt.dispose()
       e.rt = next
       scene.environment = next.texture
@@ -143,20 +239,28 @@ export function DayNight() {
     // out of the grass; the sun + hemisphere do the heavy lifting.
     scene.environmentIntensity = 0.12 + s.dayAmt * 0.38
 
-    // stars fade in at night
-    const starMat = starsRef.current?.material as THREE.PointsMaterial | undefined
-    if (starMat) {
-      starMat.opacity = s.starsOpacity
-      starsRef.current.visible = s.starsOpacity > 0.02
+    // stars — fade in with world, hidden during intro
+    if (worldVisible) {
+      const starMat = starsRef.current?.material as THREE.PointsMaterial | undefined
+      if (starMat) {
+        starMat.opacity = s.starsOpacity * WORLD_ALPHA.value
+        starsRef.current.visible = !under && s.starsOpacity > 0.02 && WORLD_ALPHA.value > 0.01
+      }
+    } else if (starsRef.current) {
+      starsRef.current.visible = false
     }
 
-    // sun & moon billboards
-    sunMesh.current.position.copy(s.sunDir).multiplyScalar(420)
-    sunMesh.current.visible = s.sunDir.y > -0.1
-    ;(sunMesh.current.material as THREE.MeshBasicMaterial).color.copy(s.sunColor)
-
-    moonMesh.current.position.copy(s.moonDir).multiplyScalar(420)
-    moonMesh.current.visible = s.moonDir.y > -0.05
+    // sun & moon billboards — fade in with world
+    if (worldVisible && WORLD_ALPHA.value > 0.01) {
+      sunMesh.current.position.copy(s.sunDir).multiplyScalar(420)
+      sunMesh.current.visible = !under && s.sunDir.y > -0.1
+      ;(sunMesh.current.material as THREE.SpriteMaterial).color.copy(s.sunColor)
+      moonMesh.current.position.copy(s.moonDir).multiplyScalar(420)
+      moonMesh.current.visible = !under && s.moonDir.y > -0.05
+    } else {
+      sunMesh.current.visible = false
+      moonMesh.current.visible = false
+    }
   })
 
   return (
@@ -186,16 +290,14 @@ export function DayNight() {
       />
       <directionalLight ref={moon} />
 
-      {/* soft sun disc */}
-      <mesh ref={sunMesh}>
-        <sphereGeometry args={[18, 24, 24]} />
-        <meshBasicMaterial color={0xfff4da} toneMapped={false} fog={false} />
-      </mesh>
-      {/* moon */}
-      <mesh ref={moonMesh}>
-        <sphereGeometry args={[12, 24, 24]} />
-        <meshBasicMaterial color={0xeaf0ff} toneMapped={false} fog={false} />
-      </mesh>
+      {/* soft glowing sun disc (textured sprite, warm-tinted per time of day) */}
+      <sprite ref={sunMesh} scale={[92, 92, 1]}>
+        <spriteMaterial map={sunTex} color={0xfff4da} transparent depthWrite={false} toneMapped={false} fog={false} />
+      </sprite>
+      {/* pale cratered moon */}
+      <sprite ref={moonMesh} scale={[48, 48, 1]}>
+        <spriteMaterial map={moonTex} color={0xeaf0ff} transparent depthWrite={false} toneMapped={false} fog={false} />
+      </sprite>
     </>
   )
 }

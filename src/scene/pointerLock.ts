@@ -9,5 +9,13 @@ export function setLockFn(fn: (() => void) | null) {
 }
 
 export function requestLock() {
-  lockFn?.()
+  try {
+    lockFn?.()
+  } catch {
+    // Browser security: pointer lock can't be acquired immediately after exiting.
+    // Retry once after a short delay to clear the cooldown period.
+    setTimeout(() => {
+      try { lockFn?.() } catch { /* ignore */ }
+    }, 200)
+  }
 }
