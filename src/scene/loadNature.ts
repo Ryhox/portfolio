@@ -40,6 +40,9 @@ export const WIND = {
   // DayNight). Read by the audio bed and the falling leaves so everything swells
   // together.
   strength: { value: 0.4 },
+  // World-space player position; foliage near it bends away (set per-frame by the
+  // Player). Parked far off until the player spawns.
+  player: { value: new THREE.Vector3(9999, 0, 9999) },
   // ground cover: grass, flowers, ferns, clover, bushes (set per-frame from strength)
   gAmp: { value: 0.08 },
   gSpeed: { value: 1.2 },
@@ -52,16 +55,16 @@ export const WIND = {
   cFlat: { value: 0.5 },
 }
 
-// Overall wind strength as a smooth, organic function of time: layered waves at
-// irrational frequencies so it wanders from near-calm to gusty without an
-// obvious repeat. The mid band (~33s ≈ 5-6 in-game hours at the default day
-// length) gives the "shifts every few hours" feel the design calls for.
+// Overall wind strength as a smooth, organic function of time. Layered waves at
+// irrational frequencies keep it from repeating, but it's deliberately kept in a
+// narrow cozy band — it always reads as a gentle breeze and only drifts SLIGHTLY
+// (yet noticeably), never building into a strong gust.
 export function windStrengthAt(timeSec: number): number {
-  let w = 0.42
-  w += 0.3 * Math.sin(timeSec * 0.035 + 1.3) // very slow weather drift
-  w += 0.2 * Math.sin(timeSec * 0.19 + 4.1) // a new mood every ~33s
-  w += 0.1 * Math.sin(timeSec * 0.42 + 0.7) // shorter gusts
-  return w < 0 ? 0 : w > 0.62 ? 0.62 : w
+  let w = 0.3
+  w += 0.06 * Math.sin(timeSec * 0.035 + 1.3) // very slow weather drift
+  w += 0.04 * Math.sin(timeSec * 0.19 + 4.1) // a new mood every ~33s
+  w += 0.03 * Math.sin(timeSec * 0.42 + 0.7) // shorter gusts
+  return w < 0.18 ? 0.18 : w > 0.4 ? 0.4 : w
 }
 
 let cache: NatureMap | null = null
@@ -124,6 +127,11 @@ export function convertMaterial(src: THREE.Material): THREE.Material {
       shader.uniforms.uWindSpeed = canopy ? WIND.cSpeed : WIND.gSpeed
       shader.uniforms.uWindFlutter = canopy ? WIND.cFlutter : WIND.gFlutter
       shader.uniforms.uFlatten = canopy ? WIND.cFlat : WIND.gFlat
+      shader.uniforms.uPlayer = WIND.player
+      // Ground cover gets strongly shoved aside within a generous radius so it's
+      // obviously parting around you in first person; canopies only nudge.
+      shader.uniforms.uPushRadius = { value: canopy ? 1.4 : 3.0 }
+      shader.uniforms.uPushAmt = { value: canopy ? 0.2 : 1.3 }
 
       // Wind sway (vertex). Phase varies per instance (its world XZ) so the field
       // ripples rather than sways in lockstep; a slow gust swells the strength.
@@ -135,6 +143,7 @@ export function convertMaterial(src: THREE.Material): THREE.Material {
             'attribute float aSway;',
             'uniform float uWindTime; uniform float uWindAmp; uniform float uWindSpeed;',
             'uniform float uWindFlutter; uniform vec2 uWindDir;',
+            'uniform vec3 uPlayer; uniform float uPushRadius; uniform float uPushAmt;',
           ].join('\n'),
         )
         .replace(
@@ -155,6 +164,14 @@ export function convertMaterial(src: THREE.Material): THREE.Material {
             '  float _fl = sin(uWindTime * 7.0 + position.x * 5.0 + position.y * 3.0);',
             '  transformed.x += _fl * uWindFlutter * aSway;',
             '  transformed.z += _fl * uWindFlutter * aSway * 0.6;',
+            // Player push: bend the tips away from the player when they walk through.
+            '  vec2 _toP = _iw.xz - uPlayer.xz;',
+            '  float _pd = length(_toP);',
+            '  float _pf = 1.0 - clamp(_pd / uPushRadius, 0.0, 1.0);',
+            '  _pf *= _pf;',
+            '  vec2 _pdir = _pd > 0.001 ? _toP / _pd : vec2(0.0);',
+            '  transformed.x += _pdir.x * _pf * uPushAmt * aSway;',
+            '  transformed.z += _pdir.y * _pf * uPushAmt * aSway;',
             '}',
           ].join('\n'),
         )

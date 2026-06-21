@@ -38,6 +38,9 @@ export function Water() {
     u.uSky.value.copy(s.skyBottom)
     u.uSunDir.value.copy(s.sunDir)
     u.uSunColor.value.copy(s.sunColor)
+    // night sky / star reflection (fades in with the stars)
+    u.uNight.value = s.starsOpacity
+    u.uMoonDir.value.copy(s.moonDir)
 
     // live ripple field — RippleSim swaps RIPPLE.texture each frame
     u.uRipple.value = RIPPLE.texture

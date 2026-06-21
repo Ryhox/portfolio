@@ -62,6 +62,9 @@ const fragment = /* glsl */ `
   uniform vec3 uSky;
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
+  uniform float uNight;     // 0 by day -> 1 at full night (drives sky/star reflection)
+  uniform vec3 uMoonDir;
+  uniform vec3 uMoonColor;
   uniform sampler2D uRipple;
   uniform float uRippleOn;
   uniform vec4 uRocks[${SEA_ROCK_MAX}];
@@ -159,6 +162,16 @@ const fragment = /* glsl */ `
     float glint = pow(max(dot(N, H), 0.0), 60.0);
     col += uSunColor * glint * 0.35;
 
+    // --- night: reflected starfield + a soft shimmering moonpath on the swell ---
+    // Only on the top side (1 - uUnder) and only after dark (uNight).
+    float nightSurf = uNight * (1.0 - uUnder);
+    if (nightSurf > 0.01) {
+      // moonpath: a soft specular toward the moon, the night cousin of the sun sheen
+      vec3 Hm = normalize(uMoonDir + V);
+      float mglint = pow(max(dot(N, Hm), 0.0), 70.0);
+      col += uMoonColor * mglint * nightSurf * 0.6;
+    }
+
     // underside look (smoothly blended via uUnder when the eye is below water)
     if (uUnder > 0.001) {
       float graze = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 2.0);
@@ -193,6 +206,9 @@ export function createWaterMaterial() {
       uSky: { value: new THREE.Color(0xcdeaf7) },
       uSunDir: { value: new THREE.Vector3(0, 1, 0) },
       uSunColor: { value: new THREE.Color(0xfff4da) },
+      uNight: { value: 0 },
+      uMoonDir: { value: new THREE.Vector3(0, 1, 0) },
+      uMoonColor: { value: new THREE.Color(0xc4d2ff) },
       uRipple: { value: RIPPLE.texture },
       uRippleCenter: { value: RIPPLE.center },
       uRippleSize: { value: RIPPLE.size },

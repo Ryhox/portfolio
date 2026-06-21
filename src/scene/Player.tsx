@@ -1,17 +1,17 @@
-import { PointerLockControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useWorld } from '../state/useWorld'
 import { smoothstep } from './palette'
 import { buildColliders, buildSteps } from './placement'
-import { setLockFn } from './pointerLock'
+import { setLockFn, requestLock } from './pointerLock'
 import { WATER_LEVEL, getHeight } from './terrain'
 import { waveHeight } from './oceanWave'
 import { seabedHeight } from './seabedField'
 import { SWIM } from './swimState'
 import { addRipple } from './rippleField'
 import { SEA_ROCKS } from './seaRocks'
+import { WIND } from './loadNature'
 
 const EYE = 1.7 // eye height above ground when walking
 const SWIM_EYE = 0.5 // eye height above the water surface when floating
@@ -27,14 +27,20 @@ const BUOY = 0.2 // gentle float back toward the surface when not swimming down
 // floating on the swell. While swimming you move along your GAZE — look down and
 // swim to dive, look up and swim to surface (no dive keys). Reads the shared
 // oceanWave field so the float matches the visible waves.
+// Mouse-look sensitivity (matches three's PointerLockControls default) and the
+// pitch clamp just shy of straight up/down.
+const LOOK_SENS = 0.002
+const PITCH_LIMIT = Math.PI / 2 - 0.02
+
 export function Player() {
   const camera = useThree((s) => s.camera)
-  const controls = useRef<any>(null)
+  const gl = useThree((s) => s.gl)
   const keys = useRef<Record<string, boolean>>({})
   const bobT = useRef(0)
   const wadeAmt = useRef(0)
   const rippleClock = useRef(0)
   const started = useWorld((s) => s.started)
+  const menuOpen = useWorld((s) => s.menuOpen)
   const colliders = useMemo(() => buildColliders(), [])
   const steps = useMemo(() => buildSteps(), [])
 
@@ -43,12 +49,20 @@ export function Player() {
   const right = useRef(new THREE.Vector3())
   const move = useRef(new THREE.Vector3())
 
+  // Custom first-person look state (replaces drei PointerLockControls so we can
+  // honour the Invert X / Invert Y toggles, which it has no option for).
+  const yaw = useRef(0)
+  const pitch = useRef(0)
+  const euler = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
+
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
+      // Ignore movement input entirely while the settings sheet is open.
+      if (useWorld.getState().menuOpen) return
       keys.current[e.code] = true
-      if (useWorld.getState().started && !document.pointerLockElement) {
+      if (useWorld.getState().started && document.pointerLockElement !== gl.domElement) {
         if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-          controls.current?.lock?.()
+          requestLock()
         }
       }
     }
@@ -59,13 +73,61 @@ export function Player() {
       window.removeEventListener('keydown', dn)
       window.removeEventListener('keyup', up)
     }
-  }, [])
+  }, [gl])
 
-  // Let the Enter button request pointer lock within its click gesture.
+  // Pointer-lock look controller: requestLock() locks the canvas; mouse movement
+  // (only while locked, playing, and the menu is closed) drives yaw/pitch with the
+  // invert flags applied. A canvas click re-locks (e.g. after closing the menu).
   useEffect(() => {
-    setLockFn(() => controls.current?.lock?.())
-    return () => setLockFn(null)
-  }, [])
+    const canvas = gl.domElement
+    setLockFn(() => {
+      const r = canvas.requestPointerLock() as unknown as Promise<void> | undefined
+      if (r && typeof r.catch === 'function') r.catch(() => {})
+    })
+
+    const onMove = (e: MouseEvent) => {
+      if (document.pointerLockElement !== canvas) return
+      const ws = useWorld.getState()
+      if (!ws.started || ws.menuOpen) return
+      yaw.current   -= e.movementX * LOOK_SENS * (ws.invertX ? -1 : 1)
+      pitch.current -= e.movementY * LOOK_SENS * (ws.invertY ? -1 : 1)
+      pitch.current = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch.current))
+      euler.set(pitch.current, yaw.current, 0)
+      camera.quaternion.setFromEuler(euler)
+    }
+    const onClick = () => {
+      const ws = useWorld.getState()
+      if (ws.started && !ws.menuOpen && document.pointerLockElement !== canvas) requestLock()
+    }
+
+    document.addEventListener('mousemove', onMove)
+    canvas.addEventListener('click', onClick)
+    return () => {
+      setLockFn(null)
+      document.removeEventListener('mousemove', onMove)
+      canvas.removeEventListener('click', onClick)
+    }
+  }, [gl, camera, euler])
+
+  // Drop any held keys when the sheet opens so the camera doesn't keep gliding.
+  useEffect(() => {
+    if (menuOpen) keys.current = {}
+  }, [menuOpen])
+
+  // Cursor follows the *real* lock state, not the menu state: it stays visible
+  // through the browser's ~1.25s re-lock cooldown after ESC (so you always have a
+  // working cursor to click and resume) and only hides once we're actually locked.
+  useEffect(() => {
+    const sync = () => {
+      document.body.style.cursor = document.pointerLockElement === gl.domElement ? 'none' : ''
+    }
+    document.addEventListener('pointerlockchange', sync)
+    sync()
+    return () => {
+      document.removeEventListener('pointerlockchange', sync)
+      document.body.style.cursor = ''
+    }
+  }, [gl])
 
   // Spawn on the south beach looking north toward the hill.
   useEffect(() => {
@@ -75,10 +137,16 @@ export function Player() {
     const spawnY = Math.max(getHeight(spawnX, spawnZ), 0.15) + EYE
     camera.position.set(spawnX, spawnY, spawnZ)
     camera.lookAt(0, 3, 0)
-  }, [started, camera])
+    // Seed the look controller's yaw/pitch from the spawn orientation so the first
+    // mouse move continues smoothly instead of snapping.
+    euler.setFromQuaternion(camera.quaternion)
+    yaw.current = euler.y
+    pitch.current = euler.x
+  }, [started, camera, euler])
 
   useFrame((state, dtRaw) => {
-    if (!useWorld.getState().started) return
+    const ws = useWorld.getState()
+    if (!ws.started || ws.menuOpen) return // freeze movement while the menu is up
     const dt = Math.min(dtRaw, 0.05)
     const time = state.clock.elapsedTime
     const k = keys.current
@@ -182,12 +250,19 @@ export function Player() {
       camera.position.y += (targetY - camera.position.y) * Math.min(1, dt * settle)
     }
 
+    // Feed the player position to the foliage shader so grass/ferns bend away.
+    WIND.player.value.copy(camera.position)
+
     // --- publish swim state ---
     SWIM.wadeAmt = ww
     SWIM.inWater = inWater
     SWIM.surfaceY = surfaceY
-    SWIM.depth = Math.max(0, WATER_LEVEL - camera.position.y)
-    SWIM.underwater = camera.position.y < WATER_LEVEL - 0.1
+    // Depth is measured against the ACTUAL wavy surface at the player (not the
+    // flat water level), so the underwater murk/fog tracks exactly when the eye
+    // dips under a passing swell — no clear-water gap or fog-on-the-sky while
+    // straddling the surface.
+    SWIM.depth = Math.max(0, surfaceY - camera.position.y)
+    SWIM.underwater = camera.position.y < surfaceY - 0.1
 
     // Swimming stirs the ripple field.
     if (inWater && (moving || ww > 0.5)) {
@@ -199,5 +274,5 @@ export function Player() {
     }
   })
 
-  return <PointerLockControls ref={controls} makeDefault selector="canvas" />
+  return null
 }

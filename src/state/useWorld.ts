@@ -8,6 +8,8 @@ import type { Object3D } from 'three'
 // useFrame (no React re-render). UI that needs to display the time subscribes
 // through the hook as usual.
 export type VolKey = 'master' | 'music' | 'waves' | 'wind' | 'ambient'
+export type Quality = 'Low' | 'Medium' | 'High'
+export const QUALITY_ORDER: Quality[] = ['Low', 'Medium', 'High']
 
 export type WorldState = {
   t: number
@@ -17,6 +19,9 @@ export type WorldState = {
   started: boolean
   muted: boolean
   menuOpen: boolean
+  quality: Quality
+  invertX: boolean
+  invertY: boolean
   volMaster: number
   volMusic: number
   volWaves: number
@@ -35,6 +40,8 @@ export type WorldState = {
   toggleMuted: () => void
   setSunMesh: (m: Object3D | null) => void
   setMenuOpen: (open: boolean) => void
+  cycleQuality: () => void
+  toggleInvert: (axis: 'x' | 'y') => void
   setVol: (key: VolKey, v: number) => void
   setIntroProgress: (p: number) => void
   setIntroStep: (s: number) => void
@@ -56,6 +63,9 @@ export const useWorld = create<WorldState>((set) => ({
   started: false,
   muted: false,
   menuOpen: false,
+  quality: 'High',
+  invertX: false,
+  invertY: false,
   volMaster: 1,
   volMusic: 0.5,
   volWaves: 0.5,
@@ -74,6 +84,12 @@ export const useWorld = create<WorldState>((set) => ({
   toggleMuted: () => set((s) => ({ muted: !s.muted })),
   setSunMesh: (sunMesh) => set({ sunMesh }),
   setMenuOpen: (menuOpen) => set({ menuOpen }),
+  cycleQuality: () =>
+    set((s) => ({
+      quality: QUALITY_ORDER[(QUALITY_ORDER.indexOf(s.quality) + 1) % QUALITY_ORDER.length],
+    })),
+  toggleInvert: (axis) =>
+    set((s) => (axis === 'x' ? { invertX: !s.invertX } : { invertY: !s.invertY })),
   setVol: (key, v) => set({ [VOL_KEY_MAP[key]]: v } as Partial<WorldState>),
   setIntroProgress: (introProgress) => set({ introProgress }),
   setIntroStep: (introStep) => set({ introStep }),

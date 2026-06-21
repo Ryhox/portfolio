@@ -281,7 +281,29 @@ export function buildColliders(): Collider[] {
     else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: base * it.scale })
   }
+  // The path lamps are solid posts you bump into.
+  for (const s of buildLampSpots()) out.push({ x: s.x, z: s.z, r: 0.4 })
   return out
+}
+
+// Where the path lamps stand — shared by the renderer (GlowProps) and the
+// collision system so they line up exactly. Spaced along the same trail curve.
+const LAMP_US = [0.16, 0.4, 0.64, 0.85]
+const LAMP_OFFSET = 1.5
+export function buildLampSpots(): { x: number; y: number; z: number }[] {
+  const curve = new THREE.CatmullRomCurve3(
+    PATH_WAYPOINTS.map((w) => new THREE.Vector3(w.x, 0, w.z)),
+    false,
+    'catmullrom',
+    0.5,
+  )
+  return LAMP_US.map((u) => {
+    const p = curve.getPoint(u)
+    const tan = curve.getTangent(u)
+    const x = p.x + -tan.z * LAMP_OFFSET
+    const z = p.z + tan.x * LAMP_OFFSET
+    return { x, y: getHeight(x, z), z }
+  })
 }
 
 // Low, solid props (the path stones and the shore pebbles) read as gentle steps

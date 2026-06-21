@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { Suspense, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { updateAmbience } from '../audio/useAmbience'
 import { patchReveal } from './patchReveal'
@@ -54,6 +54,20 @@ function RevealPatcher() {
       }
     })
   })
+  return null
+}
+
+// Live render-resolution control tied to the graphics quality setting. Lower
+// quality renders at a lower pixel ratio (cheaper, softer); High uses the device
+// ratio capped at 2 — matching the Canvas default.
+function QualityDPR() {
+  const setDpr  = useThree((s) => s.setDpr)
+  const quality = useWorld((s) => s.quality)
+  useEffect(() => {
+    const cap = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 2
+    const dpr = quality === 'Low' ? 1 : quality === 'Medium' ? 1.5 : cap
+    setDpr(dpr)
+  }, [quality, setDpr])
   return null
 }
 
@@ -146,6 +160,7 @@ export function Experience() {
   return (
     <>
       <RevealPatcher />
+      <QualityDPR />
       <TimeDriver />
       <CinematicCamera />
       <Player />

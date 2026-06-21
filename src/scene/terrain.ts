@@ -65,7 +65,7 @@ export function getHeight(x: number, z: number): number {
   const hillGauss = Math.exp(-(dHill * dHill) / (2 * (HEART.r * 0.6) ** 2))
   const hillShape = Math.min(hillGauss * 1.5, 1.0)
   macro += hillShape * HEART.height * (0.45 + 0.55 * mask)
-  macro -= smoothstep(0.9, 1.5, edge) * 18 // seabed
+  macro -= smoothstep(0.9, 1.5, edge) * 26 // plunge below the seabed dunes so the open-water floor covers the island edge
 
   // --- detail: rolling bumps, smoothed out in cleared areas ---
   const onPath = smoothstep(7.0, 3.0, distToPath(x, z))

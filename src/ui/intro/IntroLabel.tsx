@@ -8,43 +8,18 @@ const isTouch =
   typeof window !== 'undefined' &&
   (window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window)
 
-// Subtle opacity breathe on the prompt (stays prominent) + a hover lift on the
-// mute icon. No glow, no blur.
+// Subtle opacity breathe on the prompt (stays prominent). No glow, no blur.
 const CSS = `
 @keyframes introPromptPulse {
   0%, 100% { opacity: 0.78; }
   50%      { opacity: 1;    }
 }
-.intro-mute { transition: opacity 0.15s ease, transform 0.15s ease; }
-.intro-mute:hover { opacity: 0.95 !important; transform: scale(1.08); }
 `
-
-function SpeakerIcon({ muted }: { muted: boolean }) {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-      {muted ? (
-        <>
-          <line x1="22" y1="9" x2="16" y2="15" />
-          <line x1="16" y1="9" x2="22" y2="15" />
-        </>
-      ) : (
-        <>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-        </>
-      )}
-    </svg>
-  )
-}
 
 export function IntroLabel() {
   const outerRef    = useRef<HTMLDivElement>(null) // GSAP owns the entrance here
   const tiltRef     = useRef<HTMLDivElement>(null) // rAF owns the parallax transform here
-  const muted       = useWorld((s) => s.muted)
   const started     = useWorld((s) => s.started)
-  const toggleMuted = useWorld((s) => s.toggleMuted)
 
   // Start hidden + slightly low so the entrance is a quick rise-in.
   useEffect(() => {
@@ -98,18 +73,6 @@ export function IntroLabel() {
           <h1 style={sTitle}>WELCOME</h1>
           <div style={sDivider} />
           <div style={sPrompt}>{isTouch ? 'TAP ANYWHERE TO BEGIN' : 'CLICK ANYWHERE TO BEGIN'}</div>
-
-          <button
-            className="intro-mute"
-            style={sMute}
-            aria-label={muted ? 'Unmute sound' : 'Mute sound'}
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleMuted()
-            }}
-          >
-            <SpeakerIcon muted={muted} />
-          </button>
         </div>
       </div>
     </div>
@@ -117,7 +80,6 @@ export function IntroLabel() {
 }
 
 const NUNITO = "'Nunito', system-ui, sans-serif"
-const WARM    = '#f5e3bf' // warm gold — used for the mute icon
 const BRIGHT  = '#fff7ea' // bright warm white — the call to action
 const LEGIBLE = '0 1px 3px rgba(35,20,8,0.45)' // tight dark shadow for contrast, not a glow
 
@@ -172,17 +134,4 @@ const sPrompt: CSSProperties = {
   color: BRIGHT,
   textShadow: LEGIBLE,
   animation: 'introPromptPulse 2.4s ease-in-out infinite',
-}
-
-const sMute: CSSProperties = {
-  appearance: 'none',
-  background: 'none',
-  border: 'none',
-  marginTop: 20,
-  padding: 6,
-  lineHeight: 0,
-  color: WARM,
-  opacity: 0.6,
-  cursor: 'pointer',
-  pointerEvents: 'auto', // opt back in over the click-through container
 }

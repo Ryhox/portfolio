@@ -3,8 +3,8 @@ import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Experience } from './scene/Experience'
 import { LITE } from './scene/config'
+import { Brand } from './ui/Brand'
 import { EscMenu } from './ui/EscMenu'
-import { Hud } from './ui/Hud'
 import { IntroController } from './ui/intro/IntroController'
 import { IntroGrid } from './ui/intro/IntroGrid'
 import { IntroLabel } from './ui/intro/IntroLabel'
@@ -30,7 +30,7 @@ export default function App() {
       <IntroLabel />
       <IntroController />
       <EscMenu />
-      <Hud />
+      <Brand />
       <WaterOverlay />
     </>
   )

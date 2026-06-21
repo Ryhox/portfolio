@@ -13,6 +13,9 @@ import { SWIM } from './swimState'
 const _fogTmp = new THREE.Color()
 // Bright, happy tropical-water tint for the underwater murk + light (not gloomy gray).
 const _AQUA = new THREE.Color(0x5fd4de)
+// Warm golden-hour wash so the underwater murk picks up sunrise/sunset light
+// instead of staying a clashing blue while everything above is orange.
+const _GOLD = new THREE.Color(0xff8a44)
 
 // All the sky & lighting. Reads time-of-day imperatively each frame and mutates
 // lights / sky / fog / moon / environment directly (no React re-renders for the
@@ -166,19 +169,21 @@ export function DayNight() {
     amb.current.intensity = s.ambIntensity
 
     // Underwater: smoothly swap the airy haze for a dense blue-green murk as the
-    // eye dips below the surface (SWIM.depth ramps 0→1 just under the waterline).
-    const uw = THREE.MathUtils.clamp(THREE.MathUtils.smoothstep(SWIM.depth, -0.1, 1.0), 0, 1)
-    const under = uw > 0.5
+    // eye dips below the surface. Depth is now measured against the real wavy
+    // surface (see Player.tsx), so this ramp lines up with what you actually see
+    // crossing the waterline — a quick but smooth 0→1 over the first ~0.6m down.
+    const uw = THREE.MathUtils.clamp(THREE.MathUtils.smoothstep(SWIM.depth, 0.0, 0.6), 0, 1)
     // By DAY a bright, happy turquoise; by NIGHT a deep, moody night-water (the
     // daytime aqua would look wrong in the dark), driven by sun elevation.
     _fogTmp.copy(s.waterDeep).lerp(_AQUA, 0.15 + s.dayAmt * 0.55)
+    _fogTmp.lerp(_GOLD, s.golden * 0.4) // warm the murk at sunrise/sunset
     fog.color.copy(s.fog).lerp(_fogTmp, uw)
     fog.near = 9 * (1 - uw) + 1.0 * uw
     fog.far = 120 * (1 - uw) + (38 + s.dayAmt * 22) * uw // see further by day, murkier at night
-    // Fill the empty directions with the same water tone so you never see
-    // sky/stars through the water while diving (sky dome + stars hidden below).
-    if (under) scene.background = _fogTmp
-    else if (scene.background) scene.background = null
+    // The sky dome itself dissolves into this same murk (uUnder below), so we no
+    // longer hard-hide it or swap scene.background — that hard switch was what
+    // made the surface straddle pop (clear sky one frame, flat murk the next).
+    if (scene.background) scene.background = null
     // Lift + cool the light underwater so the reef reads cheerful by day, while
     // night stays only gently lifted (still dark and cozy).
     if (uw > 0.001) {
@@ -193,7 +198,7 @@ export function DayNight() {
     RIM.color.value.copy(s.hemiSky).lerp(s.sunColor, 0.3 + s.golden * 0.4)
     RIM.strength.value = (s.dayAmt * 0.5 + s.golden * 0.5) * 0.28
 
-    domeRef.current.visible = worldVisible && !under
+    domeRef.current.visible = worldVisible
     domeRef.current.position.copy(camera.position)
     const du = domeMat.uniforms
     du.uTop.value.copy(s.skyTop)
@@ -204,6 +209,8 @@ export function DayNight() {
     du.uSunDir.value.copy(s.sunDir)
     du.uSunColor.value.copy(s.sunColor)
     du.uAlpha.value = WORLD_ALPHA.value
+    du.uUnder.value = uw
+    du.uUnderColor.value.copy(_fogTmp)
 
     // Dynamic wind: the phase clock plus an overall strength that wanders
     // light→heavy over time. Strength feeds the (deliberately subtle) sway
@@ -214,11 +221,11 @@ export function DayNight() {
     const ws = windStrengthAt(et)
     WIND.strength.value = ws
     WIND.gAmp.value = 0.02 + ws * 0.13
-    WIND.gSpeed.value = 0.9 + ws * 0.8
-    WIND.gFlutter.value = 0.015 + ws * 0.05
+    WIND.gSpeed.value = 0.5 + ws * 0.35   // slower, gentler grass sway
+    WIND.gFlutter.value = 0.012 + ws * 0.035
     WIND.cAmp.value = 0.06 + ws * 0.34
-    WIND.cSpeed.value = 0.6 + ws * 0.5
-    WIND.cFlutter.value = 0.05 + ws * 0.13
+    WIND.cSpeed.value = 0.32 + ws * 0.28  // slower canopy sway
+    WIND.cFlutter.value = 0.04 + ws * 0.08
 
     // Refresh the IBL environment when the sky has shifted enough.
     const e = env.current
@@ -239,24 +246,26 @@ export function DayNight() {
     // out of the grass; the sun + hemisphere do the heavy lifting.
     scene.environmentIntensity = 0.12 + s.dayAmt * 0.38
 
-    // stars — fade in with world, hidden during intro
+    // stars — fade in with world, hidden during intro; fade out as you dive
     if (worldVisible) {
       const starMat = starsRef.current?.material as THREE.PointsMaterial | undefined
       if (starMat) {
-        starMat.opacity = s.starsOpacity * WORLD_ALPHA.value
-        starsRef.current.visible = !under && s.starsOpacity > 0.02 && WORLD_ALPHA.value > 0.01
+        starMat.opacity = s.starsOpacity * WORLD_ALPHA.value * (1 - uw)
+        starsRef.current.visible = uw < 0.99 && s.starsOpacity > 0.02 && WORLD_ALPHA.value > 0.01
       }
     } else if (starsRef.current) {
       starsRef.current.visible = false
     }
 
-    // sun & moon billboards — fade in with world
+    // sun & moon billboards — fade in with world; fade out smoothly as you dive
     if (worldVisible && WORLD_ALPHA.value > 0.01) {
       sunMesh.current.position.copy(s.sunDir).multiplyScalar(420)
-      sunMesh.current.visible = !under && s.sunDir.y > -0.1
+      sunMesh.current.visible = uw < 0.99 && s.sunDir.y > -0.1
       ;(sunMesh.current.material as THREE.SpriteMaterial).color.copy(s.sunColor)
+      ;(sunMesh.current.material as THREE.SpriteMaterial).opacity = 1 - uw
       moonMesh.current.position.copy(s.moonDir).multiplyScalar(420)
-      moonMesh.current.visible = !under && s.moonDir.y > -0.05
+      moonMesh.current.visible = uw < 0.99 && s.moonDir.y > -0.05
+      ;(moonMesh.current.material as THREE.SpriteMaterial).opacity = 1 - uw
     } else {
       sunMesh.current.visible = false
       moonMesh.current.visible = false

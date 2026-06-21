@@ -1,9 +1,11 @@
 import { useFrame } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { NOOK, PATH_WAYPOINTS, REGIONS } from './layout'
+import { NOOK, REGIONS } from './layout'
 import { getSky } from './palette'
 import { getHeight } from './terrain'
+import { buildLampSpots } from './placement'
 import { useWorld } from '../state/useWorld'
 import { patchReveal } from './patchReveal'
 
@@ -17,53 +19,114 @@ function rng(seed: number) {
   }
 }
 
-// A chunky low-poly street lamp — square post with a prominent lantern head.
-function Lantern({ pos }: { pos: [number, number, number] }) {
+// Target world-space height for the lamp model. The GLB is auto-scaled to this
+// regardless of its native units, then its base is dropped flush to the ground.
+const LAMP_HEIGHT = 3.4
+const LAMP_WARM = new THREE.Color(0xffb86a)
+
+// Stylized lamp model — replaces the old box-built lantern. Auto-scaled from its
+// own bounding box so it stands LAMP_HEIGHT tall, base on the ground. Each
+// instance gets its own cloned materials so they can glow independently: every
+// material emits in its own (warm-shifted) color, scaled by the night factor, so
+// the light shade blazes at night while the dark post barely glows. A warm point
+// light near the head matches the old lantern's pool of light.
+const lum = (c: THREE.Color) => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+
+function Lamp({ pos }: { pos: [number, number, number] }) {
+  const { scene } = useGLTF('/models/stylized_lamp.glb')
   const light = useRef<THREE.PointLight>(null!)
   const phase = useMemo(() => Math.random() * 6.28, [])
-  const glass = useMemo(() => {
-    const m = new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb24d, emissiveIntensity: 0, toneMapped: false })
-    patchReveal(m); return m
-  }, [])
-  const post = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x5c4a3a, roughness: 0.8 }); patchReveal(m); return m }, [])
-  const dark = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x2e2218, roughness: 0.85 }); patchReveal(m); return m }, [])
+  const glowMats = useRef<THREE.MeshStandardMaterial[]>([])
+
+  const { model, lightPos } = useMemo(() => {
+    const root = scene.clone(true)
+    root.updateMatrixWorld(true)
+    const size = new THREE.Vector3()
+    new THREE.Box3().setFromObject(root).getSize(size)
+    root.scale.setScalar(LAMP_HEIGHT / (size.y || 1))
+    root.updateMatrixWorld(true)
+
+    // Recompute at final scale to seat the base on the ground and centre it.
+    const box = new THREE.Box3().setFromObject(root)
+    const center = new THREE.Vector3()
+    box.getCenter(center)
+    root.position.set(-center.x, -box.min.y, -center.z)
+    root.updateMatrixWorld(true)
+
+    // First pass: clone+patch every material and find the brightest one — the
+    // lantern glass/shade. Only that part glows (not the dark post).
+    type Hit = { mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial }
+    const hits: Hit[] = []
+    let maxLum = 0
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!(mesh as { isMesh?: boolean }).isMesh) return
+      mesh.castShadow = true
+      // Build a FRESH MeshStandardMaterial (rather than cloning the GLB's) so the
+      // reveal patch reliably takes — cloned materials can skip the shader patch
+      // and pop in unmasked during the intro sweep.
+      const apply = (src: THREE.Material) => {
+        const s = src as THREE.MeshStandardMaterial
+        const m = new THREE.MeshStandardMaterial({
+          color: s.color ? s.color.clone() : new THREE.Color(0xffffff),
+          map: s.map ?? null,
+          normalMap: s.normalMap ?? null,
+          roughnessMap: s.roughnessMap ?? null,
+          metalnessMap: s.metalnessMap ?? null,
+          roughness: s.roughness ?? 1,
+          metalness: s.metalness ?? 0,
+          vertexColors: s.vertexColors ?? false,
+          transparent: s.transparent ?? false,
+          opacity: s.opacity ?? 1,
+          side: s.side,
+        })
+        if (s.emissive) m.emissive.copy(s.emissive)
+        if (s.emissiveMap) m.emissiveMap = s.emissiveMap
+        patchReveal(m)
+        if (m.color) {
+          hits.push({ mesh, mat: m })
+          maxLum = Math.max(maxLum, lum(m.color))
+        }
+        return m
+      }
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(apply)
+        : apply(mesh.material)
+    })
+
+    // Second pass: the bright materials become the glowing shade; collect the
+    // world-space centre of their meshes so the point light sits in the lantern.
+    const glowBox = new THREE.Box3()
+    const mats: THREE.MeshStandardMaterial[] = []
+    for (const { mesh, mat } of hits) {
+      if (mat.color && lum(mat.color) >= Math.max(0.18, maxLum * 0.7)) {
+        mat.emissive.copy(mat.color).lerp(LAMP_WARM, 0.45)
+        mat.emissiveIntensity = 0
+        mat.toneMapped = false
+        mats.push(mat)
+        glowBox.expandByObject(mesh)
+      }
+    }
+    const lp = new THREE.Vector3()
+    if (!glowBox.isEmpty()) glowBox.getCenter(lp)
+    else lp.set(0, LAMP_HEIGHT * 0.82, 0)
+
+    glowMats.current = mats
+    return { model: root, lightPos: lp }
+  }, [scene])
+
   useFrame((state) => {
     const nf = getSky(useWorld.getState().t).nightFactor
     const flick = 0.85 + Math.sin(state.clock.elapsedTime * 7 + phase) * 0.15
-    glass.emissiveIntensity = nf * 1.7 * flick
+    const e = nf * 1.7 * flick
+    for (const m of glowMats.current) m.emissiveIntensity = e
     light.current.intensity = nf * 3.2 * flick
   })
+
   return (
     <group position={pos}>
-      {/* base plate */}
-      <mesh castShadow material={post} position={[0, 0.08, 0]}>
-        <boxGeometry args={[0.36, 0.16, 0.36]} />
-      </mesh>
-      {/* main square pole */}
-      <mesh castShadow material={post} position={[0, 1.0, 0]}>
-        <boxGeometry args={[0.16, 1.68, 0.16]} />
-      </mesh>
-      {/* mid collar */}
-      <mesh castShadow material={post} position={[0, 0.7, 0]}>
-        <boxGeometry args={[0.24, 0.12, 0.24]} />
-      </mesh>
-      {/* under-lantern collar — sits flush on top of pole (pole top = 1.84) */}
-      <mesh castShadow material={dark} position={[0, 1.90, 0]}>
-        <boxGeometry args={[0.46, 0.12, 0.46]} />
-      </mesh>
-      {/* lantern glass body — bottom flush with collar top (1.90+0.06=1.96) */}
-      <mesh material={glass} position={[0, 2.24, 0]}>
-        <boxGeometry args={[0.52, 0.56, 0.52]} />
-      </mesh>
-      {/* lantern roof — bottom flush with glass top (2.24+0.28=2.52) */}
-      <mesh castShadow material={dark} position={[0, 2.58, 0]}>
-        <boxGeometry args={[0.56, 0.12, 0.56]} />
-      </mesh>
-      {/* finial — bottom flush with roof top (2.58+0.06=2.64) */}
-      <mesh castShadow material={post} position={[0, 2.73, 0]}>
-        <boxGeometry args={[0.09, 0.18, 0.09]} />
-      </mesh>
-      <pointLight ref={light} position={[0, 2.24, 0]} color={0xffb86a} distance={9} decay={2} />
+      <primitive object={model} />
+      <pointLight ref={light} position={lightPos} color={0xffb86a} distance={9} decay={2} />
     </group>
   )
 }
@@ -130,29 +193,15 @@ function GlowMushrooms({
 }
 
 export function GlowProps() {
-  const lanterns = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3(
-      PATH_WAYPOINTS.map((w) => new THREE.Vector3(w.x, 0, w.z)),
-      false,
-      'catmullrom',
-      0.5,
-    )
-    return [0.16, 0.4, 0.64, 0.85].map((u) => {
-      const p = curve.getPoint(u)
-      const tan = curve.getTangent(u)
-      const nx = -tan.z
-      const nz = tan.x
-      const off = 1.5
-      const x = p.x + nx * off
-      const z = p.z + nz * off
-      return [x, getHeight(x, z), z] as [number, number, number]
-    })
-  }, [])
+  const lanterns = useMemo(
+    () => buildLampSpots().map((s) => [s.x, s.y, s.z] as [number, number, number]),
+    [],
+  )
 
   return (
     <>
       {lanterns.map((p, i) => (
-        <Lantern key={i} pos={p} />
+        <Lamp key={i} pos={p} />
       ))}
       <GlowMushrooms center={[NOOK.x - 1.8, NOOK.z + 1.6]} count={7} seed={1} color={0x49f5e0} />
       <GlowMushrooms center={[REGIONS.spookyCorner.x, REGIONS.spookyCorner.z]} count={9} seed={2} color={0x7be36b} />
@@ -166,3 +215,5 @@ export function GlowProps() {
     </>
   )
 }
+
+useGLTF.preload('/models/stylized_lamp.glb')

@@ -24,6 +24,8 @@ const fragment = /* glsl */ `
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
   uniform float uAlpha;
+  uniform float uUnder;       // 0 above water -> 1 fully submerged
+  uniform vec3 uUnderColor;   // murk tint to dissolve the sky into while diving
   varying vec3 vDir;
 
   // --- cheap value-noise fbm for the clouds ---
@@ -100,6 +102,10 @@ const fragment = /* glsl */ `
     cloudCol += uSunColor * pow(sd, 4.0) * 0.5; // bright sun-facing rim
     col = mix(col, cloudCol, clamp(clouds, 0.0, 1.0) * 0.8);
 
+    // Diving: the dome itself dissolves into the underwater murk so the sky melts
+    // away smoothly (no hard hide / background swap), matching the scene fog.
+    col = mix(col, uUnderColor, uUnder);
+
     gl_FragColor = vec4(col, uAlpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -118,6 +124,8 @@ export function createSkyDomeMaterial() {
       uSunDir: { value: new THREE.Vector3(0, 1, 0) },
       uSunColor: { value: new THREE.Color(0xfff4da) },
       uAlpha: { value: 0 },
+      uUnder: { value: 0 },
+      uUnderColor: { value: new THREE.Color(0x5fd4de) },
     },
     vertexShader: vertex,
     fragmentShader: fragment,

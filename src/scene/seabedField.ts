@@ -1,7 +1,6 @@
 import { createNoise2D } from 'simplex-noise'
 import { smoothstep } from './palette'
 import { getHeight } from './terrain'
-import { TERRAIN_HALF } from './layout'
 
 // ---------------------------------------------------------------------------
 // The ocean floor height field — its own DETERMINISTIC seed, so the hills are
@@ -32,14 +31,19 @@ export function seabedHeight(x: number, z: number): number {
   const small = snoise(x * 0.08 + 40, z * 0.08 + 3) * 0.18
   const hills = SEABED_BASE + (big + med + small) * 4.5
 
-  // Near/under the island, tuck the floor below the island's own terrain so the
-  // two never poke through each other (mask = 1 within the island mesh, fading
-  // out past it into the open-water dunes).
-  const r = Math.hypot(x, z)
-  const mask = smoothstep(TERRAIN_HALF + 46, TERRAIN_HALF, r)
-  if (mask <= 0.001) return hills
-  const tuck = getHeight(x, z) - 3
-  return hills * (1 - mask) + Math.min(hills, tuck) * mask
+  // The island and the seabed are two separate meshes, so how they meet matters:
+  //   - In the SHALLOWS (where the island's own terrain is at/above the water)
+  //     we tuck the floor safely beneath the island so the dunes never poke up
+  //     through the beach.
+  //   - In DEEPER water — where the island has already plunged well below the
+  //     floor — we let the natural dunes be the visible floor so they rise up
+  //     and COVER the island mesh's edge. Otherwise the island plane's straight
+  //     square edge shows underwater as a hard diagonal seam.
+  const land = getHeight(x, z)
+  const shallow = smoothstep(-10, 1, land) // 0 = deep water, 1 = at/above shore
+  if (shallow <= 0.001) return hills
+  const tuck = Math.min(hills, land - 4)
+  return hills + (tuck - hills) * shallow
 }
 
 // Half-size of the (square) seabed mesh — large enough that its edge always sits
