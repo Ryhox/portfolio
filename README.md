@@ -5,13 +5,9 @@
   <img src="https://img.shields.io/badge/License-MIT-success?style=for-the-badge" alt="MIT License Badge" />
 </div>
 
-## It's still at the very beginning, so don't expect too much pls
+## ⚠️ It's still at the very beginning, so don't expect too much pls
 
 <br />
-
-
-> ⚠️ **Note:** This forest is currently a **Work in Progress**! I am continually planting new code and placing magic stones. Please pardon any stray pixie dust or broken twigs as you explore. 🌱🚧
-
 
 ## 🛠️ Tech Stack
 
