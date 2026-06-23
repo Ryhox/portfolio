@@ -56,6 +56,7 @@ export function EscMenu() {
   const invertY  = useWorld(s => s.invertY)
   const [tab, setTab] = useState<Tab>('Settings')
   const [applying, setApplying] = useState(false)
+  const [extHref, setExtHref] = useState<string | null>(null) // pending external link → warn first
 
   // ── Menu / pointer-lock flow ───────────────────────────────────────────────
   // `menuOpen` is the single source of truth. ESC toggles it; pointer lock just
@@ -182,8 +183,8 @@ export function EscMenu() {
               </>
             )}
 
-            {tab === 'Credits' && <CreditsTab />}
-            {tab === 'Socials' && <SocialsTab />}
+            {tab === 'Credits' && <CreditsTab onExternal={setExtHref} />}
+            {tab === 'Socials' && <SocialsTab onExternal={setExtHref} />}
           </div>
         </div>
       </div>
@@ -196,6 +197,47 @@ export function EscMenu() {
         </svg>
         <span style={sBackLabel}>Back</span>
       </button>
+
+      {extHref && (
+        <ExternalWarning
+          href={extHref}
+          onCancel={() => setExtHref(null)}
+          onConfirm={() => {
+            window.open(extHref, '_blank', 'noopener,noreferrer')
+            setExtHref(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// A small confirm that pops before any link leaves for a website outside the
+// island, so visitors always opt in to navigating away.
+function ExternalWarning({ href, onCancel, onConfirm }: { href: string; onCancel: () => void; onConfirm: () => void }) {
+  let host = href
+  try {
+    host = new URL(href).hostname.replace(/^www\./, '')
+  } catch {
+    /* keep the raw href */
+  }
+  return (
+    <div style={sWarnBackdrop} onClick={onCancel}>
+      <div style={sWarnCard} onClick={(e) => e.stopPropagation()}>
+        <svg width={34} height={34} viewBox="0 0 24 24" fill="none" stroke="#a9762a"
+          strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <div style={sWarnTitle}>Heads up — external site</div>
+        <div style={sWarnText}>This link leaves the island and opens an outside website:</div>
+        <div style={sWarnUrl}>{host}</div>
+        <div style={sWarnBtns}>
+          <button style={sWarnCancel} onClick={onCancel}>Stay here</button>
+          <button style={sWarnGo} onClick={onConfirm}>Continue</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -212,7 +254,7 @@ function ValueRow({
   )
 }
 
-function CreditsTab() {
+function CreditsTab({ onExternal }: { onExternal: (href: string) => void }) {
   return (
     <div style={{ padding: '2px 4px' }}>
       <p style={sCreditLine}>A cozy island.</p>
@@ -222,11 +264,19 @@ function CreditsTab() {
       <div style={{ margin: '16px 0' }}><Divider /></div>
 
       <div style={sCreditHead}>Inspiration</div>
-      <ExternalRow label="Bruno Simon" sub="bruno-simon.com" href="https://bruno-simon.com/" />
+      <ExternalRow
+        label="Bruno Simon"
+        sub="bruno-simon.com"
+        license="basic idea"
+        href="https://bruno-simon.com/"
+        onExternal={onExternal}
+      />
       <ExternalRow
         label="COSMOS"
-        sub="darkobyte · stargaze feature"
+        sub="darkobyte"
+        license="stargaze feature"
         href="https://github.com/darkobyte/COSMOS"
+        onExternal={onExternal}
       />
 
       <div style={{ margin: '16px 0' }}><Divider /></div>
@@ -234,42 +284,61 @@ function CreditsTab() {
       <div style={sCreditHead}>Assets</div>
       <ExternalRow
         label="Minecraft Boat"
-        sub="vovash · CC BY 4.0"
+        sub="vovash"
+        license="CC BY 4.0"
         href="https://sketchfab.com/3d-models/minecraft-boat-e0d9d3e6cdd1430e83c94bf4998ed391"
+        onExternal={onExternal}
       />
       <ExternalRow
         label="Stylized Lamp"
-        sub="Sketchfab"
+        sub="Giannis97"
+        license="CC BY 4.0"
         href="https://sketchfab.com/3d-models/stylized-lamp-c511b5e92d39457e96c71938aad70266"
+        onExternal={onExternal}
       />
       <ExternalRow
         label="Stylized Nature Megakit"
         sub="Quaternius"
+        license="CC0"
         href="https://quaternius.itch.io/stylized-nature-megakit"
+        onExternal={onExternal}
       />
     </div>
   )
 }
 
-function SocialsTab() {
-  // TODO: drop in your real profile URLs — email below is wired up already.
+function SocialsTab({ onExternal }: { onExternal: (href: string) => void }) {
   return (
     <div style={{ padding: '2px 4px' }}>
       <div style={{ ...sCreditHead, marginBottom: 10 }}>{'Contact me <3'}</div>
-      <ExternalRow label="Email" sub="emanuelpfeifer1@gmail.com" href="mailto:emanuelpfeifer1@gmail.com" />
+      <ExternalRow label="Email" sub="emanuelpfeifer1@gmail.com" href="mailto:emanuelpfeifer1@gmail.com" onExternal={onExternal} />
       <Divider />
-      <ExternalRow label="GitHub" sub="github.com/ryhox" href="https://github.com/ryhox" />
+      <ExternalRow label="GitHub" sub="github.com/ryhox" href="https://github.com/ryhox" onExternal={onExternal} />
       <Divider />
-      <ExternalRow label="Organisation" sub="github.com/pokyh-labs" href="https://github.com/pokyh-labs" />
+      <ExternalRow label="Organisation" sub="github.com/pokyh-labs" href="https://github.com/pokyh-labs" onExternal={onExternal} />
     </div>
   )
 }
 
-function ExternalRow({ label, sub, href }: { label: string; sub: string; href: string }) {
+function ExternalRow({
+  label, sub, href, onExternal, license,
+}: { label: string; sub: string; href: string; onExternal: (href: string) => void; license?: string }) {
+  // Web links get the "leaving for an external site" warning first; mailto: just opens the mail client.
+  const isWeb = href.startsWith('http')
   return (
-    <a className="alba-row" style={{ ...sRow, textDecoration: 'none' }} href={href} target="_blank" rel="noopener noreferrer">
+    <a
+      className="alba-row"
+      style={{ ...sRow, textDecoration: 'none' }}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={isWeb ? (e) => { e.preventDefault(); onExternal(href) } : undefined}
+    >
       <span style={sRowText}>{label}</span>
-      <span style={sValue}>{sub}</span>
+      <span style={sValueCol}>
+        <span style={sValue}>{sub}</span>
+        {license && <span style={sLicense}>{license}</span>}
+      </span>
       <Chevron />
     </a>
   )
@@ -427,6 +496,16 @@ const sValue: CSSProperties = {
   fontFamily: HAND, color: INK_SOFT, fontSize: 20, flexShrink: 0,
 }
 
+// Author name + (optional) licence stacked, right-aligned, in the asset credits.
+const sValueCol: CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+  flexShrink: 0, lineHeight: 1.15,
+}
+
+const sLicense: CSSProperties = {
+  fontFamily: HAND, color: 'rgba(111,88,54,0.6)', fontSize: 15,
+}
+
 const sMinMax: CSSProperties = {
   display: 'flex', justifyContent: 'space-between',
   marginTop: 6,
@@ -444,4 +523,49 @@ const sToggleKnob: CSSProperties = {
   width: 22, height: 20, borderRadius: 3,
   background: '#fffdf6', border: '1px solid #c9ba94',
   boxShadow: '0 1px 3px rgba(90,69,40,0.4)',
+}
+
+// ── External-link warning ────────────────────────────────────────────────────
+const sWarnBackdrop: CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 60,
+  display: 'grid', placeItems: 'center',
+  background: 'rgba(20,16,10,0.55)',
+}
+
+const sWarnCard: CSSProperties = {
+  width: 'min(86vw, 320px)',
+  display: 'flex', flexDirection: 'column', alignItems: 'center',
+  gap: 8, padding: '22px 22px 18px', borderRadius: 12,
+  background: '#f6efda', border: '1px solid #d7c8a3',
+  boxShadow: '0 18px 50px rgba(0,0,0,0.5)',
+  textAlign: 'center',
+}
+
+const sWarnTitle: CSSProperties = {
+  fontFamily: HAND, fontSize: 23, color: INK_DARK, lineHeight: 1.1,
+}
+
+const sWarnText: CSSProperties = {
+  fontFamily: HAND, fontSize: 16, color: INK, lineHeight: 1.3, marginTop: 2,
+}
+
+const sWarnUrl: CSSProperties = {
+  fontFamily: HAND, fontSize: 18, color: '#8a6d3b',
+  wordBreak: 'break-all', margin: '2px 0 6px',
+}
+
+const sWarnBtns: CSSProperties = {
+  display: 'flex', gap: 10, marginTop: 6, width: '100%',
+}
+
+const sWarnCancel: CSSProperties = {
+  flex: 1, padding: '9px 12px', borderRadius: 8, cursor: 'pointer',
+  fontFamily: HAND, fontSize: 18, color: INK_DARK,
+  background: '#efe4c6', border: '1px solid #d7c8a3',
+}
+
+const sWarnGo: CSSProperties = {
+  flex: 1, padding: '9px 12px', borderRadius: 8, cursor: 'pointer',
+  fontFamily: HAND, fontSize: 18, color: '#f6efda',
+  background: '#5a4528', border: '1px solid #4a3c26',
 }
