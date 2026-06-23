@@ -33,7 +33,7 @@ import {
   type Tier,
   type Variant,
 } from './biomes'
-import { loadStargazerLogins } from './stargazers'
+import { loadStargazerLogins, refreshStargazerLogins, nextRefreshAt } from './stargazers'
 
 export type IslandInstance = {
   id: number // star rank (0-based)
@@ -324,6 +324,23 @@ export function nearestIsland(x: number, z: number): { isl: IslandInstance; edge
   return best ? { isl: best, edgeDist: bestD } : null
 }
 
+// The island whose dome is the tallest at (x,z) — i.e. the one whose terrain you
+// actually stand on there. Used to colour the maps with that island's biome
+// palette. Returns null over open sea.
+export function archDominantIsland(x: number, z: number): IslandInstance | null {
+  const near = nearbyIslands(x, z)
+  let best: IslandInstance | null = null
+  let bestH = -Infinity
+  for (let i = 0; i < near.length; i++) {
+    const hi = islandHeightAt(near[i], x, z)
+    if (hi > bestH) {
+      bestH = hi
+      best = near[i]
+    }
+  }
+  return best
+}
+
 // Nearest islands to a point — fed to the water shader as a foam-ring array.
 export type FoamIsland = { cx: number; cz: number; radius: number }
 export function foamIslands(x: number, z: number, max: number): FoamIsland[] {
@@ -344,6 +361,12 @@ export type IslandStats = {
   tier: Tier
   luck: string
   isMother?: boolean // a group's central landmark, not a rolled stargazer island
+  // Mother isles show the whole REGION's odds instead of one island's roll:
+  region?: {
+    groupPct: number // chance any star lands in this group at all
+    variants: { name: string; pct: number }[] // odds of each look once you're in it
+    sizes: { name: string; pct: number }[] // size-tier odds (independent of group)
+  }
 }
 
 function luckLabel(p: number): string {
@@ -356,7 +379,9 @@ function luckLabel(p: number): string {
 
 export function islandStats(isl: IslandInstance): IslandStats {
   if (isl.isMother) {
-    // Not a roll — it's the region's capital. Show that instead of luck odds.
+    // Not a roll — it's the region's capital. Show the whole region's odds:
+    // chance to land in this group, the look odds within it, and the size odds.
+    const vTotal = isl.theme.variants.reduce((s, v) => s + v.weight, 0)
     return {
       group: isl.theme.name,
       biomeName: 'Mother Island',
@@ -366,6 +391,11 @@ export function islandStats(isl: IslandInstance): IslandStats {
       tier: isl.theme.tier,
       luck: 'The heart of this region',
       isMother: true,
+      region: {
+        groupPct: (isl.theme.weight / THEME_TOTAL) * 100,
+        variants: isl.theme.variants.map((v) => ({ name: v.name, pct: (v.weight / vTotal) * 100 })),
+        sizes: SIZE_TIERS.map((sz) => ({ name: sz.name, pct: (sz.weight / SIZE_TOTAL) * 100 })),
+      },
     }
   }
   const pTheme = isl.theme.weight / THEME_TOTAL
@@ -546,6 +576,19 @@ export function archSteps(islands: IslandInstance[]): Step[] {
   return out
 }
 
+// Minimap dot colours per biome: rocks take the biome's rock colour; trees take a
+// representative canopy colour for the theme (snow-white on Frostfell, pink on
+// Sakura, ember-red, sandy dead wood on the desert, green in the woods).
+const hexColor = (n: number) => '#' + (n & 0xffffff).toString(16).padStart(6, '0')
+const TREE_MAP_COLOR: Record<string, string> = {
+  wildwood: '#3f7a32',
+  bleakshoal: '#6b7158',
+  ember_hollow: '#b9532f',
+  frostfell: '#dbe7ee',
+  bloomtide: '#eaa6cb',
+  desert: '#c3ad84',
+}
+
 export function buildArchMapProps(islands: IslandInstance[]): MapProp[] {
   const out: MapProp[] = []
   for (const e of getArchPlacements(islands)) {
@@ -553,7 +596,15 @@ export function buildArchMapProps(islands: IslandInstance[]): MapProp[] {
     if (TREE_SET.has(e.model)) kind = 'tree'
     else if (ROCK_SET.has(e.model)) kind = 'rock'
     else continue
-    for (const it of e.items) out.push({ x: it.x, z: it.z, kind })
+    for (const it of e.items) {
+      const isl = archDominantIsland(it.x, it.z)
+      const color = isl
+        ? kind === 'rock'
+          ? hexColor(isl.biome.palette.rock)
+          : TREE_MAP_COLOR[isl.theme.id] ?? '#3f7a32'
+        : undefined
+      out.push({ x: it.x, z: it.z, kind, color })
+    }
   }
   return out
 }
@@ -594,6 +645,23 @@ export const useArchipelago = create<ArchStore>((set) => {
     _placeCache = null
     set({ islands, ready: true })
   }
+  // Re-pull the stargazer list on a UTC-aligned 5-min cadence so brand-new
+  // islands appear without a reload. Self-rescheduling (re-aligns each cycle, so
+  // it survives clock drift / a sleeping tab); applies only when the list changed.
+  let _live = false
+  const startLiveRefresh = () => {
+    if (_live || typeof window === 'undefined') return
+    _live = true
+    const scheduleNext = () => {
+      const delay = Math.max(1000, nextRefreshAt(Date.now()) - Date.now())
+      window.setTimeout(() => {
+        refreshStargazerLogins().then(apply).catch(() => {})
+        scheduleNext()
+      }, delay)
+    }
+    scheduleNext()
+  }
+
   return {
     islands: [],
     ready: false,
@@ -605,6 +673,7 @@ export const useArchipelago = create<ArchStore>((set) => {
       loadStargazerLogins(apply)
         .then(apply)
         .catch(() => set({ ready: true }))
+      startLiveRefresh() // then keep it fresh every 5 min
     },
   }
 })

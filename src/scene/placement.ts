@@ -334,7 +334,9 @@ export function buildSteps(): Step[] {
 // The notable .glb landmarks worth plotting on the minimap: every tree (incl.
 // the grand Heartwood), the rock outcrops, and the path lamps. Grass/flowers/
 // pebbles are skipped — they'd just be noise at map scale.
-export type MapProp = { x: number; z: number; kind: 'tree' | 'rock' | 'lamp' }
+// `color` is an optional per-prop override (the archipelago sets it per biome);
+// the home map leaves it unset and falls back to the generic kind colours.
+export type MapProp = { x: number; z: number; kind: 'tree' | 'rock' | 'lamp'; color?: string }
 export function buildMapProps(): MapProp[] {
   const out: MapProp[] = []
   for (const e of getPlacements()) {

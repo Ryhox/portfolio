@@ -4,13 +4,22 @@ import { getHeight } from '../scene/terrain'
 import { NAV } from '../scene/boatState'
 import { buildMapProps, type MapProp } from '../scene/placement'
 import {
+  archDominantIsland,
   archHeight,
   archipelagoExtent,
   buildArchMapProps,
   groupLabels,
   useArchipelago,
 } from '../scene/archipelago/archipelago'
-import { buildMap } from './mapRender'
+import { buildMap, hexToRgb, landRamp, seaRamp } from './mapRender'
+
+// Colours an archipelago map pixel with the biome palette of the island under it
+// (grey Bleakshoal, white Frostfell, sandy desert, …); open sea uses the shared ramp.
+function archMapColor(x: number, z: number, h: number): number[] {
+  if (h < 0.4) return seaRamp(h)
+  const p = archDominantIsland(x, z)?.biome.palette
+  return p ? landRamp(h, hexToRgb(p.sand), hexToRgb(p.grassLo), hexToRgb(p.grassHi)) : landRamp(h)
+}
 
 // Bottom-left minimap — shown while sailing, and the whole time you're in the
 // archipelago. The sea + land are rendered ONCE into an offscreen canvas; every
@@ -41,7 +50,7 @@ export function Minimap() {
     const isArch = mapId === 'archipelago'
     const rWorld = isArch ? Math.max(R_WORLD_HOME, archipelagoExtent() + 30) : R_WORLD_HOME
     rWorldRef.current = rWorld
-    islandRef.current = buildMap(isArch ? archHeight : getHeight, rWorld)
+    islandRef.current = buildMap(isArch ? archHeight : getHeight, rWorld, 320, isArch ? archMapColor : undefined)
     propsRef.current = isArch ? buildArchMapProps(islands) : buildMapProps()
     labelsRef.current = isArch ? groupLabels(islands) : []
 
@@ -69,6 +78,12 @@ export function Minimap() {
       ctx.roundRect(0, 0, MM, MM, 12)
       ctx.clip()
 
+      // Fill with the map's deep-sea colour first, so when you're near the world
+      // edge the area beyond the built map reads as open ocean instead of a hard
+      // dark void (it used to show the scene behind the transparent canvas).
+      ctx.fillStyle = '#214350' // == C_DEEP in mapRender
+      ctx.fillRect(0, 0, MM, MM)
+
       // land/sea crop, centred on the boat
       const ox = (NAV.px + rW) * pxPerWorld
       const oy = (NAV.pz + rW) * pxPerWorld
@@ -84,7 +99,7 @@ export function Minimap() {
           if (Math.abs(dx) > VIEW || Math.abs(dz) > VIEW) continue
           const mx = half + dx * sc
           const my = half + dz * sc
-          ctx.fillStyle = PROP_COLOR[p.kind]
+          ctx.fillStyle = p.color ?? PROP_COLOR[p.kind]
           ctx.beginPath()
           ctx.arc(mx, my, p.kind === 'tree' ? 2.1 : 1.5, 0, Math.PI * 2)
           ctx.fill()
@@ -142,14 +157,19 @@ export function Minimap() {
     <>
       <div style={sWrap}>
         <canvas ref={canvasRef} style={sCanvas} />
-        <span style={sNorth}>N</span>
       </div>
-      {/* "M · World map" hint, sitting just to the right of the minimap (the M key
-          opens the map — same flat chip design as the corner hints). */}
+      {/* Hint chips beside the minimap (archipelago only): "Hold E · Sail home"
+          stacked above "M · World map" — same flat chip design as the corner hints. */}
       {mapId === 'archipelago' && (
-        <div style={sMapHint}>
-          <span style={sHintCap}>M</span>
-          <span style={sHintLabel}>World map</span>
+        <div style={sHintStack}>
+          <div style={sHintRow}>
+            <span style={sHintCap}>Hold E</span>
+            <span style={sHintLabel}>Sail home</span>
+          </div>
+          <div style={sHintRow}>
+            <span style={sHintCap}>M</span>
+            <span style={sHintLabel}>World map</span>
+          </div>
         </div>
       )}
     </>
@@ -165,10 +185,7 @@ const sWrap: CSSProperties = {
   width: MM,
   height: MM,
   zIndex: 120,
-  borderRadius: 14,
-  padding: 3,
-  background: '#f6efda',
-  border: '1px solid #d7c8a3',
+  borderRadius: 12,
   boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
   pointerEvents: 'none',
 }
@@ -178,31 +195,27 @@ const sCanvas: CSSProperties = {
   height: MM,
   borderRadius: 12,
   display: 'block',
+  boxSizing: 'border-box',
+  border: '1.5px solid rgba(20,16,10,0.5)', // thin frame around the whole minimap
 }
 
-const sNorth: CSSProperties = {
-  position: 'absolute',
-  top: 4,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  fontFamily: HAND,
-  fontSize: 15,
-  lineHeight: 1,
-  color: '#fffaf0',
-  textShadow: '0 1px 2px rgba(0,0,0,0.7)',
-}
-
-// "M · World map" chip beside the minimap — mirrors Brand's corner hint design.
-const sMapHint: CSSProperties = {
+// Hint chips beside the minimap — mirror Brand's corner hint design.
+const sHintStack: CSSProperties = {
   position: 'fixed',
   left: 22 + MM + 12, // just to the right of the minimap
   bottom: 30,
   display: 'flex',
-  alignItems: 'center',
-  gap: 10,
+  flexDirection: 'column',
+  gap: 8,
   zIndex: 120,
   pointerEvents: 'none',
   userSelect: 'none',
+}
+
+const sHintRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
 }
 
 const sHintCap: CSSProperties = {

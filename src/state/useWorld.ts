@@ -35,6 +35,7 @@ export type WorldState = {
   boardPrompt: boolean   // near the stranded boat → show the "press E" interact prompt
   mapId: 'home' | 'archipelago' // which world is mounted: the home island or the archipelago
   mapOpen: boolean       // the full-screen world map overlay is open (freezes the player)
+  infoOpen: boolean      // the island rarity/info panel is open (toggled with I on an island)
   setT: (t: number) => void
   setPaused: (p: boolean) => void
   togglePaused: () => void
@@ -54,6 +55,8 @@ export type WorldState = {
   setBoardPrompt: (v: boolean) => void
   setMapId: (m: 'home' | 'archipelago') => void
   setMapOpen: (v: boolean) => void
+  setInfoOpen: (v: boolean) => void
+  toggleInfo: () => void
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
@@ -87,6 +90,7 @@ export const useWorld = create<WorldState>((set) => ({
   boardPrompt: false,
   mapId: 'home',
   mapOpen: false,
+  infoOpen: false,
   setT: (t) => set({ t: wrap01(t) }),
   setPaused: (paused) => set({ paused }),
   togglePaused: () => set((s) => ({ paused: !s.paused })),
@@ -110,6 +114,8 @@ export const useWorld = create<WorldState>((set) => ({
   setBoardPrompt: (boardPrompt) => set({ boardPrompt }),
   setMapId: (mapId) => set({ mapId }),
   setMapOpen: (mapOpen) => set({ mapOpen }),
+  setInfoOpen: (infoOpen) => set({ infoOpen }),
+  toggleInfo: () => set((s) => ({ infoOpen: !s.infoOpen })),
 }))
 
 // Mutable object GSAP can animate — drives the cinematic fly-in in Experience.tsx.

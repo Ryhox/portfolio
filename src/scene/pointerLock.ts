@@ -1,23 +1,62 @@
-// Bridges the Enter button (HTML, outside the Canvas) to the PointerLockControls
-// (inside the Canvas). Pointer lock must be requested synchronously inside the
-// click gesture, so the Player registers its lock fn here and StartOverlay calls
-// requestLock() directly in the handler.
+// Bridges the Enter button (HTML, outside the Canvas) to the pointer-lock look
+// controls (inside the Canvas). Pointer lock must be requested inside a user
+// gesture, so the Player registers its lock fn here and callers invoke
+// requestLock() from their handlers.
+//
+// The settings-menu controller (EscMenu) treats `menuOpen` as the source of truth
+// and uses these helpers to make pointer lock simply follow it. The one browser
+// quirk we work around: after the user exits lock with ESC there's a ~1.25s
+// cooldown during which re-locking is rejected, and the browser can briefly
+// grant-then-revoke the lock — `isAcquiring()` lets the controller ignore those
+// bounces so the menu doesn't flicker.
 let lockFn: (() => void) | null = null
+let acquiring = false
+let timer: ReturnType<typeof setTimeout> | null = null
 
 export function setLockFn(fn: (() => void) | null) {
   lockFn = fn
 }
 
+// True while we're polling to (re)acquire the lock — see the note above.
+export function isAcquiring() {
+  return acquiring
+}
+
+// Stop any in-flight re-lock polling (e.g. the user reopened the menu mid-cooldown
+// and we should leave the cursor free).
+export function cancelLock() {
+  acquiring = false
+  if (timer != null) {
+    clearTimeout(timer)
+    timer = null
+  }
+}
+
 export function requestLock() {
-  // Browsers block requestPointerLock for ~1.25s after the user exits lock with
-  // ESC (a hard security cooldown we can't skip). Poll on a tight interval so we
-  // re-lock the very instant it's allowed again — otherwise closing the ESC menu
-  // leaves the cursor on screen and mouse-look dead longer than necessary.
+  if (typeof document === 'undefined' || document.pointerLockElement) return
+  cancelLock()
+  acquiring = true
   let tries = 0
   const attempt = () => {
-    if (document.pointerLockElement) return
-    try { lockFn?.() } catch { /* still on cooldown */ }
-    if (++tries < 30 && !document.pointerLockElement) setTimeout(attempt, 100)
+    timer = null
+    if (!acquiring) return // cancelled (menu reopened) — leave the cursor be
+    if (document.pointerLockElement) {
+      acquiring = false
+      return
+    }
+    try { lockFn?.() } catch { /* still on the post-ESC cooldown */ }
+    // Poll tightly so we re-lock the instant the cooldown lifts (~1.25s), without
+    // the cursor lingering longer than necessary.
+    if (++tries < 40 && !document.pointerLockElement) {
+      timer = setTimeout(attempt, 80)
+    } else {
+      acquiring = false
+    }
   }
   attempt()
+}
+
+export function exitLock() {
+  cancelLock()
+  if (typeof document !== 'undefined' && document.pointerLockElement) document.exitPointerLock()
 }

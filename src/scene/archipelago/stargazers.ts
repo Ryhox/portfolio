@@ -13,8 +13,11 @@ const REPO = 'portfolio'
 const CACHE_KEY = 'archipelago.stargazers.v1'
 const TTL = 5 * 60 * 1000 // serve cache without re-hitting the API for 5 min
 
-const FORCE_REAL =
-  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('realstars')
+// Live-refresh cadence. Aligned to a UTC 5-min grid (floor to the grid, +1 step)
+// so every visitor refetches — and counts the timer down — in lockstep, and the
+// API is hit at most once per 5 min per client (well clear of rate limits).
+export const REFRESH_MS = 5 * 60 * 1000
+export const nextRefreshAt = (now: number) => Math.floor(now / REFRESH_MS) * REFRESH_MS + REFRESH_MS
 
 type Cache = { ts: number; logins: string[] }
 
@@ -63,13 +66,6 @@ async function fetchAll(): Promise<string[]> {
 // cache, it revalidates in the background and calls `onFresh` only when the list
 // actually changed.
 export function loadStargazerLogins(onFresh?: (logins: string[]) => void): Promise<string[]> {
-  // No fake crew: every group already has its central Mother Isle, so an empty
-  // star list just means clusters with only their mother for now. ?realstars or
-  // production fills the rings with real stargazers.
-  if (import.meta.env.DEV && !FORCE_REAL) {
-    return Promise.resolve([])
-  }
-
   const cache = readCache()
   if (cache && Date.now() - cache.ts < TTL) {
     return Promise.resolve(cache.logins) // fresh enough — no network
@@ -95,4 +91,17 @@ export function loadStargazerLogins(onFresh?: (logins: string[]) => void): Promi
   }
 
   return fetching // no cache yet — wait for the first fetch
+}
+
+// Force a fresh pull (bypassing the serve-from-cache TTL) for the periodic
+// refresh; updates the cache and falls back to the cached list on failure.
+export async function refreshStargazerLogins(): Promise<string[]> {
+  try {
+    const logins = await fetchAll()
+    writeCache(logins)
+    return logins
+  } catch (e) {
+    console.warn('[stargazers] refresh failed, keeping cache', e)
+    return readCache()?.logins ?? []
+  }
 }

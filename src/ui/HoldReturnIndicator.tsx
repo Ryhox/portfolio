@@ -42,7 +42,7 @@ export function HoldReturnIndicator() {
         </svg>
         <span style={sKey}>E</span>
       </div>
-      <div style={sLabel}>Return home</div>
+      <div style={sLabel}>Sail home</div>
     </div>
   )
 }

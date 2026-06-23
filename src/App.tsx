@@ -14,6 +14,8 @@ import { LoadingScreen } from './ui/intro/LoadingScreen'
 import { WaterOverlay } from './ui/WaterOverlay'
 import { MapTransition } from './ui/MapTransition'
 import { EnteringIslandBanner } from './ui/EnteringIslandBanner'
+import { IslandInfo } from './ui/IslandInfo'
+import { CompassHUD } from './ui/CompassHUD'
 import { HoldReturnIndicator } from './ui/HoldReturnIndicator'
 
 export default function App() {
@@ -40,6 +42,8 @@ export default function App() {
       <WorldMap />
       <WaterOverlay />
       <EnteringIslandBanner />
+      <IslandInfo />
+      <CompassHUD />
       <HoldReturnIndicator />
       <MapTransition />
     </>

@@ -28,7 +28,7 @@ const _scratch = { x: 0, y: 0, z: 0 }
 const DEBUG = { freeze: false } // dev-only: hold an external camera for screenshots
 
 const EYE = 1.7 // eye height above ground when walking
-const SWIM_EYE = 0.5 // eye height above the water surface when floating
+const SWIM_EYE = 0.28 // eye height above the water surface when floating (sit low in the water)
 const SPEED = 9
 const SWIM_SPEED = 5.5
 const SPRINT = 1.9
@@ -543,12 +543,13 @@ export function Player() {
     SWIM.depth = Math.max(0, surfaceY - camera.position.y)
     SWIM.underwater = camera.position.y < surfaceY - 0.1
 
-    // Swimming stirs the ripple field.
-    if (inWater && (moving || ww > 0.5)) {
+    // Only shallow wading (footsteps near the shore) stirs the ripple field —
+    // floating/swimming leaves no wake, so the surface stays calm around you.
+    if (inWater && moving && ww < 0.5) {
       rippleClock.current += dt
       if (rippleClock.current > 0.06) {
         rippleClock.current = 0
-        addRipple(camera.position.x, camera.position.z, moving ? 0.12 : 0.05, 2.2)
+        addRipple(camera.position.x, camera.position.z, 0.08, 2.2)
       }
     }
 

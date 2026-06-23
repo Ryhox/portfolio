@@ -48,11 +48,7 @@ export function Brand() {
               <Hint cap="WASD"  label="Steer" />
               <Hint cap="Mouse" label="Look" />
               <Hint cap="E"     label="Step ashore" />
-              {mapId === 'archipelago' ? (
-                <Hint cap="Hold E" label="Sail home" />
-              ) : (
-                <Hint cap="Horizon" label="New isles" />
-              )}
+              {mapId !== 'archipelago' && <Hint cap="Horizon" label="New isles" />}
               <Hint cap="N"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
               <Hint cap="ESC"   label="Settings" />
             </>
@@ -61,9 +57,6 @@ export function Brand() {
               <Hint cap="WASD"  label="Move" />
               <Hint cap="Mouse" label="Look" />
               <Hint cap="Shift" label="Sprint" />
-              {mapId === 'archipelago' && (
-                <Hint cap="Hold E" label="Sail home" />
-              )}
               <Hint cap="N"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
               <Hint cap="ESC"   label="Settings" />
             </>

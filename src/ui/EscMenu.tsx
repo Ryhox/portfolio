@@ -1,6 +1,6 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { useWorld } from '../state/useWorld'
-import { requestLock } from '../scene/pointerLock'
+import { requestLock, exitLock, cancelLock, isAcquiring } from '../scene/pointerLock'
 import { setVol as setAudioVol } from '../audio/useAmbience'
 
 // A faithful recreation of the Alba "torn notepad" settings sheet: cream paper
@@ -57,30 +57,63 @@ export function EscMenu() {
   const [tab, setTab] = useState<Tab>('Settings')
   const [applying, setApplying] = useState(false)
 
-  // Show the sheet whenever pointer lock is released (browser ESC exits lock).
+  // ── Menu / pointer-lock flow ───────────────────────────────────────────────
+  // `menuOpen` is the single source of truth. ESC toggles it; pointer lock just
+  // follows — locked while playing, free while the menu (or map) is up. This keeps
+  // open ↔ close ↔ reopen snappy and never traps the cursor.
+
+  // Whenever the menu is up, free the cursor and stop any re-lock polling.
+  useEffect(() => {
+    if (started && menuOpen) exitLock()
+  }, [started, menuOpen])
+
+  // ESC keydown. While LOCKED the browser eats this to exit pointer lock, so the
+  // open-from-play case is caught by pointerlockchange below instead. While
+  // UNLOCKED it fires normally — so it CLOSES the menu and, crucially, can REOPEN
+  // it instantly during the browser's post-ESC re-lock cooldown (no waiting).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'Escape') return
+      const ws = useWorld.getState()
+      if (!ws.started || ws.mapOpen) return // the world map owns its own ESC
+      e.preventDefault()
+      if (ws.menuOpen) {
+        ws.setMenuOpen(false)
+        requestLock()
+      } else if (ws.infoOpen) {
+        ws.setInfoOpen(false) // ESC closes the island info popup, then resumes play
+        requestLock()
+      } else {
+        ws.setMenuOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Pointer-lock changes. A real loss of lock = the user pressed ESC while playing
+  // → open the menu. We ignore the brief grant→revoke "bounce" the browser emits
+  // while we're re-acquiring (isAcquiring), which used to flicker the menu back up.
   useEffect(() => {
     const onChange = () => {
       const ws = useWorld.getState()
       if (!ws.started) return
-      if (ws.mapOpen) return // the world map releases the cursor on purpose
-      ws.setMenuOpen(!document.pointerLockElement)
+      if (document.pointerLockElement) {
+        cancelLock() // settled into play
+        if (ws.menuOpen) ws.setMenuOpen(false)
+        return
+      }
+      if (ws.mapOpen || isAcquiring() || ws.menuOpen) return
+      if (ws.infoOpen) {
+        ws.setInfoOpen(false) // ESC out of an island closes the info popup, resumes
+        requestLock()
+        return
+      }
+      ws.setMenuOpen(true) // genuine ESC-out-of-play → settings
     }
     document.addEventListener('pointerlockchange', onChange)
     return () => document.removeEventListener('pointerlockchange', onChange)
   }, [])
-
-  // ESC again (while the sheet is up) closes it. We can't re-lock the pointer
-  // straight away — the browser blocks requestPointerLock for ~1s after an ESC
-  // exit — so close the menu directly and best-effort re-lock; if that's still
-  // on cooldown, moving (WASD) or clicking re-locks the look controls.
-  useEffect(() => {
-    if (!menuOpen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Escape') { e.preventDefault(); closeMenu() }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [menuOpen])
 
   const closeMenu = () => {
     useWorld.getState().setMenuOpen(false)
@@ -190,6 +223,11 @@ function CreditsTab() {
 
       <div style={sCreditHead}>Inspiration</div>
       <ExternalRow label="Bruno Simon" sub="bruno-simon.com" href="https://bruno-simon.com/" />
+      <ExternalRow
+        label="COSMOS"
+        sub="darkobyte · stargaze feature"
+        href="https://github.com/darkobyte/COSMOS"
+      />
 
       <div style={{ margin: '16px 0' }}><Divider /></div>
 
