@@ -5,11 +5,16 @@ import { Experience } from './scene/Experience'
 import { LITE } from './scene/config'
 import { Brand } from './ui/Brand'
 import { EscMenu } from './ui/EscMenu'
+import { Minimap } from './ui/Minimap'
+import { WorldMap } from './ui/WorldMap'
 import { IntroController } from './ui/intro/IntroController'
 import { IntroGrid } from './ui/intro/IntroGrid'
 import { IntroLabel } from './ui/intro/IntroLabel'
 import { LoadingScreen } from './ui/intro/LoadingScreen'
 import { WaterOverlay } from './ui/WaterOverlay'
+import { MapTransition } from './ui/MapTransition'
+import { EnteringIslandBanner } from './ui/EnteringIslandBanner'
+import { HoldReturnIndicator } from './ui/HoldReturnIndicator'
 
 export default function App() {
   return (
@@ -31,7 +36,12 @@ export default function App() {
       <IntroController />
       <EscMenu />
       <Brand />
+      <Minimap />
+      <WorldMap />
       <WaterOverlay />
+      <EnteringIslandBanner />
+      <HoldReturnIndicator />
+      <MapTransition />
     </>
   )
 }

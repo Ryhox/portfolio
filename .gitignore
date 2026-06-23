@@ -4,3 +4,9 @@ shots
 *.local
 .DS_Store
 scripts
+
+# Raw asset-pack archive — the files the app actually serves live in
+# public/models/nature. Keep only the license tracked for attribution.
+assets/source/OBJ/
+assets/source/Textures/
+assets/source/Preview_*.jpg

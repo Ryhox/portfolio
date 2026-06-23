@@ -7,6 +7,7 @@ import { useNature } from './loadNature'
 import { useWorld } from '../state/useWorld'
 import { n } from './config'
 import { SEABED_HALF, mulberry32, seabedHeight } from './seabedField'
+import { archipelagoExtent, useArchipelago } from './archipelago/archipelago'
 
 const _m4 = new THREE.Matrix4()
 const _q = new THREE.Quaternion()
@@ -27,9 +28,12 @@ const patched = <M extends THREE.Material>(m: M): M => {
 }
 
 // ---- the floor -------------------------------------------------------------
-function SeabedFloor() {
+// `half` is the floor's half-extent: the home island uses SEABED_HALF, but the
+// archipelago spreads its islands far past that, so it gets a much larger floor
+// (sized to the whole archipelago) — otherwise the sea has no bottom out there.
+function SeabedFloor({ half, seg }: { half: number; seg: number }) {
   const geo = useMemo(() => {
-    const g = new THREE.PlaneGeometry(SEABED_HALF * 2, SEABED_HALF * 2, 220, 220)
+    const g = new THREE.PlaneGeometry(half * 2, half * 2, seg, seg)
     g.rotateX(-Math.PI / 2)
     const pos = g.attributes.position as THREE.BufferAttribute
     const colors = new Float32Array(pos.count * 3)
@@ -53,7 +57,7 @@ function SeabedFloor() {
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     g.computeVertexNormals()
     return g
-  }, [])
+  }, [half, seg])
   const mat = useMemo(
     () => patched(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, side: THREE.DoubleSide })),
     [],
@@ -62,19 +66,19 @@ function SeabedFloor() {
 }
 
 // ---- stylized corals (instanced branches, deterministic) -------------------
-function Corals() {
+function Corals({ rMin = 74, rMax = 209, count = 22 }: { rMin?: number; rMax?: number; count?: number }) {
   const im = useMemo(() => {
     const branch = new THREE.CylinderGeometry(0.05, 0.16, 1.1, 6)
     branch.translate(0, 0.55, 0)
     const palette = [0xff8fb3, 0xffae5c, 0xb98cff, 0xff6f91, 0x6fd1c4]
     const rng = mulberry32(7)
     const centers: { x: number; y: number; z: number; col: number }[] = []
-    const target = n(22)
+    const target = n(count)
     let guard = 0
     while (centers.length < target && guard < target * 40) {
       guard++
       const ang = rng() * TAU
-      const rad = 74 + Math.sqrt(rng()) * 135
+      const rad = rMin + Math.sqrt(rng()) * (rMax - rMin)
       const x = Math.cos(ang) * rad
       const z = Math.sin(ang) * rad
       if (getHeight(x, z) > -1) continue
@@ -111,14 +115,14 @@ function Corals() {
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     return mesh
-  }, [])
+  }, [rMin, rMax, count])
   return <primitive object={im} />
 }
 
 // ---- seagrass (reuses the project's grass models) --------------------------
 type Item = { x: number; y: number; z: number; rotY: number; scale: number; m: number }
 
-function Seagrass() {
+function Seagrass({ rMin = 70, rMax = 220, count = 620 }: { rMin?: number; rMax?: number; count?: number }) {
   const nature = useNature()
   // lush mix: tall blades + wispy blades + a broad-leaf plant, like the reference
   const models = useMemo(
@@ -129,12 +133,12 @@ function Seagrass() {
   const items = useMemo<Item[]>(() => {
     const rng = mulberry32(99)
     const out: Item[] = []
-    const target = n(620)
+    const target = n(count)
     let guard = 0
     while (out.length < target && guard < target * 40) {
       guard++
       const ang = rng() * TAU
-      const rad = 70 + Math.sqrt(rng()) * 150 // 70 → 220, near shore out to open water
+      const rad = rMin + Math.sqrt(rng()) * (rMax - rMin) // near shore out to open water
       const x = Math.cos(ang) * rad
       const z = Math.sin(ang) * rad
       if (getHeight(x, z) > -0.5) continue // skip land / dry shore
@@ -143,7 +147,7 @@ function Seagrass() {
       out.push({ x, y, z, rotY: rng() * TAU, scale: 0.85 + rng() * 1.7, m: Math.floor(rng() * 3) })
     }
     return out
-  }, [])
+  }, [rMin, rMax, count])
 
   const meshes = useMemo(() => {
     const out: THREE.InstancedMesh[] = []
@@ -187,18 +191,18 @@ function Seagrass() {
 }
 
 // ---- colorful reef fish (little schools circling the reef) -----------------
-function ReefFish() {
+function ReefFish({ rMin = 76, rMax = 196, count = 10 }: { rMin?: number; rMax?: number; count?: number }) {
   const COLORS = [0xff8a3d, 0xffd23f, 0x4fc3ff, 0xff6fae, 0x9b7bff, 0x5fe6a0]
 
   const { mesh, fish } = useMemo(() => {
     const rng = mulberry32(303)
     const schools: { cx: number; cz: number; cy: number; r: number; spd: number; n: number; col: number }[] = []
-    const target = n(10)
+    const target = n(count)
     let guard = 0
     while (schools.length < target && guard < target * 40) {
       guard++
       const ang = rng() * TAU
-      const rad = 76 + Math.sqrt(rng()) * 120
+      const rad = rMin + Math.sqrt(rng()) * (rMax - rMin)
       const cx = Math.cos(ang) * rad
       const cz = Math.sin(ang) * rad
       if (getHeight(cx, cz) > -2) continue
@@ -226,7 +230,7 @@ function ReefFish() {
     fish.forEach((f, i) => mesh.setColorAt(i, col.setHex(f.s.col)))
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     return { mesh, fish }
-  }, [])
+  }, [rMin, rMax, count])
 
   useFrame((state) => {
     if (!useWorld.getState().worldVisible) return
@@ -250,14 +254,42 @@ function ReefFish() {
 }
 
 export function Seabed() {
+  const mapId = useWorld((s) => s.mapId)
+  // Re-read when the archipelago loads so the floor grows to cover its islands.
+  const islands = useArchipelago((s) => s.islands)
+  const isArch = mapId === 'archipelago'
+  // Stretch the floor over the whole archipelago (its islands fan out far past
+  // the home seabed). Segments scale with size but are capped for performance.
+  const half = isArch ? Math.max(SEABED_HALF, archipelagoExtent() + 140) : SEABED_HALF
+  const seg = isArch ? Math.min(300, Math.max(180, Math.round(half / 2.6))) : 220
+  void islands // dependency only — drives the half recompute on load
+
+  // Spread the reef life across whichever floor we're on: a tight ring around the
+  // home island, or the whole archipelago (counts scale with the bigger area).
+  const flora = isArch
+    ? { cMin: 50, cMax: half - 30, corals: 90, grass: 2400, fish: 26 }
+    : { cMin: 0, cMax: 0, corals: 22, grass: 620, fish: 10 } // 0 → component defaults
+
   return (
     <>
-      <SeabedFloor />
-      <Corals />
-      <ReefFish />
-      <Suspense fallback={null}>
-        <Seagrass />
-      </Suspense>
+      <SeabedFloor half={half} seg={seg} />
+      {isArch ? (
+        <>
+          <Corals rMin={flora.cMin} rMax={flora.cMax} count={flora.corals} />
+          <ReefFish rMin={flora.cMin} rMax={flora.cMax} count={flora.fish} />
+          <Suspense fallback={null}>
+            <Seagrass rMin={flora.cMin} rMax={flora.cMax} count={flora.grass} />
+          </Suspense>
+        </>
+      ) : (
+        <>
+          <Corals />
+          <ReefFish />
+          <Suspense fallback={null}>
+            <Seagrass />
+          </Suspense>
+        </>
+      )}
     </>
   )
 }

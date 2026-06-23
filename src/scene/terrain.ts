@@ -49,7 +49,32 @@ function fbm(x: number, z: number, octaves: number, freq: number) {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
+// --- map dispatch -----------------------------------------------------------
+// getHeight is the single ground field the whole sim samples: the island mesh,
+// prop placement (sampleDisc), the player's walk/swim follow, the boat's sailing
+// collision, parkedPose/launchBoat, and the minimap. It dispatches to the active
+// map so a second world (the archipelago) transparently drives the same physics
+// with no branching at the call sites. The archipelago registers its height fn at
+// import (registerArchHeight) so terrain.ts never imports it — no circular dep.
+export type MapId = 'home' | 'archipelago'
+let ACTIVE_MAP: MapId = 'home'
+export function setActiveMap(m: MapId) {
+  ACTIVE_MAP = m
+}
+export function getActiveMap(): MapId {
+  return ACTIVE_MAP
+}
+let _archHeight: ((x: number, z: number) => number) | null = null
+export function registerArchHeight(fn: (x: number, z: number) => number) {
+  _archHeight = fn
+}
+
 export function getHeight(x: number, z: number): number {
+  if (ACTIVE_MAP === 'archipelago' && _archHeight) return _archHeight(x, z)
+  return homeHeight(x, z)
+}
+
+function homeHeight(x: number, z: number): number {
   const r = Math.hypot(x, z)
   const coast = noise(x * 0.015, z * 0.015) * 9 // irregular coastline
   const edge = (r + coast) / ISLAND_RADIUS // ~0 centre, ~1 at shore

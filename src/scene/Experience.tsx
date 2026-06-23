@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { updateAmbience } from '../audio/useAmbience'
 import { patchReveal } from './patchReveal'
@@ -24,6 +24,11 @@ import { OceanLife } from './OceanLife'
 import { OceanHorizon } from './OceanHorizon'
 import { Seabed } from './Seabed'
 import { Campfire, HilltopBenches } from './Campfire'
+import { RowingBoat } from './RowingBoat'
+import { BoatPrompt } from './BoatPrompt'
+import { registerOccluder, unregisterOccluder } from './occluders'
+import { ArchipelagoLand } from './archipelago/ArchipelagoLand'
+import { HorizonGate } from './archipelago/HorizonGate'
 
 // Advances time-of-day. Kept out of React render — just mutates the store.
 function TimeDriver() {
@@ -69,6 +74,19 @@ function QualityDPR() {
     setDpr(dpr)
   }, [quality, setDpr])
   return null
+}
+
+// Registers its child group as a boat-marker occluder for the lifetime it's
+// mounted, so BoatPrompt can raycast just these solid props (not the scene).
+function Occluders({ children }: { children: ReactNode }) {
+  const ref = useRef<THREE.Group>(null)
+  useEffect(() => {
+    const g = ref.current
+    if (!g) return
+    registerOccluder(g)
+    return () => unregisterOccluder(g)
+  }, [])
+  return <group ref={ref}>{children}</group>
 }
 
 // Pre-computed spawn position.
@@ -157,6 +175,7 @@ function CinematicCamera() {
 
 export function Experience() {
   const started = useWorld((s) => s.started)
+  const mapId = useWorld((s) => s.mapId)
   return (
     <>
       <RevealPatcher />
@@ -165,21 +184,35 @@ export function Experience() {
       <CinematicCamera />
       <Player />
       <DayNight />
-      <LightShafts />
-      <Island />
+      {/* Sun shafts + drifting fireflies belong to the home island only — they'd
+          otherwise hang over the archipelago's spawn (its origin sits where the
+          home isle's effects live). */}
+      {mapId === 'home' && <LightShafts />}
+      {mapId === 'home' ? (
+        <>
+          <Island />
+          <Campfire />
+          <HilltopBenches />
+          <GlowProps />
+          <HorizonGate />
+          <Suspense fallback={null}>
+            <Occluders>
+              <NatureField />
+            </Occluders>
+          </Suspense>
+        </>
+      ) : (
+        <ArchipelagoLand />
+      )}
       <Seabed />
       <RippleSim />
       <Water />
       <Underwater />
       <OceanLife />
       <OceanHorizon />
-      <Campfire />
-      <HilltopBenches />
-      <GlowProps />
-      <Particles />
-      <Suspense fallback={null}>
-        <NatureField />
-      </Suspense>
+      <RowingBoat />
+      <BoatPrompt />
+      {mapId === 'home' && <Particles />}
       <Postfx />
     </>
   )

@@ -31,6 +31,10 @@ export type WorldState = {
   introProgress: number  // 0–1, tracks asset loading for the ring fill
   introStep: number      // -1 idle | 0 loading complete | 1 clicked
   worldVisible: boolean  // true once the ring starts expanding → fade-in sky/water/particles
+  boatMode: 'parked' | 'sailing' // whether the player is currently sailing the boat
+  boardPrompt: boolean   // near the stranded boat → show the "press E" interact prompt
+  mapId: 'home' | 'archipelago' // which world is mounted: the home island or the archipelago
+  mapOpen: boolean       // the full-screen world map overlay is open (freezes the player)
   setT: (t: number) => void
   setPaused: (p: boolean) => void
   togglePaused: () => void
@@ -46,6 +50,10 @@ export type WorldState = {
   setIntroProgress: (p: number) => void
   setIntroStep: (s: number) => void
   setWorldVisible: (v: boolean) => void
+  setBoatMode: (m: 'parked' | 'sailing') => void
+  setBoardPrompt: (v: boolean) => void
+  setMapId: (m: 'home' | 'archipelago') => void
+  setMapOpen: (v: boolean) => void
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
@@ -75,6 +83,10 @@ export const useWorld = create<WorldState>((set) => ({
   introProgress: 0,
   introStep: -1,
   worldVisible: false,
+  boatMode: 'parked',
+  boardPrompt: false,
+  mapId: 'home',
+  mapOpen: false,
   setT: (t) => set({ t: wrap01(t) }),
   setPaused: (paused) => set({ paused }),
   togglePaused: () => set((s) => ({ paused: !s.paused })),
@@ -94,6 +106,10 @@ export const useWorld = create<WorldState>((set) => ({
   setIntroProgress: (introProgress) => set({ introProgress }),
   setIntroStep: (introStep) => set({ introStep }),
   setWorldVisible: (worldVisible) => set({ worldVisible }),
+  setBoatMode: (boatMode) => set({ boatMode }),
+  setBoardPrompt: (boardPrompt) => set({ boardPrompt }),
+  setMapId: (mapId) => set({ mapId }),
+  setMapOpen: (mapOpen) => set({ mapOpen }),
 }))
 
 // Mutable object GSAP can animate — drives the cinematic fly-in in Experience.tsx.

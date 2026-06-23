@@ -60,8 +60,10 @@ export function EscMenu() {
   // Show the sheet whenever pointer lock is released (browser ESC exits lock).
   useEffect(() => {
     const onChange = () => {
-      if (!useWorld.getState().started) return
-      useWorld.getState().setMenuOpen(!document.pointerLockElement)
+      const ws = useWorld.getState()
+      if (!ws.started) return
+      if (ws.mapOpen) return // the world map releases the cursor on purpose
+      ws.setMenuOpen(!document.pointerLockElement)
     }
     document.addEventListener('pointerlockchange', onChange)
     return () => document.removeEventListener('pointerlockchange', onChange)
@@ -192,6 +194,11 @@ function CreditsTab() {
       <div style={{ margin: '16px 0' }}><Divider /></div>
 
       <div style={sCreditHead}>Assets</div>
+      <ExternalRow
+        label="Minecraft Boat"
+        sub="vovash · CC BY 4.0"
+        href="https://sketchfab.com/3d-models/minecraft-boat-e0d9d3e6cdd1430e83c94bf4998ed391"
+      />
       <ExternalRow
         label="Stylized Lamp"
         sub="Sketchfab"

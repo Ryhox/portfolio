@@ -9,7 +9,7 @@ const UP = new THREE.Vector3(0, 1, 0)
 // Draws one InstancedMesh per model part. The model's intrinsic size is scaled
 // to a target height, multiplied by each item's variation, and seated on the
 // ground (offset by the model's minY).
-function Instanced({
+export function Instanced({
   parts,
   items,
   targetH,
@@ -19,6 +19,8 @@ function Instanced({
   recv,
   align,
   tilt,
+  tint,
+  sink,
 }: {
   parts: Part[]
   items: Placed[]
@@ -29,6 +31,8 @@ function Instanced({
   recv?: boolean
   align?: boolean
   tilt?: number // max random lean (radians) — breaks up rigid-vertical foliage
+  tint?: THREE.Color // per-instance multiplicative recolour (biome tint)
+  sink?: number // metres to embed the base below the ground (hides slope/facet gaps)
 }) {
   const meshes = useMemo(() => {
     const baseScale = targetH / (sizeY || 1)
@@ -67,15 +71,19 @@ function Instanced({
           qTilt.setFromAxisAngle(tiltAxis, (r2 - 0.5) * 2 * tilt)
           q.premultiply(qTilt)
         }
-        pos.set(it.x, it.y - minY * fs, it.z)
+        pos.set(it.x, it.y - minY * fs - (sink ?? 0), it.z)
         scl.set(fs, fs, fs)
         m4.compose(pos, q, scl)
         im.setMatrixAt(i, m4)
       })
       im.instanceMatrix.needsUpdate = true
+      if (tint) {
+        for (let i = 0; i < items.length; i++) im.setColorAt(i, tint)
+        if (im.instanceColor) im.instanceColor.needsUpdate = true
+      }
       return im
     })
-  }, [parts, items, targetH, sizeY, minY, cast, recv, align, tilt])
+  }, [parts, items, targetH, sizeY, minY, cast, recv, align, tilt, tint, sink])
 
   return (
     <>

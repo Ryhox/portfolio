@@ -329,3 +329,21 @@ export function buildSteps(): Step[] {
   }
   return out
 }
+
+// --- minimap markers --------------------------------------------------------
+// The notable .glb landmarks worth plotting on the minimap: every tree (incl.
+// the grand Heartwood), the rock outcrops, and the path lamps. Grass/flowers/
+// pebbles are skipped — they'd just be noise at map scale.
+export type MapProp = { x: number; z: number; kind: 'tree' | 'rock' | 'lamp' }
+export function buildMapProps(): MapProp[] {
+  const out: MapProp[] = []
+  for (const e of getPlacements()) {
+    let kind: MapProp['kind'] | null = null
+    if (TREE_MODELS.has(e.model)) kind = 'tree'
+    else if (ROCK_MODELS.has(e.model)) kind = 'rock'
+    else continue
+    for (const it of e.items) out.push({ x: it.x, z: it.z, kind })
+  }
+  for (const s of buildLampSpots()) out.push({ x: s.x, z: s.z, kind: 'lamp' })
+  return out
+}

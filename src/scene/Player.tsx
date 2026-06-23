@@ -12,6 +12,20 @@ import { SWIM } from './swimState'
 import { addRipple } from './rippleField'
 import { SEA_ROCKS } from './seaRocks'
 import { WIND } from './loadNature'
+import { REVEAL_DIST, WORLD_ALPHA } from './revealUniforms'
+import {
+  BOAT, BOAT_ACCEL, BOAT_DRAG, BOAT_MAX_SPEED, BOAT_REVERSE_SPEED,
+  BOAT_SAIL_LIMIT, BOAT_TURN_RATE, BOARD_RANGE, NAV,
+  boatColliders, disembarkSpot, floatPose, headingDir, launchBoat,
+  parkedPose, seatWorld, strandBoat,
+} from './boatState'
+import { archColliders, archSteps, archipelagoExtent, islandStats, nearestIsland, useArchipelago } from './archipelago/archipelago'
+import { EHOLD, ENTERING, TELEPORT, enterArchipelago, isTransitioning, returnHome } from './mapTransition'
+
+// Scratch objects reused each frame (no per-frame allocation).
+const _seat = { x: 0, y: 0, z: 0 }
+const _scratch = { x: 0, y: 0, z: 0 }
+const DEBUG = { freeze: false } // dev-only: hold an external camera for screenshots
 
 const EYE = 1.7 // eye height above ground when walking
 const SWIM_EYE = 0.5 // eye height above the water surface when floating
@@ -21,6 +35,10 @@ const SPRINT = 1.9
 const PLAYER_R = 0.45 // wanderer's body radius for prop collision
 const SWIM_LIMIT = 220 // soft boundary: a gentle current eases you back past this
 const BUOY = 0.2 // gentle float back toward the surface when not swimming down
+const HORIZON_R = 150 // sail past this radius on the home sea → cross to the archipelago
+const ENTER_BAND = 16 // within this distance of an island's shore → raise its banner
+const HOLD_SECS = 3 // hold E this long (s) in the archipelago to sail home
+const NO_SEA_ROCKS: typeof SEA_ROCKS = [] // home-only sea-stacks; empty on the archipelago
 
 // First-person wanderer: pointer-lock look + WASD. On land it's glued to the
 // ground with a head-bob; walk off any shore and it smoothly transitions to
@@ -39,10 +57,23 @@ export function Player() {
   const bobT = useRef(0)
   const wadeAmt = useRef(0)
   const rippleClock = useRef(0)
+  const eWasDown = useRef(false)
+  const eHeld = useRef(0)
+  const eConsumed = useRef(false)
+  const enteringId = useRef(-1)
   const started = useWorld((s) => s.started)
   const menuOpen = useWorld((s) => s.menuOpen)
-  const colliders = useMemo(() => buildColliders(), [])
-  const steps = useMemo(() => buildSteps(), [])
+  const mapOpen = useWorld((s) => s.mapOpen)
+  const mapId = useWorld((s) => s.mapId)
+  const islands = useArchipelago((s) => s.islands)
+  const colliders = useMemo(
+    () => (mapId === 'archipelago' ? archColliders(islands) : buildColliders()),
+    [mapId, islands],
+  )
+  const steps = useMemo(
+    () => (mapId === 'archipelago' ? archSteps(islands) : buildSteps()),
+    [mapId, islands],
+  )
 
   const look = useRef(new THREE.Vector3())
   const fwd = useRef(new THREE.Vector3())
@@ -57,8 +88,9 @@ export function Player() {
 
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
-      // Ignore movement input entirely while the settings sheet is open.
-      if (useWorld.getState().menuOpen) return
+      // Ignore movement input entirely while the settings sheet or world map is open.
+      const ws = useWorld.getState()
+      if (ws.menuOpen || ws.mapOpen) return
       keys.current[e.code] = true
       if (useWorld.getState().started && document.pointerLockElement !== gl.domElement) {
         if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
@@ -88,16 +120,19 @@ export function Player() {
     const onMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return
       const ws = useWorld.getState()
-      if (!ws.started || ws.menuOpen) return
+      if (!ws.started || ws.menuOpen || ws.mapOpen) return
       yaw.current   -= e.movementX * LOOK_SENS * (ws.invertX ? -1 : 1)
       pitch.current -= e.movementY * LOOK_SENS * (ws.invertY ? -1 : 1)
       pitch.current = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch.current))
+      // While sailing, yaw.current is a look OFFSET around the boat's heading —
+      // useFrame composes the final orientation, so don't set the camera here.
+      if (BOAT.mode === 'sailing') return
       euler.set(pitch.current, yaw.current, 0)
       camera.quaternion.setFromEuler(euler)
     }
     const onClick = () => {
       const ws = useWorld.getState()
-      if (ws.started && !ws.menuOpen && document.pointerLockElement !== canvas) requestLock()
+      if (ws.started && !ws.menuOpen && !ws.mapOpen && document.pointerLockElement !== canvas) requestLock()
     }
 
     document.addEventListener('mousemove', onMove)
@@ -109,10 +144,10 @@ export function Player() {
     }
   }, [gl, camera, euler])
 
-  // Drop any held keys when the sheet opens so the camera doesn't keep gliding.
+  // Drop any held keys when the sheet or world map opens so the camera doesn't keep gliding.
   useEffect(() => {
-    if (menuOpen) keys.current = {}
-  }, [menuOpen])
+    if (menuOpen || mapOpen) keys.current = {}
+  }, [menuOpen, mapOpen])
 
   // Cursor follows the *real* lock state, not the menu state: it stays visible
   // through the browser's ~1.25s re-lock cooldown after ESC (so you always have a
@@ -142,13 +177,240 @@ export function Player() {
     euler.setFromQuaternion(camera.quaternion)
     yaw.current = euler.y
     pitch.current = euler.x
+    // Start with the boat stranded on the beach behind the spawn.
+    useWorld.getState().setBoatMode('parked')
+    useWorld.getState().setBoardPrompt(false)
+    strandBoat()
   }, [started, camera, euler])
+
+  // E is handled in useFrame now (a tap boards/disembarks; a 3s hold in the
+  // archipelago sails you home) so we can tell a tap from a hold — see useFrame.
+
+  // Dev-only: lets the screenshot harness frame / board the boat.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    ;(window as unknown as { __boat: unknown }).__boat = {
+      face(dist = 7, h = 3) {
+        DEBUG.freeze = true
+        camera.position.set(
+          BOAT.x + Math.sin(BOAT.heading + 0.7) * dist,
+          h,
+          BOAT.z + Math.cos(BOAT.heading + 0.7) * dist,
+        )
+        camera.lookAt(BOAT.x, BOAT.y + 1.1, BOAT.z)
+        euler.setFromQuaternion(camera.quaternion)
+        yaw.current = euler.y
+        pitch.current = euler.x
+      },
+      board(p = -0.32) {
+        DEBUG.freeze = false
+        launchBoat()
+        BOAT.mode = 'sailing'
+        useWorld.getState().setBoatMode('sailing')
+        yaw.current = 0
+        pitch.current = p
+      },
+      reveal() {
+        REVEAL_DIST.value = 99999
+        WORLD_ALPHA.value = 1
+        useWorld.getState().setWorldVisible(true)
+      },
+      // Float the boat out on the sea and row in place, camera external.
+      extOars(thr = 1, trn = 0) {
+        DEBUG.freeze = true
+        BOAT.mode = 'parked'
+        BOAT.x = 0
+        BOAT.z = 96
+        BOAT.heading = 0
+        BOAT.throttle = thr
+        BOAT.turn = trn
+      },
+    }
+  }, [camera, euler])
+
+  // Raise the "you are entering <island>" banner + luck card when you're within
+  // ENTER_BAND of an island's shore. Called both while sailing (boat position)
+  // and on foot (camera position), so the text updates either way.
+  const updateEntering = (x: number, z: number) => {
+    const ni = nearestIsland(x, z)
+    if (ni && ni.edgeDist < ENTER_BAND) {
+      if (enteringId.current !== ni.isl.id) {
+        enteringId.current = ni.isl.id
+        ENTERING.name = ni.isl.name
+        ENTERING.stats = islandStats(ni.isl)
+        ENTERING.key++
+      }
+    } else if (enteringId.current !== -1) {
+      enteringId.current = -1
+      ENTERING.name = null
+      ENTERING.stats = null
+    }
+  }
 
   useFrame((state, dtRaw) => {
     const ws = useWorld.getState()
-    if (!ws.started || ws.menuOpen) return // freeze movement while the menu is up
+    if (!ws.started || ws.menuOpen || ws.mapOpen) return // freeze while the menu/map is up
     const dt = Math.min(dtRaw, 0.05)
     const time = state.clock.elapsedTime
+
+    if (DEBUG.freeze) { parkedPose(time); return } // dev: external camera holds
+
+    // Apply a pending map-flip teleport (sets the camera-ref state we own here).
+    if (TELEPORT.pending) {
+      yaw.current = TELEPORT.yaw
+      pitch.current = TELEPORT.pitch
+      if (TELEPORT.setPos) {
+        const ty = TELEPORT.ground ? Math.max(getHeight(TELEPORT.x, TELEPORT.z), WATER_LEVEL) + EYE : 0
+        camera.position.set(TELEPORT.x, ty, TELEPORT.z)
+        euler.set(pitch.current, yaw.current, 0)
+        camera.quaternion.setFromEuler(euler)
+        wadeAmt.current = 0
+        bobT.current = 0
+      }
+      TELEPORT.pending = false
+    }
+
+    // E — a tap boards / disembarks; a 3s hold in the archipelago sails you home.
+    // Acting on the RELEASE edge is what lets us tell a quick tap from a long hold.
+    if (isTransitioning()) {
+      eWasDown.current = false
+      EHOLD.progress = 0
+    } else {
+      const eDown = !!keys.current['KeyE']
+      if (eDown) {
+        if (!eWasDown.current) {
+          eHeld.current = 0
+          eConsumed.current = false
+        }
+        eHeld.current += dt
+        if (ws.mapId === 'archipelago') {
+          EHOLD.progress = Math.min(1, eHeld.current / HOLD_SECS)
+          if (eHeld.current >= HOLD_SECS && !eConsumed.current) {
+            eConsumed.current = true
+            EHOLD.progress = 0
+            returnHome()
+          }
+        }
+      } else {
+        if (eWasDown.current && !eConsumed.current) {
+          if (BOAT.mode === 'parked') {
+            if (BOAT.near) {
+              if (ws.mapId === 'home') {
+                // Board on the home isle → open the world map to choose where to
+                // sail; picking an island carries you across to it.
+                keys.current = {}
+                useArchipelago.getState().ensureLoaded()
+                ws.setMapOpen(true)
+              } else {
+                // Island-hopping: local sailing between the isles.
+                launchBoat()
+                BOAT.mode = 'sailing'
+                BOAT.speed = 0
+                keys.current = {}
+                yaw.current = 0
+                pitch.current = -0.06
+                ws.setBoatMode('sailing')
+                ws.setBoardPrompt(false)
+                BOAT.near = false
+                NAV.sailing = true
+              }
+            }
+          } else {
+            // Disembark beside the boat — onto sand, or into the water to SWIM if
+            // you're out at sea (seed the float so you never snap to the seabed).
+            const d = disembarkSpot(_scratch)
+            const gY = getHeight(d.x, d.z)
+            let standY: number
+            if (gY < -0.3) {
+              standY = WATER_LEVEL + waveHeight(d.x, d.z, time) + SWIM_EYE
+              wadeAmt.current = 1
+            } else {
+              standY = Math.max(gY, WATER_LEVEL) + EYE
+              wadeAmt.current = 0
+            }
+            camera.position.set(d.x, standY, d.z)
+            yaw.current = BOAT.heading + Math.PI + yaw.current
+            pitch.current = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch.current))
+            euler.set(pitch.current, yaw.current, 0)
+            camera.quaternion.setFromEuler(euler)
+            BOAT.mode = 'parked'
+            BOAT.throttle = 0
+            BOAT.turn = 0
+            keys.current = {}
+            ws.setBoatMode('parked')
+            NAV.sailing = false
+          }
+        }
+        EHOLD.progress = 0
+        eConsumed.current = false
+      }
+      eWasDown.current = eDown
+    }
+
+    // ── BOAT: sailing the open sea (first-person, seated) ──────────────────
+    if (BOAT.mode === 'sailing') {
+      const bk = keys.current
+      const thrIn = (bk['KeyW'] || bk['ArrowUp'] ? 1 : 0) - (bk['KeyS'] || bk['ArrowDown'] ? 1 : 0)
+      const trnIn = (bk['KeyD'] || bk['ArrowRight'] ? 1 : 0) - (bk['KeyA'] || bk['ArrowLeft'] ? 1 : 0)
+      // Smooth the inputs — these also drive the oar power/asymmetry.
+      BOAT.throttle += (thrIn - BOAT.throttle) * Math.min(1, dt * 6)
+      BOAT.turn += (trnIn - BOAT.turn) * Math.min(1, dt * 6)
+      // Integrate speed with passive drag.
+      BOAT.speed += thrIn * BOAT_ACCEL * dt
+      BOAT.speed -= BOAT.speed * BOAT_DRAG * dt
+      BOAT.speed = Math.max(-BOAT_REVERSE_SPEED, Math.min(BOAT_MAX_SPEED, BOAT.speed))
+      if (thrIn === 0 && Math.abs(BOAT.speed) < 0.04) BOAT.speed = 0
+      // Steering keeps some authority at a standstill so you can pivot in place.
+      const auth = 0.45 + 0.55 * Math.min(1, Math.abs(BOAT.speed) / 4)
+      BOAT.heading += trnIn * BOAT_TURN_RATE * auth * dt
+      // Move, but never climb onto land — slide along the shoreline instead.
+      const f = headingDir(BOAT.heading)
+      const nx = BOAT.x + f.x * BOAT.speed * dt
+      const nz = BOAT.z + f.z * BOAT.speed * dt
+      let blocked = false
+      if (getHeight(nx, BOAT.z) < -0.6) BOAT.x = nx
+      else blocked = true
+      if (getHeight(BOAT.x, nz) < -0.6) BOAT.z = nz
+      else blocked = true
+      if (blocked) BOAT.speed *= 0.6
+      // Gentle current easing you back inside the sailable area. On the home sea,
+      // crossing the horizon instead carries you off to the archipelago.
+      const rr = Math.hypot(BOAT.x, BOAT.z)
+      const sailLimit = ws.mapId === 'archipelago' ? archipelagoExtent() + 50 : BOAT_SAIL_LIMIT
+      if (rr > sailLimit) {
+        const s = (sailLimit + (rr - sailLimit) * (1 - Math.min(1, dt * 0.8))) / rr
+        BOAT.x *= s
+        BOAT.z *= s
+      }
+      if (ws.mapId === 'home' && rr > HORIZON_R) enterArchipelago()
+      // Float on the swell, with a touch of bow-lift from speed.
+      floatPose(time)
+      BOAT.pitch -= Math.min(0.14, Math.abs(BOAT.speed) * 0.008) * Math.sign(BOAT.speed)
+      // Seat the camera; the mouse adds a free-look offset around the heading.
+      seatWorld(_seat)
+      camera.position.set(_seat.x, _seat.y, _seat.z)
+      // Camera faces the bow: the camera's yaw=0 looks down -Z, the bow points
+      // +Z, so add PI. yaw.current is the free-look offset on top.
+      euler.set(pitch.current, BOAT.heading + Math.PI + yaw.current, 0)
+      camera.quaternion.setFromEuler(euler)
+      // No swimming while aboard; feed foliage + the minimap.
+      SWIM.wadeAmt = 0
+      SWIM.inWater = false
+      SWIM.underwater = false
+      SWIM.depth = 0
+      WIND.player.value.set(BOAT.x, BOAT.y, BOAT.z)
+      NAV.px = BOAT.x
+      NAV.pz = BOAT.z
+      NAV.fx = f.x
+      NAV.fz = f.z
+      NAV.sailing = true
+      // Near an island → raise the "entering X's Island" banner + luck card.
+      if (ws.mapId === 'archipelago') updateEntering(BOAT.x, BOAT.z)
+      return
+    }
+    // Keep the parked hull beached (or bobbing if you left it at sea).
+    parkedPose(time)
+
     const k = keys.current
     const w = wadeAmt.current // wade/swim amount from last frame
     const swimming = w >= 0.5
@@ -191,7 +453,7 @@ export function Player() {
           camera.position.z += dz * push
         }
       }
-      for (const rk of SEA_ROCKS) {
+      for (const rk of ws.mapId === 'home' ? SEA_ROCKS : NO_SEA_ROCKS) {
         const dx = camera.position.x - rk.x
         const dz = camera.position.z - rk.z
         const rr = rk.r + PLAYER_R
@@ -203,12 +465,29 @@ export function Player() {
           camera.position.z += dz * push
         }
       }
+      // The stranded boat is a solid hull you bump into (board it with E).
+      for (const c of boatColliders()) {
+        const dx = camera.position.x - c.x
+        const dz = camera.position.z - c.z
+        const rr = c.r + PLAYER_R
+        const d2 = dx * dx + dz * dz
+        if (d2 < rr * rr && d2 > 1e-6) {
+          const d = Math.sqrt(d2)
+          const push = (rr - d) / d
+          camera.position.x += dx * push
+          camera.position.z += dz * push
+        }
+      }
     }
 
-    // Soft swim boundary — a gentle current eases you back, no hard wall.
+    // Soft swim boundary — a gentle current eases you back, no hard wall. On the
+    // archipelago the playable area reaches the far clusters, so widen it to the
+    // archipelago extent (mirrors the sailing limit); otherwise stepping ashore on
+    // a distant island would drag you back toward the centre.
+    const walkLimit = ws.mapId === 'archipelago' ? archipelagoExtent() + 50 : SWIM_LIMIT
     const r = Math.hypot(camera.position.x, camera.position.z)
-    if (r > SWIM_LIMIT) {
-      const target = SWIM_LIMIT + (r - SWIM_LIMIT) * (1 - Math.min(1, dt * 0.8))
+    if (r > walkLimit) {
+      const target = walkLimit + (r - walkLimit) * (1 - Math.min(1, dt * 0.8))
       const s = target / r
       camera.position.x *= s
       camera.position.z *= s
@@ -272,6 +551,23 @@ export function Player() {
         addRipple(camera.position.x, camera.position.z, moving ? 0.12 : 0.05, 2.2)
       }
     }
+
+    // Parked boat: raise the board prompt when you're close; feed the minimap.
+    const bdx = camera.position.x - BOAT.x
+    const bdz = camera.position.z - BOAT.z
+    const near = bdx * bdx + bdz * bdz < BOARD_RANGE * BOARD_RANGE
+    if (near !== BOAT.near) {
+      BOAT.near = near
+      useWorld.getState().setBoardPrompt(near)
+    }
+    NAV.px = camera.position.x
+    NAV.pz = camera.position.z
+    NAV.fx = -Math.sin(yaw.current)
+    NAV.fz = -Math.cos(yaw.current)
+    NAV.sailing = false
+
+    // On foot in the archipelago, keep the entering banner + luck card current.
+    if (ws.mapId === 'archipelago') updateEntering(camera.position.x, camera.position.z)
   })
 
   return null

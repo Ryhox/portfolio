@@ -12,6 +12,7 @@ import { SEA_ROCKS, SEA_ROCK_MAX } from './seaRocks'
 // z-fights itself at grazing angles while you swim.
 
 const SIM_RES = 256.0 // must match RippleSim's render-target resolution
+export const ISLE_FOAM_MAX = 12 // max nearby islands that get their own foam ring (archipelago)
 
 const vertex = /* glsl */ `
   uniform float uTime;
@@ -56,6 +57,9 @@ const fragment = /* glsl */ `
   uniform float uIslandR;
   uniform float uUnder;
   uniform float uShoreFoam;
+  uniform float uHomeFoamOn;            // 1 = draw the home isle's shore ring; 0 on the archipelago
+  uniform vec4 uIslands[${ISLE_FOAM_MAX}]; // archipelago: xy = centre, z = radius
+  uniform int uIslandCount;
   uniform vec3 uDeep;
   uniform vec3 uShallow;
   uniform vec3 uFoam;
@@ -135,22 +139,41 @@ const fragment = /* glsl */ `
     col = mix(col, lineCol, clamp(lines * 0.2 + ripFoam * 0.15, 0.0, 1.0));
 
     // --- foam: a clean, solid shore line (hidden on the idle screen) ---
-    float ang = atan(vWorld.z, vWorld.x);
-    float coast = sin(ang * 5.0) * 2.5 + sin(ang * 11.0) * 1.2;
-    float r = length(vWorld.xz) + coast;
-    float ring = smoothstep(uIslandR + 4.0, uIslandR + 0.5, r) *
-                 smoothstep(uIslandR - 8.0, uIslandR - 2.0, r);
-    float bands = smoothstep(0.45, 0.95, sin(r * 0.8 - uTime * 1.4) * 0.5 + 0.5);
-    float foam = clamp(ring * (0.82 + 0.18 * bands), 0.0, 1.0) * uShoreFoam;
+    float foam = 0.0;
+    // Home isle: one big shore ring around the origin (+ optional sea-stack rings).
+    if (uHomeFoamOn > 0.5) {
+      float ang = atan(vWorld.z, vWorld.x);
+      float coast = sin(ang * 5.0) * 2.5 + sin(ang * 11.0) * 1.2;
+      float r = length(vWorld.xz) + coast;
+      float ring = smoothstep(uIslandR + 4.0, uIslandR + 0.5, r) *
+                   smoothstep(uIslandR - 8.0, uIslandR - 2.0, r);
+      float bands = smoothstep(0.45, 0.95, sin(r * 0.8 - uTime * 1.4) * 0.5 + 0.5);
+      foam = clamp(ring * (0.82 + 0.18 * bands), 0.0, 1.0) * uShoreFoam;
 
-    // optional foam rings around sea-stacks (none unless SEA_ROCKS is populated)
-    for (int i = 0; i < ${SEA_ROCK_MAX}; i++) {
-      if (i >= uRockCount) break;
-      vec2 rp = uRocks[i].xy;
-      float rr = uRocks[i].z;
-      float dr = length(vWorld.xz - rp);
-      float rk = smoothstep(rr + 5.0, rr + 1.0, dr) * smoothstep(rr - 1.0, rr + 1.0, dr);
-      foam = max(foam, clamp(rk * uShoreFoam, 0.0, 1.0));
+      // optional foam rings around sea-stacks (none unless SEA_ROCKS is populated)
+      for (int i = 0; i < ${SEA_ROCK_MAX}; i++) {
+        if (i >= uRockCount) break;
+        vec2 rp = uRocks[i].xy;
+        float rr = uRocks[i].z;
+        float dr = length(vWorld.xz - rp);
+        float rk = smoothstep(rr + 5.0, rr + 1.0, dr) * smoothstep(rr - 1.0, rr + 1.0, dr);
+        foam = max(foam, clamp(rk * uShoreFoam, 0.0, 1.0));
+      }
+    }
+
+    // Archipelago: a foam ring hugging each nearby island's shore (its own, not
+    // the home isle's). uIslands is refreshed each frame with the closest isles.
+    for (int i = 0; i < ${ISLE_FOAM_MAX}; i++) {
+      if (i >= uIslandCount) break;
+      vec2 ic = uIslands[i].xy;
+      float ir = uIslands[i].z;
+      vec2 rel = vWorld.xz - ic;
+      float ia = atan(rel.y, rel.x);
+      float wob = ir * 0.1;                                   // wobble scales with island size
+      float ir2 = length(rel) + (sin(ia * 5.0) + sin(ia * 11.0) * 0.5) * wob;
+      float ring2 = smoothstep(ir + 4.0, ir + 0.5, ir2) * smoothstep(ir - 4.0, ir - 1.0, ir2);
+      float bands2 = smoothstep(0.45, 0.95, sin(ir2 * 0.8 - uTime * 1.4) * 0.5 + 0.5);
+      foam = max(foam, clamp(ring2 * (0.82 + 0.18 * bands2), 0.0, 1.0) * uShoreFoam);
     }
 
     // cursor / fish / swimmer foam (clean single ring — the bit the user liked)
@@ -192,6 +215,9 @@ const rockData = Array.from({ length: SEA_ROCK_MAX }, (_, i) => {
   return rk ? new THREE.Vector4(rk.x, rk.z, rk.r, 0) : new THREE.Vector4(0, 0, 0, 0)
 })
 
+// Per-island foam slots (archipelago); Water.tsx refills these each frame.
+const isleData = Array.from({ length: ISLE_FOAM_MAX }, () => new THREE.Vector4(0, 0, 0, 0))
+
 export function createWaterMaterial() {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
@@ -200,6 +226,9 @@ export function createWaterMaterial() {
       uIslandR: { value: ISLAND_RADIUS },
       uUnder: { value: 0 },
       uShoreFoam: { value: 0 }, // 0 on the idle screen, ramps to 1 once you're in the world
+      uHomeFoamOn: { value: 1 }, // gated off on the archipelago (per-island foam instead)
+      uIslands: { value: isleData },
+      uIslandCount: { value: 0 },
       uDeep: { value: new THREE.Color(0x1b6f86) },
       uShallow: { value: new THREE.Color(0x57c6c0) },
       uFoam: { value: new THREE.Color(0xeafcff) },

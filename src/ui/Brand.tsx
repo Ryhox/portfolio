@@ -18,11 +18,13 @@ export function Brand() {
   const t        = useWorld(s => s.t)
   const started  = useWorld(s => s.started)
   const muted    = useWorld(s => s.muted)
+  const boatMode = useWorld(s => s.boatMode)
+  const mapId    = useWorld(s => s.mapId)
 
-  // "M" still toggles mute even though there's no on-screen button.
+  // "N" toggles mute (M now opens the world map — handled by WorldMap).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'KeyM') useWorld.getState().toggleMuted()
+      if (e.code === 'KeyN') useWorld.getState().toggleMuted()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -41,11 +43,31 @@ export function Brand() {
 
       {started && (
         <div style={sHints}>
-          <Hint cap="WASD"  label="Move" />
-          <Hint cap="Mouse" label="Look" />
-          <Hint cap="Shift" label="Sprint" />
-          <Hint cap="M"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
-          <Hint cap="ESC"   label="Settings" />
+          {boatMode === 'sailing' ? (
+            <>
+              <Hint cap="WASD"  label="Steer" />
+              <Hint cap="Mouse" label="Look" />
+              <Hint cap="E"     label="Step ashore" />
+              {mapId === 'archipelago' ? (
+                <Hint cap="Hold E" label="Sail home" />
+              ) : (
+                <Hint cap="Horizon" label="New isles" />
+              )}
+              <Hint cap="N"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
+              <Hint cap="ESC"   label="Settings" />
+            </>
+          ) : (
+            <>
+              <Hint cap="WASD"  label="Move" />
+              <Hint cap="Mouse" label="Look" />
+              <Hint cap="Shift" label="Sprint" />
+              {mapId === 'archipelago' && (
+                <Hint cap="Hold E" label="Sail home" />
+              )}
+              <Hint cap="N"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
+              <Hint cap="ESC"   label="Settings" />
+            </>
+          )}
         </div>
       )}
     </div>
