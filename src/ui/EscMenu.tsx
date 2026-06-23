@@ -41,7 +41,6 @@ const INJECTED_CSS = `
 }
 .alba-row { transition: background 0.12s; }
 .alba-row:hover { background: ${HIGHLIGHT}; }
-.alba-back:hover { opacity: 1; transform: translateX(-2px); }
 `
 
 type Tab = 'Settings' | 'Credits' | 'Socials'
@@ -187,16 +186,14 @@ export function EscMenu() {
             {tab === 'Socials' && <SocialsTab onExternal={setExtHref} />}
           </div>
         </div>
-      </div>
 
-      {/* Back arrow — bottom-left, resumes play */}
-      <button className="alba-back" style={sBack} onClick={closeMenu} aria-label="Back">
-        <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
-        <span style={sBackLabel}>Back</span>
-      </button>
+        {/* X close — top-right of the sheet, same as the world map's close button */}
+        <button style={sCloseX} onClick={closeMenu} aria-label="Close settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.4" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
 
       {extHref && (
         <ExternalWarning
@@ -403,24 +400,29 @@ const sOverlay: CSSProperties = {
   zIndex: 30,
 }
 
-const sBack: CSSProperties = {
-  position: 'fixed', bottom: 26, left: 24,
-  display: 'flex', alignItems: 'center', gap: 6,
-  appearance: 'none', background: 'none', border: 'none', padding: 6,
-  color: '#fff', cursor: 'pointer', opacity: 0.88, lineHeight: 0,
-  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
-  transition: 'opacity 0.12s, transform 0.12s',
-}
-
-const sBackLabel: CSSProperties = {
-  fontFamily: HAND, fontSize: 20, lineHeight: 1,
-  textShadow: '0 1px 3px rgba(0,0,0,0.6)',
-}
-
 const sSheetWrap: CSSProperties = {
   position: 'relative',
   width: 'min(90vw, 384px)',
   transform: 'rotate(-0.6deg)',
+}
+
+// X close button, pinned to the sheet's top-right corner above the spiral holes.
+const sCloseX: CSSProperties = {
+  position: 'absolute',
+  top: -14,
+  right: 6,
+  width: 30,
+  height: 30,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+  borderRadius: 8,
+  background: '#efe4c6',
+  border: '1px solid #d7c8a3',
+  boxShadow: '0 1px 2px rgba(90,69,40,0.25)',
+  cursor: 'pointer',
+  zIndex: 3,
 }
 
 const sHoleRow: CSSProperties = {
