@@ -11,6 +11,7 @@ import { smoothstep } from './palette'
 import { WIND } from './loadNature'
 import { DayNight } from './DayNight'
 import { LightShafts } from './LightShafts'
+import { ArchLightShafts } from './ArchLightShafts'
 import { GlowProps } from './GlowProps'
 import { Island } from './Island'
 import { Particles } from './Particles'
@@ -188,6 +189,7 @@ export function Experience() {
           otherwise hang over the archipelago's spawn (its origin sits where the
           home isle's effects live). */}
       {mapId === 'home' && <LightShafts />}
+      {mapId === 'archipelago' && <ArchLightShafts />}
       {mapId === 'home' ? (
         <>
           <Island />

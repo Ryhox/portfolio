@@ -197,6 +197,10 @@ export type DiscFill = {
   innerR?: number // keep a clear centre
   yOffset?: number
   awayFromPath?: number // reject if closer than this to the path
+  // Optional per-angle radius multiplier (mean ~1). Lets the fill follow a warped,
+  // non-circular shore so points spread to the same edge fraction in every
+  // direction instead of inside one inner circle. Defaults to a plain circle.
+  radiusShape?: (ang: number) => number
 }
 
 export function sampleDisc(o: DiscFill): Placed[] {
@@ -214,6 +218,7 @@ export function sampleDisc(o: DiscFill): Placed[] {
     innerR = 0,
     yOffset = 0,
     awayFromPath = 0,
+    radiusShape,
   } = o
   const rng = mulberry32(seed)
   const out: Placed[] = []
@@ -223,7 +228,8 @@ export function sampleDisc(o: DiscFill): Placed[] {
   while (out.length < target && guard < target * 60) {
     guard++
     const ang = rng() * Math.PI * 2
-    const rad = innerR + Math.sqrt(rng()) * (r - innerR)
+    const rOuter = radiusShape ? r * radiusShape(ang) : r
+    const rad = innerR + Math.sqrt(rng()) * (rOuter - innerR)
     const x = cx + Math.cos(ang) * rad
     const z = cz + Math.sin(ang) * rad
     const h = getHeight(x, z)

@@ -169,9 +169,16 @@ const fragment = /* glsl */ `
       float ir = uIslands[i].z;
       vec2 rel = vWorld.xz - ic;
       float ia = atan(rel.y, rel.x);
-      float wob = ir * 0.1;                                   // wobble scales with island size
-      float ir2 = length(rel) + (sin(ia * 5.0) + sin(ia * 11.0) * 0.5) * wob;
-      float ring2 = smoothstep(ir + 4.0, ir + 0.5, ir2) * smoothstep(ir - 4.0, ir - 1.0, ir2);
+      // Rebuild islandHeightAt's shoreShape() so the ring follows the lobed coast,
+      // not a circle. Phases come from the low 24 bits of the seed (packed in .w).
+      float packed = uIslands[i].w;
+      float p1 = mod(packed, 256.0) / 255.0 * 6.2831853;
+      float p2 = mod(floor(packed / 256.0), 256.0) / 255.0 * 6.2831853;
+      float p3 = mod(floor(packed / 65536.0), 256.0) / 255.0 * 6.2831853;
+      float shape = 1.0 + 0.18 * sin(ia * 2.0 + p1) + 0.12 * sin(ia * 3.0 + p2) + 0.08 * sin(ia * 5.0 + p3);
+      float irA = ir * shape;                                 // direction-warped shore radius
+      float ir2 = length(rel);
+      float ring2 = smoothstep(irA + 4.0, irA + 0.5, ir2) * smoothstep(irA - 4.0, irA - 1.0, ir2);
       float bands2 = smoothstep(0.45, 0.95, sin(ir2 * 0.8 - uTime * 1.4) * 0.5 + 0.5);
       foam = max(foam, clamp(ring2 * (0.82 + 0.18 * bands2), 0.0, 1.0) * uShoreFoam);
     }

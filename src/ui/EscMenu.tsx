@@ -275,6 +275,13 @@ function CreditsTab({ onExternal }: { onExternal: (href: string) => void }) {
         href="https://github.com/darkobyte/COSMOS"
         onExternal={onExternal}
       />
+      <ExternalRow
+        label="Helper"
+        sub="Plattnericus"
+        license="for giving ideas"
+        href="https://github.com/Plattnericus"
+        onExternal={onExternal}
+      />
 
       <div style={{ margin: '16px 0' }}><Divider /></div>
 

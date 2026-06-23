@@ -121,12 +121,15 @@ function clusterPos(group: number, slot: number): { cx: number; cz: number } {
 
 // Deterministic relaxation: nudge overlapping islands apart and off the spawn.
 function relax(islands: IslandInstance[]) {
+  // Space islands by their *bulged* radius (lobes reach radius·SHORE_MAX), so two
+  // coastlines facing each other still keep MARGIN of open water between them.
   for (let it = 0; it < 4; it++) {
     for (let i = 0; i < islands.length; i++) {
       const a = islands[i]
+      const ra = a.radius * SHORE_MAX
       if (!a.isMother) {
         const dc = Math.hypot(a.cx, a.cz) || 1
-        const minC = MIN_CENTER + a.radius
+        const minC = MIN_CENTER + ra
         if (dc < minC) {
           const s = minC / dc
           a.cx *= s
@@ -138,7 +141,7 @@ function relax(islands: IslandInstance[]) {
         const dx = b.cx - a.cx
         const dz = b.cz - a.cz
         const d = Math.hypot(dx, dz)
-        const need = a.radius + b.radius + MARGIN
+        const need = ra + b.radius * SHORE_MAX + MARGIN
         if (d < need && d > 1e-3) {
           // Mother islands are fixed anchors at the cluster centre — only the
           // stargazer island moves when something overlaps a mother.
@@ -247,23 +250,46 @@ export function buildIslands(logins: string[]): IslandInstance[] {
 }
 
 // --- height field -----------------------------------------------------------
+// Per-island coastline warp: instead of a perfect circle, the effective radius
+// breathes in and out with direction so every island reads as an organic, lobed
+// landmass. Built from a few angular harmonics with per-island phases (derived
+// from the seed) — periodic in angle, deterministic, and cheap to sample. Mean
+// is 1.0 so the island keeps its rolled `radius`; total swing stays under ~38%
+// so the shore stays convex-ish (no pinched-off or self-crossing spikes).
+// SHORE_MAX = the farthest the coast can bulge out (1 + sum of amplitudes); prop
+// sampling scales its disc by this so the lobes don't sit bare.
+export const SHORE_MAX = 1 + 0.18 + 0.12 + 0.08
+function shoreShape(isl: IslandInstance, ang: number): number {
+  const s = isl.seed
+  const p1 = ((s & 0xff) / 255) * Math.PI * 2
+  const p2 = (((s >> 8) & 0xff) / 255) * Math.PI * 2
+  const p3 = (((s >> 16) & 0xff) / 255) * Math.PI * 2
+  return (
+    1 +
+    0.18 * Math.sin(ang * 2 + p1) +
+    0.12 * Math.sin(ang * 3 + p2) +
+    0.08 * Math.sin(ang * 5 + p3)
+  )
+}
+
 // A single island's dome: a smooth hill that rises in the core and plunges below
 // the seabed past its shore. Used for both the visible mesh and archHeight.
 export function islandHeightAt(isl: IslandInstance, x: number, z: number): number {
   const dx = x - isl.cx
   const dz = z - isl.cz
   const d = Math.hypot(dx, dz)
-  const R = isl.radius
-  if (d > R * 1.8) return DEEP
+  // Warp the radius by direction so the coastline is island-shaped, not round.
+  const R = isl.radius * shoreShape(isl, Math.atan2(dz, dx))
+  if (d > R * 1.9) return DEEP
   const edge = d / R
   const mask = 1 - smoothstep(0.5, 1.0, edge)
   // Broad, gentle crown (sigma 0.72·R, not 0.5·R) so the centre rounds off
-  // softly instead of peaking. Peak height ≈ heightScale·0.6 (was ·1.15) so the
-  // islands read as low, rather-flat land rather than steep domes.
+  // softly instead of peaking. Peak height ≈ heightScale·0.46 so the islands read
+  // as low, rather-flat land rather than steep domes.
   const crown = Math.exp(-(d * d) / (2 * (R * 0.72) ** 2))
   // Mothers stand taller so they read as the grand central landmark of a group.
   const hs = isl.biome.heightScale * (isl.isMother ? 2.4 : 1)
-  let h = mask * hs * 0.38 + crown * hs * 0.22
+  let h = mask * hs * 0.30 + crown * hs * 0.16
   h += mask * fbm(x + isl.seedX, z + isl.seedZ, 3, 0.05) * isl.biome.detail
   h -= smoothstep(0.92, 1.6, edge) * 26 // plunge to the seabed past the shore
   return h
@@ -359,13 +385,15 @@ export function archDominantIsland(x: number, z: number): IslandInstance | null 
 }
 
 // Nearest islands to a point — fed to the water shader as a foam-ring array.
-export type FoamIsland = { cx: number; cz: number; radius: number }
+// `seed` carries the low 24 bits of the island seed so the shader can rebuild the
+// exact same `shoreShape` phases and hug the real (lobed) coastline, not a circle.
+export type FoamIsland = { cx: number; cz: number; radius: number; seed: number }
 export function foamIslands(x: number, z: number, max: number): FoamIsland[] {
   return ARCH.islands
     .map((i) => ({ i, d: Math.hypot(x - i.cx, z - i.cz) - i.radius }))
     .sort((a, b) => a.d - b.d)
     .slice(0, max)
-    .map(({ i }) => ({ cx: i.cx, cz: i.cz, radius: i.radius }))
+    .map(({ i }) => ({ cx: i.cx, cz: i.cz, radius: i.radius, seed: i.seed & 0xffffff }))
 }
 
 // --- per-island "how lucky was this roll" stats (shown on the luck card) -----
@@ -507,10 +535,14 @@ function buildArchPlacements(islands: IslandInstance[]): ArchEntry[] {
       // edge slope where they float / hang over the water. Ground cover & rocks
       // keep the wider spread so the island still looks full to its beaches.
       const isTreePlan = plan.models.some((m) => TREE_SET.has(m))
+      // Fill follows the warped coast: the disc reaches the same edge fraction in
+      // every direction (radiusShape), so lobes fill and dents pull back — no bare
+      // bulges, no props pushed past the shore or into the water.
       const items = sampleDisc({
         cx: isl.cx,
         cz: isl.cz,
         r: isl.radius * (isTreePlan ? 0.74 : 0.92),
+        radiusShape: (ang) => shoreShape(isl, ang),
         count: Math.max(1, Math.round(plan.count * areaScale)),
         seed,
         minScale: plan.minScale ?? 1,

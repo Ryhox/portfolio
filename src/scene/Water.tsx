@@ -62,7 +62,7 @@ export function Water() {
         const slots = u.uIslands.value as THREE.Vector4[]
         for (let i = 0; i < ISLE_FOAM_MAX; i++) {
           const isl = near[i]
-          if (isl) slots[i].set(isl.cx, isl.cz, isl.radius, 0)
+          if (isl) slots[i].set(isl.cx, isl.cz, isl.radius, isl.seed)
           else slots[i].set(0, 0, 0, 0)
         }
         u.uIslandCount.value = near.length

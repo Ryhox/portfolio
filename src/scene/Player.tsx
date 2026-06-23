@@ -351,7 +351,7 @@ export function Player() {
     if (BOAT.mode === 'sailing') {
       const bk = keys.current
       const thrIn = (bk['KeyW'] || bk['ArrowUp'] ? 1 : 0) - (bk['KeyS'] || bk['ArrowDown'] ? 1 : 0)
-      const trnIn = (bk['KeyD'] || bk['ArrowRight'] ? 1 : 0) - (bk['KeyA'] || bk['ArrowLeft'] ? 1 : 0)
+      const trnIn = (bk['KeyA'] || bk['ArrowRight'] ? 1 : 0) - (bk['KeyD'] || bk['ArrowLeft'] ? 1 : 0)
       // Smooth the inputs — these also drive the oar power/asymmetry.
       BOAT.throttle += (thrIn - BOAT.throttle) * Math.min(1, dt * 6)
       BOAT.turn += (trnIn - BOAT.turn) * Math.min(1, dt * 6)
