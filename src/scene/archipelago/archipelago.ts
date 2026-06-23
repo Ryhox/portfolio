@@ -190,6 +190,14 @@ function buildMother(theme: Theme, group: number): IslandInstance {
   }
 }
 
+// Hand-tuned island overrides for specific stargazers, keyed by lowercased login.
+// These replace ONLY that person's region/look/size — everyone else is still rolled
+// purely from their username hash, and the override doesn't touch the rng sequence,
+// so the island's terrain detail (seedX/seedZ) and everyone else stay identical.
+const ISLAND_OVERRIDES: Record<string, { themeId: string; variantId: string; sizeId: string }> = {
+  plattnericus: { themeId: 'bloomtide', variantId: 'sakura', sizeId: 'huge' }, // gifted a Huge Sakura Grove
+}
+
 export function buildIslands(logins: string[]): IslandInstance[] {
   // One mother island per group, anchored at the cluster centre. Stargazers start
   // at slot 1 so they ring the mother instead of landing on top of it.
@@ -200,10 +208,19 @@ export function buildIslands(logins: string[]): IslandInstance[] {
     const rng = mulberry32(seed)
     // Three permanent rolls from the username hash: theme (group), the look
     // within it, and the size tier. Order matters — keep it stable.
-    const theme = pickWeighted(THEMES, rng)
-    const biome = pickWeighted(theme.variants, rng)
-    const size = pickWeighted(SIZE_TIERS, rng)
-    const radius = size.rMin + rng() * (size.rMax - size.rMin)
+    let theme = pickWeighted(THEMES, rng)
+    let biome = pickWeighted(theme.variants, rng)
+    let size = pickWeighted(SIZE_TIERS, rng)
+    let radius = size.rMin + rng() * (size.rMax - size.rMin)
+    // Apply a hand-tuned override for this login, if any (after consuming the rng
+    // above so terrain detail and everyone else are unaffected).
+    const ov = ISLAND_OVERRIDES[login.toLowerCase()]
+    if (ov) {
+      theme = THEMES.find((t) => t.id === ov.themeId) ?? theme
+      biome = theme.variants.find((v) => v.id === ov.variantId) ?? biome
+      size = SIZE_TIERS.find((s) => s.id === ov.sizeId) ?? size
+      radius = (size.rMin + size.rMax) / 2
+    }
     const group = THEMES.indexOf(theme)
     const slot = slotByGroup[group]++ // running index within the cluster
     const { cx, cz } = clusterPos(group, slot)
