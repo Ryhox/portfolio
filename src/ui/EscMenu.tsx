@@ -301,6 +301,27 @@ function CreditsTab({ onExternal }: { onExternal: (href: string) => void }) {
         onExternal={onExternal}
       />
       <ExternalRow
+        label="Stylized Fish Model"
+        sub="RahulTambat"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/stylized-fish-model-730c3ca02c27453184652d1c4bbb757c"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="Cartoon Manta Ray"
+        sub="Jungle Jim"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/cartoon-manta-ray-animated-3f56886ab5fe4c7b8b151ea0974bf5b3"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="Trout Fish Animated"
+        sub="Sba Stuff"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/trout-fish-animated-4fa0cb7afc004d65bd49f406bffd5b2b"
+        onExternal={onExternal}
+      />
+      <ExternalRow
         label="Stylized Nature Megakit"
         sub="Quaternius"
         license="CC0"

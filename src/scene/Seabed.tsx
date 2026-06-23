@@ -1,4 +1,3 @@
-import { useFrame } from '@react-three/fiber'
 import { Suspense, useMemo } from 'react'
 import * as THREE from 'three'
 import { smoothstep } from './palette'
@@ -8,12 +7,7 @@ import { useWorld } from '../state/useWorld'
 import { n } from './config'
 import { SEABED_HALF, mulberry32, seabedHeight } from './seabedField'
 import { archipelagoExtent, useArchipelago } from './archipelago/archipelago'
-
-const _m4 = new THREE.Matrix4()
-const _q = new THREE.Quaternion()
-const _e = new THREE.Euler()
-const _p = new THREE.Vector3()
-const _s = new THREE.Vector3(1, 1, 1)
+import { UnderwaterFish } from './FishLife'
 
 // The ocean floor + its flora. A big deterministic dune field tucked under the
 // island, dressed with the project's own grass (reused as seagrass) and a few
@@ -190,69 +184,6 @@ function Seagrass({ rMin = 70, rMax = 220, count = 620 }: { rMin?: number; rMax?
   )
 }
 
-// ---- colorful reef fish (little schools circling the reef) -----------------
-function ReefFish({ rMin = 76, rMax = 196, count = 10 }: { rMin?: number; rMax?: number; count?: number }) {
-  const COLORS = [0xff8a3d, 0xffd23f, 0x4fc3ff, 0xff6fae, 0x9b7bff, 0x5fe6a0]
-
-  const { mesh, fish } = useMemo(() => {
-    const rng = mulberry32(303)
-    const schools: { cx: number; cz: number; cy: number; r: number; spd: number; n: number; col: number }[] = []
-    const target = n(count)
-    let guard = 0
-    while (schools.length < target && guard < target * 40) {
-      guard++
-      const ang = rng() * TAU
-      const rad = rMin + Math.sqrt(rng()) * (rMax - rMin)
-      const cx = Math.cos(ang) * rad
-      const cz = Math.sin(ang) * rad
-      if (getHeight(cx, cz) > -2) continue
-      schools.push({
-        cx,
-        cz,
-        cy: seabedHeight(cx, cz) + 2.2 + rng() * 2.5,
-        r: 2.5 + rng() * 3,
-        spd: (0.4 + rng() * 0.5) * (rng() < 0.5 ? 1 : -1),
-        n: 4 + Math.floor(rng() * 4),
-        col: COLORS[Math.floor(rng() * COLORS.length)],
-      })
-    }
-
-    const fish: { s: (typeof schools)[number]; phase: number; rr: number; yoff: number }[] = []
-    const frng = mulberry32(404)
-    for (const s of schools) for (let i = 0; i < s.n; i++) fish.push({ s, phase: frng() * TAU, rr: s.r * (0.7 + frng() * 0.5), yoff: (frng() - 0.5) * 1.2 })
-
-    const geo = new THREE.SphereGeometry(0.16, 8, 6)
-    geo.scale(2.0, 0.8, 0.8)
-    const m = patched(new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 }))
-    const mesh = new THREE.InstancedMesh(geo, m, Math.max(1, fish.length))
-    mesh.frustumCulled = false
-    const col = new THREE.Color()
-    fish.forEach((f, i) => mesh.setColorAt(i, col.setHex(f.s.col)))
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-    return { mesh, fish }
-  }, [rMin, rMax, count])
-
-  useFrame((state) => {
-    if (!useWorld.getState().worldVisible) return
-    const t = state.clock.elapsedTime
-    fish.forEach((f, i) => {
-      const a = f.phase + t * f.s.spd
-      const x = f.s.cx + Math.cos(a) * f.rr
-      const z = f.s.cz + Math.sin(a) * f.rr
-      const y = f.s.cy + f.yoff + Math.sin(t * 1.5 + f.phase) * 0.25
-      const tang = a + (f.s.spd > 0 ? Math.PI / 2 : -Math.PI / 2)
-      _e.set(0, -tang, 0)
-      _q.setFromEuler(_e)
-      _p.set(x, y, z)
-      _m4.compose(_p, _q, _s)
-      mesh.setMatrixAt(i, _m4)
-    })
-    mesh.instanceMatrix.needsUpdate = true
-  })
-
-  return <primitive object={mesh} />
-}
-
 export function Seabed() {
   const mapId = useWorld((s) => s.mapId)
   // Re-read when the archipelago loads so the floor grows to cover its islands.
@@ -267,8 +198,8 @@ export function Seabed() {
   // Spread the reef life across whichever floor we're on: a tight ring around the
   // home island, or the whole archipelago (counts scale with the bigger area).
   const flora = isArch
-    ? { cMin: 50, cMax: half - 30, corals: 90, grass: 2400, fish: 26 }
-    : { cMin: 0, cMax: 0, corals: 22, grass: 620, fish: 10 } // 0 → component defaults
+    ? { cMin: 50, cMax: half - 30, corals: 90, grass: 2400, schools: 18, perSchool: 6, mantas: 10 }
+    : { cMin: 0, cMax: 0, corals: 22, grass: 620 } // 0 → component defaults (home)
 
   return (
     <>
@@ -276,16 +207,22 @@ export function Seabed() {
       {isArch ? (
         <>
           <Corals rMin={flora.cMin} rMax={flora.cMax} count={flora.corals} />
-          <ReefFish rMin={flora.cMin} rMax={flora.cMax} count={flora.fish} />
           <Suspense fallback={null}>
+            <UnderwaterFish
+              rMin={flora.cMin}
+              rMax={flora.cMax}
+              schools={flora.schools}
+              perSchool={flora.perSchool}
+              mantas={flora.mantas}
+            />
             <Seagrass rMin={flora.cMin} rMax={flora.cMax} count={flora.grass} />
           </Suspense>
         </>
       ) : (
         <>
           <Corals />
-          <ReefFish />
           <Suspense fallback={null}>
+            <UnderwaterFish />
             <Seagrass />
           </Suspense>
         </>

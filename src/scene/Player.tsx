@@ -226,6 +226,14 @@ export function Player() {
         BOAT.turn = trn
       },
     }
+    // Park the camera anywhere (e.g. underwater) for screenshots/inspection.
+    ;(window as unknown as { __cam: unknown }).__cam = (
+      px: number, py: number, pz: number, lx = 0, ly = py, lz = 0,
+    ) => {
+      DEBUG.freeze = true
+      camera.position.set(px, py, pz)
+      camera.lookAt(lx, ly, lz)
+    }
   }, [camera, euler])
 
   // Raise the "you are entering <island>" banner + luck card when you're within

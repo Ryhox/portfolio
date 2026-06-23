@@ -1,13 +1,13 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { ISLAND_RADIUS, WATER_LEVEL } from './layout'
+import { WATER_LEVEL } from './layout'
 import { getSky } from './palette'
 import { useWorld } from '../state/useWorld'
 import { WORLD_ALPHA } from './revealUniforms'
 import { waveHeight, waveNormal } from './oceanWave'
-import { addRipple } from './rippleField'
 import { n } from './config'
+import { JumpingFish } from './FishLife'
 
 // Living touches out on the sea, all kept OUT of the island reveal (visible from
 // the idle screen on): little birds drifting the horizon, fish that arc out of
@@ -128,89 +128,6 @@ function Birds() {
   )
 }
 
-// ---- jumping fish ----------------------------------------------------------
-function Fish() {
-  const geo = useMemo(() => {
-    const g = new THREE.SphereGeometry(0.4, 10, 8)
-    g.scale(2.2, 0.7, 0.7) // stretched little body
-    return g
-  }, [])
-  const mat = useMemo(() => {
-    const m = new THREE.MeshStandardMaterial({ color: 0x8fa6b4, roughness: 0.4, metalness: 0.3 })
-    ;(m as any).__revealPatched = true
-    return m
-  }, [])
-
-  const fish = useMemo(
-    () =>
-      Array.from({ length: n(3) }, () => ({
-        active: false,
-        nextAt: 1 + Math.random() * 5,
-        t0: 0,
-        dur: 1,
-        x: 0,
-        z: 0,
-        dir: 0,
-        peak: 2,
-        speed: 4,
-      })),
-    [],
-  )
-  const refs = useRef<THREE.Mesh[]>([])
-
-  useFrame((state) => {
-    if (!useWorld.getState().worldVisible) return
-    const time = state.clock.elapsedTime
-    fish.forEach((f, i) => {
-      const mesh = refs.current[i]
-      if (!mesh) return
-      if (!f.active) {
-        mesh.visible = false
-        if (time > f.nextAt) {
-          // launch a new jump somewhere out in the sea
-          const ang = Math.random() * Math.PI * 2
-          const rad = ISLAND_RADIUS + 8 + Math.random() * 110
-          f.x = Math.cos(ang) * rad
-          f.z = Math.sin(ang) * rad
-          f.dir = Math.random() * Math.PI * 2
-          f.dur = 1.0 + Math.random() * 0.5
-          f.peak = 1.6 + Math.random() * 1.3
-          f.speed = 3 + Math.random() * 3
-          f.t0 = time
-          f.active = true
-          addRipple(f.x, f.z, 0.45, 3.0) // takeoff splash
-        }
-        return
-      }
-      const p = (time - f.t0) / f.dur
-      if (p >= 1) {
-        f.active = false
-        f.nextAt = time + 4 + Math.random() * 9
-        addRipple(f.x, f.z, 0.6, 3.4) // landing splash
-        mesh.visible = false
-        return
-      }
-      f.x += Math.cos(f.dir) * f.speed * 0.016
-      f.z += Math.sin(f.dir) * f.speed * 0.016
-      const surfaceY = WATER_LEVEL + waveHeight(f.x, f.z, time)
-      const arc = Math.sin(p * Math.PI) * f.peak
-      mesh.visible = true
-      mesh.position.set(f.x, surfaceY + arc - 0.2, f.z)
-      // nose up on the way out, down on the way in
-      const pitch = Math.cos(p * Math.PI) * 0.9
-      mesh.rotation.set(0, -f.dir, pitch)
-    })
-  })
-
-  return (
-    <>
-      {fish.map((_, i) => (
-        <mesh key={i} ref={(el) => (refs.current[i] = el!)} geometry={geo} material={mat} visible={false} />
-      ))}
-    </>
-  )
-}
-
 // ---- floating debris: planks, crates, barrels, bottles --------------------
 function FloatingDebris() {
   const types = useMemo(() => {
@@ -285,11 +202,19 @@ function FloatingDebris() {
 }
 
 export function OceanLife() {
+  const mapId = useWorld((s) => s.mapId)
+  // The jumping fish and the floating driftwood belong to the home isle only —
+  // the Stargazers Isles stay clean (no leaping fish, no trash on the water).
+  const home = mapId === 'home'
   return (
     <>
       <Birds />
-      <Fish />
-      <FloatingDebris />
+      {home && (
+        <Suspense fallback={null}>
+          <JumpingFish />
+        </Suspense>
+      )}
+      {home && <FloatingDebris />}
     </>
   )
 }
