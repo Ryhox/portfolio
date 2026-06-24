@@ -11,7 +11,21 @@ import {
   groupLabels,
   useArchipelago,
 } from '../scene/archipelago/archipelago'
+import { nextRefreshAt } from '../scene/archipelago/stargazers'
 import { buildMap, hexToRgb, landRamp, seaRamp } from './mapRender'
+
+// Same UTC-aligned 5-min refresh clock the big World map counts down to, so both
+// readouts hit zero together when the stargazer list re-pulls. Mirrors WorldMap's
+// formatCountdown.
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`
+  return `${m}:${pad(s)}`
+}
 
 // Colours an archipelago map pixel with the biome palette of the island under it
 // (grey Bleakshoal, white Frostfell, sandy desert, …); open sea uses the shared ramp.
@@ -29,7 +43,7 @@ function archMapColor(x: number, z: number, h: number): number[] {
 
 const R_WORLD_HOME = 230 // home offscreen covers world [-R, R]
 const VIEW = 135 // world radius shown in the minimap window
-const MM = 156 // on-screen size (css px)
+const MM = 148 // on-screen size (css px)
 
 const PROP_COLOR = { tree: '#2f5e2a', rock: '#8b8b92', lamp: '#f3c969' } as const
 
@@ -39,6 +53,10 @@ export function Minimap() {
   const islands = useArchipelago((s) => s.islands)
   const visible = sailing || mapId === 'archipelago'
 
+  // Mother isles are region landmarks, not stargazers — exclude them from the tally.
+  const stargazerCount = islands.reduce((n, i) => (i.isMother ? n : n + 1), 0)
+
+  const countdownRef = useRef<HTMLSpanElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const islandRef = useRef<HTMLCanvasElement | null>(null)
   const propsRef = useRef<MapProp[] | null>(null)
@@ -163,6 +181,18 @@ export function Minimap() {
     return () => cancelAnimationFrame(raf)
   }, [visible, mapId, islands])
 
+  // Tick the synced "next update" countdown once a second while in the isles.
+  useEffect(() => {
+    if (mapId !== 'archipelago') return
+    const update = () => {
+      const el = countdownRef.current
+      if (el) el.textContent = formatCountdown(nextRefreshAt(Date.now()) - Date.now())
+    }
+    update()
+    const id = window.setInterval(update, 1000)
+    return () => window.clearInterval(id)
+  }, [mapId])
+
   if (!visible) return null
 
   return (
@@ -170,19 +200,36 @@ export function Minimap() {
       <div style={sWrap}>
         <canvas ref={canvasRef} style={sCanvas} />
       </div>
-      {/* Hint chips beside the minimap (archipelago only): "Hold E · Sail home"
-          stacked above "M · World map" — same flat chip design as the corner hints. */}
+      {/* Right-of-minimap column (archipelago only): the stargazer tally + the
+          synced "next update" countdown pinned to the top, the control-hint chips
+          to the bottom — both aligned to the minimap's height. */}
       {mapId === 'archipelago' && (
-        <div style={sHintStack}>
-          <div style={sHintRow}>
-            <span style={sHintCap}>Hold E</span>
-            <span style={sHintLabel}>Sail home</span>
+        <>
+          {/* Stargazer tally + synced "next update" countdown — one line, pinned to
+              the bottom-centre of the screen. */}
+          <div style={sStarCard}>
+            <span style={sStarCount}>
+              <span style={sStarNum}>{stargazerCount}</span>{' '}
+              {stargazerCount === 1 ? 'Stargazer' : 'Stargazers'} {'<3'}
+            </span>
+            <span style={sStarDot}>·</span>
+            <span style={sStarLabel}>Next possible update in</span>
+            <span ref={countdownRef} style={sStarTime}>
+              --:--
+            </span>
           </div>
-          <div style={sHintRow}>
-            <span style={sHintCap}>M</span>
-            <span style={sHintLabel}>World map</span>
+          {/* Control hints to the right of the minimap. */}
+          <div style={sHintStack}>
+            <div style={sHintRow}>
+              <span style={sHintCap}>Hold E</span>
+              <span style={sHintLabel}>Sail home</span>
+            </div>
+            <div style={sHintRow}>
+              <span style={sHintCap}>M</span>
+              <span style={sHintLabel}>World map</span>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </>
   )
@@ -208,7 +255,66 @@ const sCanvas: CSSProperties = {
   borderRadius: 12,
   display: 'block',
   boxSizing: 'border-box',
-  border: '1.5px solid rgba(20,16,10,0.5)', // thin frame around the whole minimap
+  border: '5px solid #f7f1e1', // thick whitish-cream frame around the map
+}
+
+// Solid cream chip — same paper + ink palette as the Hold E / M key chips, so it
+// reads as part of the same HUD family. Sits just above the minimap (left-aligned
+// to it) as its little header, with a comfortable gap so nothing feels cramped.
+const sStarCard: CSSProperties = {
+  position: 'fixed',
+  left: '50%',
+  bottom: 22,
+  transform: 'translateX(-50%)', // pinned to the bottom-centre of the screen
+  boxSizing: 'border-box',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '5px 13px',
+  borderRadius: 9,
+  background: '#241c10', // solid dark paper, just kept small/quiet
+  border: '1px solid rgba(245,233,207,0.18)',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+  whiteSpace: 'nowrap',
+  zIndex: 120,
+  pointerEvents: 'none',
+  userSelect: 'none',
+}
+
+const sStarCount: CSSProperties = {
+  fontFamily: HAND,
+  fontSize: 15,
+  lineHeight: 1,
+  color: 'rgba(240,230,207,0.9)', // soft cream
+}
+
+// The count number stays light green, just a touch dimmer.
+const sStarNum: CSSProperties = {
+  color: '#88c97e',
+  fontWeight: 700,
+}
+
+// Dot separator between the tally and the countdown.
+const sStarDot: CSSProperties = {
+  fontFamily: HAND,
+  fontSize: 15,
+  color: 'rgba(240,230,207,0.35)',
+}
+
+const sStarLabel: CSSProperties = {
+  fontFamily: HAND,
+  fontSize: 13,
+  lineHeight: 1,
+  color: 'rgba(240,230,207,0.6)',
+}
+
+const sStarTime: CSSProperties = {
+  fontFamily: HAND,
+  fontSize: 15,
+  lineHeight: 1,
+  color: 'rgba(245,177,63,0.9)', // gold, slightly softened
+  letterSpacing: 1,
+  fontVariantNumeric: 'tabular-nums',
 }
 
 // Hint chips beside the minimap — mirror Brand's corner hint design.

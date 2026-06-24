@@ -202,7 +202,7 @@ const INK_DARK = '#5a4528'
 // ── Prompt (bottom-centre) ───────────────────────────────────────────────────
 const sPrompt: CSSProperties = {
   position: 'fixed',
-  bottom: 34,
+  bottom: 150,
   left: '50%',
   transform: 'translate(-50%, 10px)',
   zIndex: 128,
@@ -246,7 +246,7 @@ const sPromptLabel: CSSProperties = {
 // ── Panel ────────────────────────────────────────────────────────────────────
 const sPanel: CSSProperties = {
   position: 'fixed',
-  bottom: 34,
+  bottom: 150,
   left: '50%',
   transform: 'translate(-50%, 10px)',
   zIndex: 129,
