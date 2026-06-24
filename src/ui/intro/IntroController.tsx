@@ -13,27 +13,31 @@
  *   4. Audio fades in simultaneously
  *   5. At camera-arrival+0.3s: pointer lock + game active
  */
-import { useProgress } from '@react-three/drei'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { startAmbience, setVol as setAudioVol } from '../../audio/useAmbience'
 import { requestLock } from '../../scene/pointerLock'
 import { FLY, useWorld } from '../../state/useWorld'
 import { introActions } from './introActions'
+import { useLoadStatus } from './loadStatus'
 
 export function IntroController() {
-  const started      = useWorld((s) => s.started)
-  const { progress } = useProgress()
+  const started   = useWorld((s) => s.started)
+  // Overall load progress drives the ring fill; warmReady (GPU warm-up done) is
+  // what actually unlocks the reveal — so the world is never shown until every
+  // shader/texture/mesh is on the GPU and the first look-around is hitch-free.
+  const progress  = useLoadStatus((s) => s.progress)
+  const warmReady = useLoadStatus((s) => s.warmReady)
   const [ready,         setReady]         = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const step0Fired = useRef(false)
 
   useEffect(() => {
-    useWorld.getState().setIntroProgress(progress / 100)
+    useWorld.getState().setIntroProgress(progress)
   }, [progress])
 
   useEffect(() => {
-    if (progress < 100 || step0Fired.current) return
+    if (!warmReady || step0Fired.current) return
     step0Fired.current = true
 
     const id = setTimeout(() => {
@@ -57,7 +61,7 @@ export function IntroController() {
       // Reset flag so StrictMode's unmount/remount cycle can re-fire correctly
       step0Fired.current = false
     }
-  }, [progress])
+  }, [warmReady])
 
   // Cursor: pointer while ready and waiting for click
   useEffect(() => {

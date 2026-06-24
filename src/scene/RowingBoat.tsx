@@ -64,6 +64,17 @@ export function RowingBoat() {
     const mesh = new THREE.InstancedMesh(geo, mat, N_DRIPS)
     mesh.frustumCulled = false
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    // Park every drip off-screen + invisible to start. The frame loop only
+    // rewrites a drip's matrix while it's alive, so the buffer must already hold
+    // this hidden pose (an InstancedMesh otherwise defaults to identity = a
+    // visible unit sphere at the origin).
+    const parked = new THREE.Matrix4().compose(
+      new THREE.Vector3(0, -999, 0),
+      new THREE.Quaternion(),
+      new THREE.Vector3(0.001, 0.001, 0.001),
+    )
+    for (let i = 0; i < N_DRIPS; i++) mesh.setMatrixAt(i, parked)
+    mesh.instanceMatrix.needsUpdate = true
     const data = Array.from({ length: N_DRIPS }, () => ({ x: 0, y: -999, z: 0, vx: 0, vy: 0, vz: 0, life: 0 }))
     return { mesh, data }
   }, [])
@@ -138,19 +149,20 @@ export function RowingBoat() {
       r.wet = planted
     }
 
-    // advance falling drips
+    // Advance falling drips. Only the live ones (and the frame one lands) touch
+    // their matrix — once they've all settled, the buffer already holds them parked
+    // off-screen, so we skip the per-frame GPU upload entirely while the boat idles.
     let dirty = false
     for (let i = 0; i < drips.data.length; i++) {
       const d = drips.data[i]
-      if (d.life > 0) {
-        d.vy -= GRAV * dt
-        d.x += d.vx * dt
-        d.y += d.vy * dt
-        d.z += d.vz * dt
-        d.life -= dt
-        const wy = WATER_LEVEL + waveHeight(d.x, d.z, time)
-        if (d.y <= wy) d.life = 0
-      }
+      if (d.life <= 0) continue
+      d.vy -= GRAV * dt
+      d.x += d.vx * dt
+      d.y += d.vy * dt
+      d.z += d.vz * dt
+      d.life -= dt
+      const wy = WATER_LEVEL + waveHeight(d.x, d.z, time)
+      if (d.y <= wy) d.life = 0
       _dummy.position.set(d.x, d.life > 0 ? d.y : -999, d.z)
       _dummy.scale.setScalar(d.life > 0 ? 0.6 + d.life * 0.5 : 0.001)
       _dummy.updateMatrix()

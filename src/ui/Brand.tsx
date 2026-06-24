@@ -14,8 +14,21 @@ function clock(t: number) {
 // clock (top-centre, in-game), and the player movement hints (bottom-right, shown
 // the whole time you're exploring but hidden while the settings sheet is open).
 // Click-through except where noted.
+// The live clock readout. Subscribes to the DERIVED "HH:MM" string rather than
+// the raw `t` (which the day/night driver mutates every frame), so zustand only
+// re-renders this tiny node when the displayed minute actually changes (~10×/s)
+// instead of 60×/s — and the rest of Brand never re-renders on time at all.
+function Clock() {
+  const label = useWorld((s) => clock(s.t))
+  return (
+    <div style={sClock}>
+      <ClockIcon />
+      <span>{label}</span>
+    </div>
+  )
+}
+
 export function Brand() {
-  const t        = useWorld(s => s.t)
   const started  = useWorld(s => s.started)
   const muted    = useWorld(s => s.muted)
   const boatMode = useWorld(s => s.boatMode)
@@ -34,12 +47,7 @@ export function Brand() {
     <div style={sContainer}>
       <img src="/ui/logo.png" alt="logo" style={sLogo} />
 
-      {started && (
-        <div style={sClock}>
-          <ClockIcon />
-          <span>{clock(t)}</span>
-        </div>
-      )}
+      {started && <Clock />}
 
       {started && (
         <div style={sHints}>

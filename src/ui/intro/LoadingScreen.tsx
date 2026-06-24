@@ -1,16 +1,19 @@
-import { useProgress } from '@react-three/drei'
 import gsap from 'gsap'
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { introActions } from './introActions'
+import { useLoadStatus } from './loadStatus'
 
 export function LoadingScreen() {
-  const { progress } = useProgress()
+  // Overall progress (asset download → GPU warm-up) and the current phase caption,
+  // both fed by the Warmup component inside the Canvas.
+  const progress = useLoadStatus((s) => s.progress)
+  const phase    = useLoadStatus((s) => s.phase)
   const overlayRef   = useRef<HTMLDivElement>(null)
   const barFillRef   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!barFillRef.current) return
-    gsap.to(barFillRef.current, { width: `${progress}%`, duration: 0.4, ease: 'power1.out' })
+    gsap.to(barFillRef.current, { width: `${Math.min(100, Math.round(progress * 100))}%`, duration: 0.4, ease: 'power1.out' })
   }, [progress])
 
   useEffect(() => {
@@ -33,7 +36,7 @@ export function LoadingScreen() {
   return (
     <div ref={overlayRef} style={sOverlay}>
       <span style={sGlyph}>✦</span>
-      <div style={sText}>gathering magic...</div>
+      <div style={sText}>{phase}…</div>
       <div style={sBarOuter}>
         <div ref={barFillRef} style={sBarFill} />
       </div>

@@ -29,6 +29,9 @@ function useBubbleTexture() {
 
 const BUBBLES = 70
 const RAYS = 6
+// Cool aqua tint mixed into the sunbeam colour each frame — a shared constant so
+// the per-ray recolour below allocates nothing.
+const _RAY_AQUA = new THREE.Color(0xdff6ff)
 
 export function Underwater() {
   const camera = useThree((s) => s.camera)
@@ -93,7 +96,7 @@ export function Underwater() {
     const rayBase = amt * s.dayAmt * 0.16
     rayMats.forEach((m, i) => {
       m.opacity = rayBase * (0.6 + 0.4 * Math.sin(time * 0.6 + rayDefs[i].phase))
-      m.color.copy(s.sunColor).lerp(new THREE.Color(0xdff6ff), 0.6)
+      m.color.copy(s.sunColor).lerp(_RAY_AQUA, 0.6)
     })
 
     // bubbles rise

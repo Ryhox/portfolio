@@ -44,21 +44,111 @@ function TimeDriver() {
   return null
 }
 
-// Traverses the scene every frame and auto-patches any unpatched built-in material
-// with the reveal ring effect. ShaderMaterial/RawShaderMaterial are skipped since
-// they don't use #include tokens and need manual patching.
+// Patch one built-in material with the reveal ring effect; returns true if it was
+// newly patched. ShaderMaterial/RawShaderMaterial are skipped — they don't use
+// #include tokens and are patched manually.
+function patchOne(m: THREE.Material | null | undefined): boolean {
+  if (!m || (m as any).__revealPatched) return false
+  if (m.type === 'ShaderMaterial' || m.type === 'RawShaderMaterial') return false
+  patchReveal(m)
+  return true
+}
+
+// Queue every not-yet-seen texture on a material for GPU upload. A texture is
+// decoded + uploaded synchronously on its first DRAW, so a previously-culled
+// textured prop freezes the frame the instant it swings into view — uploading
+// ahead of time (a few per frame, below) moves that cost off the critical path.
+// Built-in material texture slots (map, normalMap, …) are top-level properties.
+function queueTextures(m: THREE.Material, seen: WeakSet<THREE.Texture>, queue: THREE.Texture[]) {
+  for (const key in m) {
+    const v = (m as any)[key]
+    if (v && v.isTexture && !seen.has(v)) {
+      seen.add(v)
+      queue.push(v)
+    }
+  }
+}
+
+// How many queued textures to upload per frame during warm-up. Small, so the
+// warm-up itself never hitches (texture uploads vary wildly in cost).
+const TEX_PER_FRAME = 3
+
+// Traverses the scene each sweep to do two jobs:
+//
+//  1. Auto-patch any unpatched built-in material with the reveal ring effect.
+//
+//  2. WARM UP shaders for freshly-arrived content. Three.js compiles a material's
+//     GLSL lazily — the first frame it's actually rendered — and with frustum
+//     culling that moment is "when you first turn to look at it" or "when a model
+//     finishes streaming in". That synchronous compile is a main-thread stall: a
+//     random stutter that gets worse the more models the scene has. So whenever
+//     the mesh count grows we kick off gl.compileAsync (parallel shader compile,
+//     off the main thread) to compile everything up front — during the idle/intro
+//     screen for the home map, and behind the fade veil for the archipelago.
+//     compiledCount tracks what the last compile covered, so once the scene
+//     settles this stops firing.
+//
+// The full-scene traverse is the per-frame cost, so post-start we throttle: every
+// 12th frame while content is still settling (the window where an unpatched
+// material would pop through the ring, or a new model could hitch), backing off to
+// every 60th once the scene is stable — nothing left to patch or warm. During the
+// intro/reveal we sweep every frame so everything is patched and warmed before the
+// reveal plays. REVEAL_DIST is maxed once started, so a late patch is invisible.
+const PATCH_ACTIVE = 12
+const PATCH_STABLE = 60
 function RevealPatcher() {
-  const { scene } = useThree()
+  const { scene, gl, camera } = useThree()
+  const frame = useRef(0)
+  const interval = useRef(PATCH_ACTIVE)
+  const compiledCount = useRef(-1)
+  const compiling = useRef(false)
+  const texQueue = useRef<THREE.Texture[]>([])
+  const texSeen = useRef(new WeakSet<THREE.Texture>())
   useFrame(() => {
+    // Drain a few queued texture uploads every frame (NOT gated by the sweep
+    // throttle below) so a textured prop never decodes/uploads mid-draw.
+    const q = texQueue.current
+    for (let i = 0; i < TEX_PER_FRAME && q.length; i++) gl.initTexture(q.pop()!)
+
+    if (useWorld.getState().started && ++frame.current % interval.current !== 0) return
+
+    let meshCount = 0
+    let patchedNew = false
     scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh)) return
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const m of mats) {
-        if (!m || (m as any).__revealPatched) continue
-        if (m.type === 'ShaderMaterial' || m.type === 'RawShaderMaterial') continue
-        patchReveal(m)
+      meshCount++
+      const mat = obj.material
+      if (Array.isArray(mat)) {
+        for (const m of mat) {
+          if (patchOne(m)) patchedNew = true
+          if (m) queueTextures(m, texSeen.current, q)
+        }
+      } else {
+        if (patchOne(mat)) patchedNew = true
+        if (mat) queueTextures(mat, texSeen.current, q)
       }
     })
+
+    // New meshes since the last warm-up → compile their shaders before they're
+    // ever drawn. Guarded so only one parallel compile is in flight at a time.
+    if (meshCount !== compiledCount.current && !compiling.current) {
+      compiling.current = true
+      const covered = meshCount
+      const done = () => {
+        compiling.current = false
+        compiledCount.current = covered
+      }
+      const r = gl as unknown as { compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<unknown> }
+      if (r.compileAsync) r.compileAsync(scene, camera).then(done, done)
+      else {
+        gl.compile(scene, camera)
+        done()
+      }
+    }
+
+    // Stay alert while anything is still streaming in / waiting to be warmed;
+    // relax the sweep rate once the scene is fully patched and compiled.
+    interval.current = patchedNew || meshCount !== compiledCount.current ? PATCH_ACTIVE : PATCH_STABLE
   })
   return null
 }

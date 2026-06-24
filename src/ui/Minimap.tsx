@@ -64,11 +64,23 @@ export function Minimap() {
     const half = MM / 2
     const sc = half / VIEW // world units → minimap px
     let raf = 0
+    // The whole minimap is a function of the player pose (NAV) over a static baked
+    // map + markers, so when you're holding still the next frame is pixel-identical
+    // — track the last-drawn pose and skip the redraw until it actually moves.
+    let lpx = NaN
+    let lpz = NaN
+    let lfx = NaN
+    let lfz = NaN
 
     const draw = () => {
       raf = requestAnimationFrame(draw)
       const island = islandRef.current
       if (!island) return
+      if (NAV.px === lpx && NAV.pz === lpz && NAV.fx === lfx && NAV.fz === lfz) return
+      lpx = NAV.px
+      lpz = NAV.pz
+      lfx = NAV.fx
+      lfz = NAV.fz
       const rW = rWorldRef.current
       const pxPerWorld = island.width / (2 * rW)
       ctx.save()

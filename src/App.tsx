@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense } from 'react'
 import * as THREE from 'three'
 import { Experience } from './scene/Experience'
+import { Warmup } from './scene/Warmup'
 import { LITE } from './scene/config'
 import { Brand } from './ui/Brand'
 import { EscMenu } from './ui/EscMenu'
@@ -25,10 +26,13 @@ export default function App() {
         shadows={LITE ? false : 'soft'}
         dpr={LITE ? 1 : [1, 2]}
         camera={{ fov: 60, near: 0.1, far: 2800, position: [100, 44, 0] }}
-        gl={{ antialias: true, alpha: true, toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.08 }}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.08 }}
       >
         {/* No <color> — canvas is transparent so CSS body #0c0a18 shows through */}
         <IntroGrid />
+        {/* Outside Suspense so it tracks asset progress during loading, then warms
+            the GPU (shaders/geometry/shadows/textures) before the intro reveals. */}
+        <Warmup />
         <Suspense fallback={null}>
           <Experience />
         </Suspense>

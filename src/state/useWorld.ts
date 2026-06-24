@@ -20,6 +20,8 @@ export type WorldState = {
   muted: boolean
   menuOpen: boolean
   quality: Quality
+  motionBlur: boolean       // temporal motion-blur post effect (Medium/High quality)
+  motionBlurAmount: number  // 0..1 strength of the motion-blur trail
   invertX: boolean
   invertY: boolean
   volMaster: number
@@ -46,6 +48,9 @@ export type WorldState = {
   setSunMesh: (m: Object3D | null) => void
   setMenuOpen: (open: boolean) => void
   cycleQuality: () => void
+  setMotionBlur: (v: boolean) => void
+  toggleMotionBlur: () => void
+  setMotionBlurAmount: (v: number) => void
   toggleInvert: (axis: 'x' | 'y') => void
   setVol: (key: VolKey, v: number) => void
   setIntroProgress: (p: number) => void
@@ -75,6 +80,8 @@ export const useWorld = create<WorldState>((set) => ({
   muted: false,
   menuOpen: false,
   quality: 'High',
+  motionBlur: true,
+  motionBlurAmount: 0.25,
   invertX: false,
   invertY: false,
   volMaster: 1,
@@ -104,6 +111,9 @@ export const useWorld = create<WorldState>((set) => ({
     set((s) => ({
       quality: QUALITY_ORDER[(QUALITY_ORDER.indexOf(s.quality) + 1) % QUALITY_ORDER.length],
     })),
+  setMotionBlur: (motionBlur) => set({ motionBlur }),
+  toggleMotionBlur: () => set((s) => ({ motionBlur: !s.motionBlur })),
+  setMotionBlurAmount: (motionBlurAmount) => set({ motionBlurAmount }),
   toggleInvert: (axis) =>
     set((s) => (axis === 'x' ? { invertX: !s.invertX } : { invertY: !s.invertY })),
   setVol: (key, v) => set({ [VOL_KEY_MAP[key]]: v } as Partial<WorldState>),

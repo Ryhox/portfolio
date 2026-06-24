@@ -21,6 +21,12 @@ import { mulberry32, seabedHeight } from './seabedField'
 // reveal (like every other ocean element) and ride the world, not the click.
 
 const TAU = Math.PI * 2
+// Animation LOD: a fish further than this from the camera is well beyond the
+// underwater fog far-distance (~38-60u), so it's fogged to solid murk and you
+// can't see its body wriggle. We keep moving it (position is a pure function of
+// time, so there's never a pop when you approach) but skip the costly skeletal
+// AnimationMixer update until it's close enough to actually be seen.
+const FISH_ANIM_DIST2 = 80 * 80
 const GOLD = '/models/gold_fish_model.glb'
 const MANTA = '/models/cartoon_manta_ray_animated.glb'
 const TROUT = '/models/trout_fish_animated.glb'
@@ -168,15 +174,19 @@ function GoldSchools({
     if (!useWorld.getState().worldVisible) return
     const t = state.clock.elapsedTime
     const dt = Math.min(dtRaw, 0.05)
+    const cx = state.camera.position.x
+    const cz = state.camera.position.z
     fish.forEach((f, i) => {
       const g = refs.current[i]
       if (!g) return
-      instances[i].mixer.update(dt)
       const a = f.phase + t * f.s.spd
       const x = f.s.cx + Math.cos(a) * f.rr
       const z = f.s.cz + Math.sin(a) * f.rr
       const y = f.s.cy + f.yoff + Math.sin(t * 1.4 + f.phase) * 0.3
       g.position.set(x, y, z)
+      // only animate the skeleton when close enough to be seen (see FISH_ANIM_DIST2)
+      const ddx = x - cx, ddz = z - cz
+      if (ddx * ddx + ddz * ddz < FISH_ANIM_DIST2) instances[i].mixer.update(dt)
       // face the way it's actually moving (tangent to the circle, sign-aware)
       g.rotation.y = Math.atan2(-Math.sin(a) * f.s.spd, Math.cos(a) * f.s.spd)
       g.rotation.z = Math.sin(t * 1.4 + f.bob) * 0.12 // gentle bank
@@ -236,15 +246,19 @@ function Mantas({ rMin, rMax, count }: { rMin: number; rMax: number; count: numb
     if (!useWorld.getState().worldVisible) return
     const t = state.clock.elapsedTime
     const dt = Math.min(dtRaw, 0.05)
+    const cx = state.camera.position.x
+    const cz = state.camera.position.z
     rays.forEach((r, i) => {
       const g = refs.current[i]
       if (!g) return
-      instances[i].mixer.update(dt)
       const a = r.phase + t * r.spd
       const x = r.cx + Math.cos(a) * r.r
       const z = r.cz + Math.sin(a) * r.r
       const y = r.cy + Math.sin(t * 0.35 + r.bob) * 1.1 // slow rise and fall
       g.position.set(x, y, z)
+      // skeleton only when close enough to be seen (see FISH_ANIM_DIST2)
+      const ddx = x - cx, ddz = z - cz
+      if (ddx * ddx + ddz * ddz < FISH_ANIM_DIST2) instances[i].mixer.update(dt)
       g.rotation.y = Math.atan2(-Math.sin(a) * r.spd, Math.cos(a) * r.spd)
       g.rotation.z = Math.sin(t * 0.4 + r.bob) * 0.18 // lazy roll into the turn
       if (import.meta.env.DEV && i === 0) (window as any).__mantaLive = [x, y, z, g.rotation.y]

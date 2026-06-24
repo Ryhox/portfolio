@@ -41,10 +41,17 @@ export function CompassHUD() {
     const ctx = canvas.getContext('2d')!
     const norm = (d: number) => ((d + 540) % 360) - 180 // wrap to −180..180
     let raf = 0
+    // The strip only depends on the heading, so when you're not turning the canvas
+    // would redraw an identical frame — skip it and only repaint when the bearing
+    // actually changes (rounded to a hair under a pixel of strip movement).
+    let lastBearing = NaN
 
     const draw = () => {
       raf = requestAnimationFrame(draw)
       const bearing = (Math.atan2(NAV.fx, -NAV.fz) * 180) / Math.PI
+      const rounded = Math.round(bearing * 64) / 64
+      if (rounded === lastBearing) return
+      lastBearing = rounded
       const cx = W / 2
       ctx.save()
       ctx.scale(dpr, dpr)

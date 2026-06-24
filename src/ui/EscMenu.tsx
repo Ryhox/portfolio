@@ -49,6 +49,8 @@ export function EscMenu() {
   const started  = useWorld(s => s.started)
   const menuOpen = useWorld(s => s.menuOpen)
   const quality  = useWorld(s => s.quality)
+  const motionBlur       = useWorld(s => s.motionBlur)
+  const motionBlurAmount = useWorld(s => s.motionBlurAmount)
   const volMusic = useWorld(s => s.volMusic)
   const volWaves = useWorld(s => s.volWaves) // representative of the SFX group
   const invertX  = useWorld(s => s.invertX)
@@ -170,6 +172,23 @@ export function EscMenu() {
                 <ValueRow label="Graphics" value={quality} busy={applying} onClick={cycleGraphics} />
                 <Divider />
                 <ValueRow label="Language" value="English" />
+                <Divider />
+
+                <Toggle
+                  label="Motion blur"
+                  on={motionBlur}
+                  onClick={() => useWorld.getState().toggleMotionBlur()}
+                />
+                {motionBlur && (
+                  <Fader
+                    label="Blur strength"
+                    value={motionBlurAmount}
+                    onChange={(v) => useWorld.getState().setMotionBlurAmount(v)}
+                  />
+                )}
+                {motionBlur && quality === 'Low' && (
+                  <div style={sMbNote}>Needs Medium or High graphics</div>
+                )}
                 <Divider />
 
                 <Fader label="Music" value={volMusic} onChange={setMusic} />
@@ -540,6 +559,12 @@ const sMinMax: CSSProperties = {
   display: 'flex', justifyContent: 'space-between',
   marginTop: 6,
   fontFamily: HAND, color: INK_SOFT, fontSize: 16,
+}
+
+// Hint shown when motion blur is on but the current quality has no post stack.
+const sMbNote: CSSProperties = {
+  fontFamily: HAND, color: '#a9762a', fontSize: 15,
+  padding: '0 4px 4px', lineHeight: 1.2,
 }
 
 const sToggleTrack: CSSProperties = {
