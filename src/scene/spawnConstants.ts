@@ -2,7 +2,7 @@ import { getHeight } from './terrain'
 import { HEART } from './layout'
 
 export const SPAWN_X = 2
-export const SPAWN_Z = 54
+export const SPAWN_Z = 72
 
 // Ring/reveal is on the hilltop Heartwood tree, not the beach spawn.
 export const RING_X = HEART.x

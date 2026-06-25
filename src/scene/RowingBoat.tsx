@@ -8,6 +8,8 @@ import {
 } from './boatState'
 import { WATER_LEVEL } from './terrain'
 import { waveHeight } from './oceanWave'
+import { getSky } from './palette'
+import { useWorld } from '../state/useWorld'
 
 // minecraft_boat.glb (vovash, CC-BY-4.0) ships its two paddles as separate
 // meshes (Object_3 / Object_4). We re-parent each onto a pivot at its top so it
@@ -53,6 +55,7 @@ export function RowingBoat() {
   const rigRef = useRef<THREE.Group>(null)
   const tiltRef = useRef<THREE.Group>(null)
   const modelRef = useRef<THREE.Group>(null)
+  const lanternRef = useRef<THREE.PointLight>(null)
   const ampL = useRef(0)
   const ampR = useRef(0)
   const rt = useRef([{ wet: false }, { wet: false }])
@@ -103,6 +106,15 @@ export function RowingBoat() {
       rigRef.current.rotation.set(0, BOAT.heading, 0)
     }
     if (tiltRef.current) tiltRef.current.rotation.set(BOAT.pitch, 0, BOAT.roll)
+
+    // A warm light shining down on the beached boat — lit only while it's PARKED
+    // on the HOME isle (off while sailing and off in the archipelago). No visible
+    // fixture; just gently flickering illumination from above, swelling at night.
+    const ws = useWorld.getState()
+    const homeParked = ws.mapId === 'home' && BOAT.mode === 'parked'
+    const nf = getSky(ws.t).nightFactor
+    const flick = 0.88 + Math.sin(time * 6.5) * 0.08 + Math.sin(time * 13.3 + 1.2) * 0.04
+    if (lanternRef.current) lanternRef.current.intensity = homeParked ? (0.5 + nf * 3.4) * flick : 0
 
     // Per-paddle effort. Forward/back move BOTH paddles; a pure turn paddles on
     // just ONE side (real canoe steering), so only that paddle swings.
@@ -184,6 +196,9 @@ export function RowingBoat() {
           >
             <primitive object={model} />
           </group>
+          {/* invisible warm light shining down on the boat, centred — only when
+              parked on the home isle */}
+          <pointLight ref={lanternRef} position={[0, 3.2, 0]} color={0xffb86a} distance={11} decay={2} intensity={0} />
         </group>
       </group>
 

@@ -4,7 +4,7 @@ import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { NOOK, REGIONS } from './layout'
 import { getSky } from './palette'
-import { getHeight } from './terrain'
+import { getHeight, getNormal } from './terrain'
 import { buildLampSpots } from './placement'
 import { useWorld } from '../state/useWorld'
 import { patchReveal } from './patchReveal'
@@ -23,6 +23,7 @@ function rng(seed: number) {
 // regardless of its native units, then its base is dropped flush to the ground.
 const LAMP_HEIGHT = 3.4
 const LAMP_WARM = new THREE.Color(0xffb86a)
+const LAMP_UP = new THREE.Vector3(0, 1, 0)
 
 // Stylized lamp model — replaces the old box-built lantern. Auto-scaled from its
 // own bounding box so it stands LAMP_HEIGHT tall, base on the ground. Each
@@ -32,7 +33,7 @@ const LAMP_WARM = new THREE.Color(0xffb86a)
 // light near the head matches the old lantern's pool of light.
 const lum = (c: THREE.Color) => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
 
-function Lamp({ pos }: { pos: [number, number, number] }) {
+function Lamp({ pos, rotY }: { pos: [number, number, number]; rotY: number }) {
   const { scene } = useGLTF('/models/stylized_lamp.glb')
   const light = useRef<THREE.PointLight>(null!)
   const phase = useMemo(() => Math.random() * 6.28, [])
@@ -115,6 +116,13 @@ function Lamp({ pos }: { pos: [number, number, number] }) {
     return { model: root, lightPos: lp }
   }, [scene])
 
+  // Tilt the post so it stands on the slope correctly (its base follows the
+  // ground normal instead of poking through / floating on inclines).
+  const quat = useMemo(() => {
+    const n = getNormal(pos[0], pos[2])
+    return new THREE.Quaternion().setFromUnitVectors(LAMP_UP, n)
+  }, [pos])
+
   useFrame((state) => {
     const nf = getSky(useWorld.getState().t).nightFactor
     const flick = 0.85 + Math.sin(state.clock.elapsedTime * 7 + phase) * 0.15
@@ -124,9 +132,11 @@ function Lamp({ pos }: { pos: [number, number, number] }) {
   })
 
   return (
-    <group position={pos}>
-      <primitive object={model} />
-      <pointLight ref={light} position={lightPos} color={0xffb86a} distance={9} decay={2} />
+    <group position={pos} quaternion={quat}>
+      <group rotation={[0, rotY, 0]}>
+        <primitive object={model} />
+        <pointLight ref={light} position={lightPos} color={0xffb86a} distance={9} decay={2} />
+      </group>
     </group>
   )
 }
@@ -194,14 +204,14 @@ function GlowMushrooms({
 
 export function GlowProps() {
   const lanterns = useMemo(
-    () => buildLampSpots().map((s) => [s.x, s.y, s.z] as [number, number, number]),
+    () => buildLampSpots().map((s) => ({ pos: [s.x, s.y, s.z] as [number, number, number], rotY: s.rotY })),
     [],
   )
 
   return (
     <>
-      {lanterns.map((p, i) => (
-        <Lamp key={i} pos={p} />
+      {lanterns.map((l, i) => (
+        <Lamp key={i} pos={l.pos} rotY={l.rotY} />
       ))}
       <GlowMushrooms center={[NOOK.x - 1.8, NOOK.z + 1.6]} count={7} seed={1} color={0x49f5e0} />
       <GlowMushrooms center={[REGIONS.spookyCorner.x, REGIONS.spookyCorner.z]} count={9} seed={2} color={0x7be36b} />

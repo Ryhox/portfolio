@@ -5,11 +5,16 @@ import { COUNT_MUL } from './config'
 import {
   HEART,
   ISLAND_RADIUS,
+  ISLET,
   NOOK,
   PLAYER_SPAWN as SPAWN_HINT,
+  SOCIAL_ARC,
   TERRAIN_HALF,
   WATER_LEVEL,
+  distToMainPath,
   distToPath,
+  distToSocialPath,
+  distToWestPath,
 } from './layout'
 
 export { ISLAND_RADIUS, WATER_LEVEL, TERRAIN_HALF, SHORE_LIMIT } from './layout'
@@ -84,15 +89,20 @@ function homeHeight(x: number, z: number): number {
   // --- macro: the smooth, intentional shape ---
   let macro = mask * 3.2
   const dHill = Math.hypot(x - HEART.x, z - HEART.z)
-  // Clamped Gaussian: plateau at the summit so the hilltop is a proper flat
-  // chilling spot rather than a sharp peak. Cap kicks in within ~12 units of
-  // center, giving a generous flat crown before the slope falls away.
-  const hillGauss = Math.exp(-(dHill * dHill) / (2 * (HEART.r * 0.6) ** 2))
-  const hillShape = Math.min(hillGauss * 1.5, 1.0)
+  // Gaussian with a SMOOTH plateau cap. A hard Math.min(…, 1) leaves a sharp
+  // crease where the flat crown meets the slope — that kink reads as a steep step
+  // and makes the path's stepping stones float at the shoulder. smoothstep eases
+  // into the plateau (derivative → 0 at the cap), so the crown rounds gently into
+  // the hillside with no crease.
+  const hillGauss = Math.exp(-(dHill * dHill) / (2 * (HEART.r * 0.82) ** 2))
+  const hillShape = smoothstep(0, 1, hillGauss * 1.5)
   macro += hillShape * HEART.height * (0.45 + 0.55 * mask)
   macro -= smoothstep(0.9, 1.5, edge) * 26 // plunge below the seabed dunes so the open-water floor covers the island edge
 
   // --- detail: rolling bumps, smoothed out in cleared areas ---
+  // distToPath covers every trail branch (climb, social fork, west spur), so each is
+  // flattened + slightly recessed the same way and the stones lie flush on all of
+  // them. Only the narrow path corridor is touched — the hill/island are untouched.
   const onPath = smoothstep(7.0, 3.0, distToPath(x, z))
   const dNook = Math.hypot(x - NOOK.x, z - NOOK.z)
   const inNook = smoothstep(NOOK.r, NOOK.r * 0.4, dNook)
@@ -100,11 +110,58 @@ function homeHeight(x: number, z: number): number {
   const inHilltop = smoothstep(9.0, 4.0, dHill)
   const flatten = Math.max(onPath * 0.92, inNook * 0.88, inHilltop * 0.85)
 
-  const detail = mask * fbm(x, z, 4, 0.015) * 4.0 * (1 - flatten)
+  // Lowered amplitude (was 4.0) for a gentler, less bumpy island to walk.
+  const detail = mask * fbm(x, z, 4, 0.015) * 2.4 * (1 - flatten)
 
   let h = macro + detail
   h -= onPath * 0.08
+
+  // The west spur reads better as a gentle RAISED dirt trail than a recessed one on
+  // the hill's shoulder — lift just that path corridor a touch (smoothly blended).
+  h += smoothstep(3.6, 1.4, distToWestPath(x, z)) * 0.1
+
+  // Flat dais beside the tree for the social pedestals: level the ground to the
+  // height at the arc centre, blended out past flatR. Guarded against recursion
+  // (the one-off centre sample skips this block).
+  if (!_arcOff) {
+    const dArc = Math.hypot(x - SOCIAL_ARC.x, z - SOCIAL_ARC.z)
+    const arcBlend = smoothstep(SOCIAL_ARC.flatR + 2.5, SOCIAL_ARC.flatR, dArc)
+    if (arcBlend > 0) h = h * (1 - arcBlend) + arcFlatHeight() * arcBlend
+  }
+
+  // The sakura islet behind the spawn — raise a small flat-topped island out of
+  // the sea. Purely additive (Math.max), so it never lowers the main island: a
+  // level crown within flatR, sloping down to below the waterline past r. The
+  // outline is warped by low-frequency noise so it reads as a natural island.
+  {
+    const ix = x - ISLET.x
+    const iz = z - ISLET.z
+    const ang = Math.atan2(iz, ix)
+    const wob = noise(Math.cos(ang) * 1.3 + 40, Math.sin(ang) * 1.3 - 20) * ISLET.wobble
+    const rEff = ISLET.r + wob
+    const dIslet = Math.hypot(ix, iz)
+    if (dIslet < rEff) {
+      const flat = smoothstep(rEff, ISLET.flatR + wob * 0.5, dIslet)
+      const islet = (WATER_LEVEL - 1.4) + (ISLET.top - (WATER_LEVEL - 1.4)) * flat
+      if (islet > h) h = islet
+    }
+  }
   return h
+}
+
+// The level height of the social dais — matched to the LOCAL ground at the dais
+// centre (out on the eastern shelf, ~1u below the tree crown) so the platform sits
+// flush with the shelf instead of as a raised terrace. Sampled once with the
+// flatten disabled, then reused so the platform is perfectly flat.
+let _arcOff = false
+let _arcH: number | null = null
+function arcFlatHeight(): number {
+  if (_arcH === null) {
+    _arcOff = true
+    _arcH = getHeight(SOCIAL_ARC.x, SOCIAL_ARC.z)
+    _arcOff = false
+  }
+  return _arcH
 }
 
 const EPS = 0.6
@@ -170,9 +227,16 @@ export function colorAt(x: number, h: number, z: number, normalY: number, out = 
   _rock.copy(COL_ROCK).multiplyScalar(0.82 + tint * 0.32)
   out.lerp(_rock, rockAmt)
 
-  // worn dirt trail — generously wide so the stepping stones always sit on bare
-  // ground rather than appearing to float over the grass.
-  const onPath = smoothstep(7.0, 3.0, distToPath(x, z)) * smoothstep(0.3, 1.6, h)
+  // worn dirt trail — kept fairly narrow so it hugs the stepping stones instead of
+  // washing wide swaths of grass to dirt on either side. The MAIN climb fans a touch
+  // wider only at the front (the trailhead near the south beach, z≳34); the social
+  // branch stays slim the whole way so it reads as the same kind of trail, not a
+  // broad muddy clearing.
+  const frontWiden = smoothstep(34, 50, z)
+  const mainDirt = smoothstep(4.0 + frontWiden * 2.6, 1.6, distToMainPath(x, z))
+  const socialDirt = smoothstep(2.6, 1.3, distToSocialPath(x, z))
+  const westDirt = smoothstep(2.6, 1.3, distToWestPath(x, z))
+  const onPath = Math.max(mainDirt, socialDirt, westDirt) * smoothstep(0.3, 1.6, h)
   out.lerp(COL_DIRT, onPath * 0.82)
   return out
 }
@@ -197,6 +261,7 @@ export type DiscFill = {
   innerR?: number // keep a clear centre
   yOffset?: number
   awayFromPath?: number // reject if closer than this to the path
+  avoid?: { x: number; z: number; r: number }[] // reject points inside these discs (e.g. clear ground around the pedestals)
   // Optional per-angle radius multiplier (mean ~1). Lets the fill follow a warped,
   // non-circular shore so points spread to the same edge fraction in every
   // direction instead of inside one inner circle. Defaults to a plain circle.
@@ -218,6 +283,7 @@ export function sampleDisc(o: DiscFill): Placed[] {
     innerR = 0,
     yOffset = 0,
     awayFromPath = 0,
+    avoid,
     radiusShape,
   } = o
   const rng = mulberry32(seed)
@@ -237,6 +303,16 @@ export function sampleDisc(o: DiscFill): Placed[] {
     if (!zones.includes(classifyZone(h, ny))) continue
     if (ny < maxSlope) continue
     if (awayFromPath > 0 && distToPath(x, z) < awayFromPath) continue
+    if (avoid) {
+      let inAvoid = false
+      for (const a of avoid) {
+        if ((x - a.x) ** 2 + (z - a.z) ** 2 < a.r * a.r) {
+          inAvoid = true
+          break
+        }
+      }
+      if (inAvoid) continue
+    }
     if (md2 > 0) {
       let tooClose = false
       for (const p of out) {

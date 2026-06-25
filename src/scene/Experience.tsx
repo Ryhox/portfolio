@@ -25,6 +25,9 @@ import { OceanLife } from './OceanLife'
 import { OceanHorizon } from './OceanHorizon'
 import { Seabed } from './Seabed'
 import { Campfire, HilltopBenches } from './Campfire'
+import { MessageBoard } from './MessageBoard'
+import { BoardCamera } from './BoardCamera'
+import { Summit } from './SummitScene'
 import { RowingBoat } from './RowingBoat'
 import { BoatPrompt } from './BoatPrompt'
 import { registerOccluder, unregisterOccluder } from './occluders'
@@ -287,6 +290,13 @@ export function Experience() {
           <HilltopBenches />
           <GlowProps />
           <HorizonGate />
+          <Suspense fallback={null}>
+            <Summit />
+          </Suspense>
+          <Suspense fallback={null}>
+            <MessageBoard />
+          </Suspense>
+          <BoardCamera />
           <Suspense fallback={null}>
             <Occluders>
               <NatureField />

@@ -16,8 +16,12 @@ import { WaterOverlay } from './ui/WaterOverlay'
 import { MapTransition } from './ui/MapTransition'
 import { EnteringIslandBanner } from './ui/EnteringIslandBanner'
 import { IslandInfo } from './ui/IslandInfo'
+import { AboutPanel } from './ui/AboutPanel'
+import { ProjectsBoard } from './ui/ProjectsBoard'
+import { SitHint } from './ui/SitHint'
 import { CompassHUD } from './ui/CompassHUD'
 import { HoldReturnIndicator } from './ui/HoldReturnIndicator'
+import { QuestList } from './ui/QuestList'
 
 export default function App() {
   return (
@@ -47,8 +51,12 @@ export default function App() {
       <WaterOverlay />
       <EnteringIslandBanner />
       <IslandInfo />
+      <AboutPanel />
+      <ProjectsBoard />
+      <SitHint />
       <CompassHUD />
       <HoldReturnIndicator />
+      <QuestList />
       <MapTransition />
     </>
   )

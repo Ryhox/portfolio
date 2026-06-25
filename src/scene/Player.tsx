@@ -19,6 +19,8 @@ import {
   boatColliders, disembarkSpot, floatPose, headingDir, launchBoat,
   parkedPose, seatWorld, strandBoat,
 } from './boatState'
+import { BOARD_FOCUS } from './boardFocus'
+import { SIT } from './benchSit'
 import { archColliders, archSteps, archipelagoExtent, islandStats, nearestIsland, useArchipelago } from './archipelago/archipelago'
 import { EHOLD, ENTERING, TELEPORT, enterArchipelago, isTransitioning, returnHome } from './mapTransition'
 
@@ -88,9 +90,10 @@ export function Player() {
 
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
-      // Ignore movement input entirely while the settings sheet or world map is open.
+      // Ignore movement input entirely while the settings sheet, world map, or
+      // projects board is open.
       const ws = useWorld.getState()
-      if (ws.menuOpen || ws.mapOpen) return
+      if (ws.menuOpen || ws.mapOpen || ws.projectsOpen) return
       keys.current[e.code] = true
       if (useWorld.getState().started && document.pointerLockElement !== gl.domElement) {
         if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
@@ -120,7 +123,7 @@ export function Player() {
     const onMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== canvas) return
       const ws = useWorld.getState()
-      if (!ws.started || ws.menuOpen || ws.mapOpen) return
+      if (!ws.started || ws.menuOpen || ws.mapOpen || ws.projectsOpen || SIT.active) return
       yaw.current   -= e.movementX * LOOK_SENS * (ws.invertX ? -1 : 1)
       pitch.current -= e.movementY * LOOK_SENS * (ws.invertY ? -1 : 1)
       pitch.current = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch.current))
@@ -132,7 +135,7 @@ export function Player() {
     }
     const onClick = () => {
       const ws = useWorld.getState()
-      if (ws.started && !ws.menuOpen && !ws.mapOpen && document.pointerLockElement !== canvas) requestLock()
+      if (ws.started && !ws.menuOpen && !ws.mapOpen && !ws.projectsOpen && document.pointerLockElement !== canvas) requestLock()
     }
 
     document.addEventListener('mousemove', onMove)
@@ -144,10 +147,12 @@ export function Player() {
     }
   }, [gl, camera, euler])
 
-  // Drop any held keys when the sheet or world map opens so the camera doesn't keep gliding.
+  // Drop any held keys when the sheet, world map, or projects board opens so the
+  // camera doesn't keep gliding.
+  const projectsOpen = useWorld((s) => s.projectsOpen)
   useEffect(() => {
-    if (menuOpen || mapOpen) keys.current = {}
-  }, [menuOpen, mapOpen])
+    if (menuOpen || mapOpen || projectsOpen) keys.current = {}
+  }, [menuOpen, mapOpen, projectsOpen])
 
   // Cursor follows the *real* lock state, not the menu state: it stays visible
   // through the browser's ~1.25s re-lock cooldown after ESC (so you always have a
@@ -164,14 +169,13 @@ export function Player() {
     }
   }, [gl])
 
-  // Spawn on the south beach looking north toward the hill.
   useEffect(() => {
     if (!started) return
     const spawnX = 2
-    const spawnZ = 54
+    const spawnZ = 72
     const spawnY = Math.max(getHeight(spawnX, spawnZ), 0.15) + EYE
     camera.position.set(spawnX, spawnY, spawnZ)
-    camera.lookAt(0, 3, 0)
+    camera.lookAt(2, 1.5, 55)
     // Seed the look controller's yaw/pitch from the spawn orientation so the first
     // mouse move continues smoothly instead of snapping.
     euler.setFromQuaternion(camera.quaternion)
@@ -258,6 +262,7 @@ export function Player() {
   useFrame((state, dtRaw) => {
     const ws = useWorld.getState()
     if (!ws.started || ws.menuOpen || ws.mapOpen) return // freeze while the menu/map is up
+    if (BOARD_FOCUS.active || SIT.active) return // the board/bench camera owns the view; stay put
     const dt = Math.min(dtRaw, 0.05)
     const time = state.clock.elapsedTime
 
@@ -502,7 +507,12 @@ export function Player() {
     }
 
     // --- swim blend: ground depth decides how much you're floating ---
-    const groundY = getHeight(camera.position.x, camera.position.z)
+    // On the sakura-islet bridge the walk surface is a smooth analytic deck (open
+    // water beneath), so you cross on foot instead of swimming the gap. Only snap
+    // to the deck when you're actually ON TOP of it — if you're below (diving), it
+    // is ignored so you can swim freely underneath.
+    const rawGroundY = getHeight(camera.position.x, camera.position.z)
+    const groundY = rawGroundY
     // the real floor you can stand/rest on is the HIGHER of the island terrain
     // and the seabed — so you can never dive below the visible seabed plane
     const floorY = Math.max(groundY, seabedHeight(camera.position.x, camera.position.z))

@@ -6,7 +6,9 @@
 // ±Z sides. BOAT_MODEL_YAW spins it so the bow points +Z (travel); BOAT_SCALE
 // sizes it to a ~3 m boat.
 
-export const BOAT_X = 0
+// Beached on the south shore just west of the bridge, so it's in view (and clear
+// of the crossing) when you turn around at spawn.
+export const BOAT_X = -7
 export const BOAT_Z = 58
 export const BOAT_SCALE = 2.35
 export const BOAT_ROT_Y = 2.5 // radians, Y-axis — beached lean (tuned visually)

@@ -1,10 +1,14 @@
-import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { HEART } from './layout'
 import { getSky } from './palette'
 import { getHeight } from './terrain'
+import { patchReveal } from './patchReveal'
 import { useWorld } from '../state/useWorld'
+import { InteractMarker } from './InteractMarker'
+import { registerInteract, unregisterInteract } from './interact'
+import { BENCH, SIT } from './benchSit'
 
 // ---------------------------------------------------------------------------
 // The campfire at the end of the trail: a ring of stones, a teepee of logs, a
@@ -359,36 +363,149 @@ export function Campfire() {
   )
 }
 
-// Two log benches on the hilltop plateau facing the view, placed near the
-// Heartwood tree. Heights are sampled per-bench so they never float.
-function aimAtHeart(x: number, z: number) {
-  return Math.atan2(HEART.x - x, HEART.z - z)
+// A single reading bench sitting ON the north path (the straight climb to the
+// Heartwood), centred between the east/social branch (z≈8) and the tree (z≈-2) — a
+// comfortable distance off the east path. It faces due WEST, looking across the
+// isle. Rests on the flattened path ground so it never floats. Height per-bench.
+// NOTE: this GLB's front is its local +X, so rotY = π aims the seat toward -X (west).
+const BENCH_DEFS = [{ x: 2.3, z: 3.4 }].map((b) => ({
+  ...b,
+  rotY: Math.PI, // face due west
+}))
+
+const BENCH_HEIGHT = 1.3 // world height the model is auto-scaled to
+const BENCH_YAW = 0 // extra yaw so the seat faces the tree (tune to the model)
+
+// One stylized_bench.glb, auto-scaled, base seated at y=0, materials kept (so its
+// texture survives) but reveal-patched so it doesn't pop through the intro ring.
+function BenchModel() {
+  const { scene } = useGLTF('/models/stylized_bench.glb')
+  const model = useMemo(() => {
+    const root = scene.clone(true)
+    root.updateMatrixWorld(true)
+    const dim = new THREE.Vector3()
+    new THREE.Box3().setFromObject(root).getSize(dim)
+    root.scale.setScalar(BENCH_HEIGHT / (dim.y || 1))
+    root.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(root)
+    const c = new THREE.Vector3()
+    box.getCenter(c)
+    root.position.set(-c.x, -box.min.y, -c.z)
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!(mesh as { isMesh?: boolean }).isMesh) return
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      const patch = (m: THREE.Material) => {
+        const cl = m.clone()
+        patchReveal(cl)
+        return cl
+      }
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(patch) : patch(mesh.material)
+    })
+    return root
+  }, [scene])
+  return <primitive object={model} />
 }
 
-const BENCH_DEFS = [
-  { x: HEART.x - 2.5, z: HEART.z + 3 },
-  { x: HEART.x + 3, z: HEART.z + 2.5 },
-].map((b) => ({ ...b, rotY: aimAtHeart(b.x, b.z) }))
+// Eases the camera onto the bench when `sitting` is set (a gentle cinematic glide
+// to a seated, west-facing pose) and freezes the player meanwhile; standing up (E,
+// any movement key, or ESC) hands the view back exactly where it started. The bench
+// publishes the seated pose + an E-to-sit interact here.
+const _sitM = new THREE.Matrix4()
+const _sitUp = new THREE.Vector3(0, 1, 0)
+function BenchSit({ x, z }: { x: number; z: number }) {
+  const camera = useThree((s) => s.camera)
+  const gy = useMemo(() => getHeight(x, z), [x, z])
+  const p = useRef(0)
+  const startPos = useRef(new THREE.Vector3())
+  const startQuat = useRef(new THREE.Quaternion())
+  const targetQuat = useRef(new THREE.Quaternion())
+  const captured = useRef(false)
+
+  useEffect(() => {
+    BENCH.camPos.set(x + 0.12, gy + 1.12, z) // sit back on the seat, eye height
+    BENCH.lookAt.set(x - 6, gy + 0.82, z) // gaze west, a touch down, across the isle
+    BENCH.ready = true
+    // E toggles sit/stand. The bench stays "armed" while you're seated (the camera
+    // sits right on it), so the shared interact handler fires this on E both ways —
+    // which is exactly what we want; no separate E handling here (that double-fired).
+    registerInteract({
+      id: 'bench',
+      x,
+      y: gy + 0.6,
+      z,
+      range: 3.0,
+      activate: () => useWorld.getState().toggleSitting(),
+    })
+    return () => unregisterInteract('bench')
+  }, [x, z, gy])
+
+  // Also stand up on any MOVEMENT key (so you can just walk off) — but NOT E, which
+  // the interact handler above already toggles.
+  useEffect(() => {
+    const STAND = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+    const onKey = (e: KeyboardEvent) => {
+      if (useWorld.getState().sitting && STAND.includes(e.code)) useWorld.getState().setSitting(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useFrame((_, dtRaw) => {
+    const sitting = useWorld.getState().sitting
+    const dt = Math.min(dtRaw, 0.05)
+    if (sitting && !captured.current) {
+      startPos.current.copy(camera.position)
+      startQuat.current.copy(camera.quaternion)
+      captured.current = true
+    }
+    const target = sitting && BENCH.ready ? 1 : 0
+    // Smooth glide DOWN onto the seat; snappier when getting back up.
+    const rate = target > p.current ? 7 : 13
+    p.current += (target - p.current) * (1 - Math.exp(-rate * dt))
+    if (target === 1 && p.current > 0.999) p.current = 1
+    if (target === 0 && p.current < 0.001) p.current = 0
+    SIT.p = p.current
+
+    if (p.current > 0.001) {
+      SIT.active = true
+      _sitM.lookAt(BENCH.camPos, BENCH.lookAt, _sitUp)
+      targetQuat.current.setFromRotationMatrix(_sitM)
+      const e = p.current * p.current * (3 - 2 * p.current) // smoothstep ease
+      camera.position.lerpVectors(startPos.current, BENCH.camPos, e)
+      camera.quaternion.slerpQuaternions(startQuat.current, targetQuat.current, e)
+    } else if (SIT.active) {
+      camera.position.copy(startPos.current)
+      camera.quaternion.copy(startQuat.current)
+      SIT.active = false
+      captured.current = false
+    }
+  })
+
+  return null
+}
 
 export function HilltopBenches() {
-  const woodMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x5a3c22, roughness: 0.92 }), [])
-  const charMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.95 }), [])
-
+  const b0 = BENCH_DEFS[0]
   return (
     <>
       {BENCH_DEFS.map((b, i) => (
-        <group key={i} position={[b.x, getHeight(b.x, b.z), b.z]} rotation={[0, b.rotY, 0]}>
-          <mesh material={woodMat} position={[0, 0.46, 0]} castShadow receiveShadow>
-            <boxGeometry args={[1.5, 0.14, 0.45]} />
-          </mesh>
-          <mesh material={charMat} position={[-0.55, 0.22, 0]} castShadow>
-            <cylinderGeometry args={[0.13, 0.15, 0.44, 8]} />
-          </mesh>
-          <mesh material={charMat} position={[0.55, 0.22, 0]} castShadow>
-            <cylinderGeometry args={[0.13, 0.15, 0.44, 8]} />
-          </mesh>
+        <group key={i} position={[b.x, getHeight(b.x, b.z), b.z]} rotation={[0, b.rotY + BENCH_YAW, 0]}>
+          <BenchModel />
         </group>
       ))}
+      <BenchSit x={b0.x} z={b0.z} />
+      <InteractMarker
+        id="bench"
+        x={b0.x}
+        y={getHeight(b0.x, b0.z) + BENCH_HEIGHT + 0.25}
+        z={b0.z}
+        label="Sit"
+        hint="press E to rest"
+      />
     </>
   )
 }
+
+useGLTF.preload('/models/stylized_bench.glb')

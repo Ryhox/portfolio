@@ -11,6 +11,12 @@ export type VolKey = 'master' | 'music' | 'waves' | 'wind' | 'ambient'
 export type Quality = 'Low' | 'Medium' | 'High'
 export const QUALITY_ORDER: Quality[] = ['Low', 'Medium', 'High']
 
+// The little to-do list shown bottom-left. Each flag flips true the first time the
+// player does the thing, and the entry gets crossed off. `projects` has no trigger
+// yet (it's "coming soon"); `enjoy` is never crossed off — it's always the mood.
+export type QuestId = 'about' | 'socials' | 'projects' | 'sail'
+export type Quests = Record<QuestId, boolean>
+
 export type WorldState = {
   t: number
   paused: boolean
@@ -38,6 +44,11 @@ export type WorldState = {
   mapId: 'home' | 'archipelago' // which world is mounted: the home island or the archipelago
   mapOpen: boolean       // the full-screen world map overlay is open (freezes the player)
   infoOpen: boolean      // the island rarity/info panel is open (toggled with I on an island)
+  aboutOpen: boolean     // the "About me" panel is open (toggled with E at the Heartwood portrait)
+  projectsOpen: boolean  // the projects message-board view is open (toggled with E at the west-path board)
+  projectIndex: number   // which project paper is showing on the board (◀ ▶ to browse)
+  sitting: boolean       // the player is sitting on the hilltop bench (E to sit / get up)
+  quests: Quests         // to-do list progress (bottom-left checklist)
   setT: (t: number) => void
   setPaused: (p: boolean) => void
   togglePaused: () => void
@@ -62,6 +73,14 @@ export type WorldState = {
   setMapOpen: (v: boolean) => void
   setInfoOpen: (v: boolean) => void
   toggleInfo: () => void
+  setAboutOpen: (v: boolean) => void
+  toggleAbout: () => void
+  setProjectsOpen: (v: boolean) => void
+  toggleProjects: () => void
+  setProjectIndex: (i: number) => void
+  setSitting: (v: boolean) => void
+  toggleSitting: () => void
+  completeQuest: (id: QuestId) => void
 }
 
 const wrap01 = (t: number) => ((t % 1) + 1) % 1
@@ -98,6 +117,11 @@ export const useWorld = create<WorldState>((set) => ({
   mapId: 'home',
   mapOpen: false,
   infoOpen: false,
+  aboutOpen: false,
+  projectsOpen: false,
+  projectIndex: 0,
+  sitting: false,
+  quests: { about: false, socials: false, projects: false, sail: false },
   setT: (t) => set({ t: wrap01(t) }),
   setPaused: (paused) => set({ paused }),
   togglePaused: () => set((s) => ({ paused: !s.paused })),
@@ -122,10 +146,33 @@ export const useWorld = create<WorldState>((set) => ({
   setWorldVisible: (worldVisible) => set({ worldVisible }),
   setBoatMode: (boatMode) => set({ boatMode }),
   setBoardPrompt: (boardPrompt) => set({ boardPrompt }),
-  setMapId: (mapId) => set({ mapId }),
+  // Arriving in the archipelago crosses off "Set Sail" (you went to see the
+  // other wanderers' isles).
+  setMapId: (mapId) =>
+    set((s) => ({ mapId, quests: mapId === 'archipelago' && !s.quests.sail ? { ...s.quests, sail: true } : s.quests })),
   setMapOpen: (mapOpen) => set({ mapOpen }),
   setInfoOpen: (infoOpen) => set({ infoOpen }),
   toggleInfo: () => set((s) => ({ infoOpen: !s.infoOpen })),
+  // Opening the About panel crosses off "Who am I?".
+  setAboutOpen: (aboutOpen) =>
+    set((s) => ({ aboutOpen, quests: aboutOpen && !s.quests.about ? { ...s.quests, about: true } : s.quests })),
+  toggleAbout: () =>
+    set((s) => {
+      const aboutOpen = !s.aboutOpen
+      return { aboutOpen, quests: aboutOpen && !s.quests.about ? { ...s.quests, about: true } : s.quests }
+    }),
+  // Opening the Projects board crosses off "Projects".
+  setProjectsOpen: (projectsOpen) =>
+    set((s) => ({ projectsOpen, quests: projectsOpen && !s.quests.projects ? { ...s.quests, projects: true } : s.quests })),
+  toggleProjects: () =>
+    set((s) => {
+      const projectsOpen = !s.projectsOpen
+      return { projectsOpen, quests: projectsOpen && !s.quests.projects ? { ...s.quests, projects: true } : s.quests }
+    }),
+  setProjectIndex: (projectIndex) => set({ projectIndex }),
+  setSitting: (sitting) => set({ sitting }),
+  toggleSitting: () => set((s) => ({ sitting: !s.sitting })),
+  completeQuest: (id) => set((s) => (s.quests[id] ? {} : { quests: { ...s.quests, [id]: true } })),
 }))
 
 // Mutable object GSAP can animate — drives the cinematic fly-in in Experience.tsx.

@@ -1,6 +1,23 @@
 import * as THREE from 'three'
-import { HEART, ISLAND_RADIUS, NOOK, PATH_DENSE, PATH_WAYPOINTS, REGIONS } from './layout'
+import { ALL_DENSE, HEART, ISLAND_RADIUS, ISLET, MESSAGE_BOARD, NOOK, PATH_WAYPOINTS, REGIONS, SOCIAL_ARC, SOCIAL_WAYPOINTS, WEST_WAYPOINTS, distToPath } from './layout'
 import { type Placed, getHeight, sampleDisc } from './terrain'
+import { pedestalSpots, summitColliders } from './summit'
+import { BOAT_X, BOAT_Z } from './boatConfig'
+
+// Clear ground-cover (grass/clover/bushes) off the social pedestals so nothing
+// pokes through the floating logos or crowds the bases.
+const PEDESTAL_AVOID = pedestalSpots().map((s) => ({ x: s.x, z: s.z, r: 2.8 }))
+// Keep the meadow's grass + flowers from flooding the whole social clearing (the
+// shrine sits at the edge of the meadow's reach) — clear the dais as one disc.
+const DAIS_AVOID = [{ x: SOCIAL_ARC.x, z: SOCIAL_ARC.z, r: 5.5 }]
+
+// Keep ground cover (ferns/grass/clover/bushes) out of the beached boat so nothing
+// grows up through the hull.
+const BOAT_AVOID = [{ x: BOAT_X, z: BOAT_Z, r: 2.8 }]
+// Keep ground cover off the projects board at the end of the west spur so nothing
+// grows up through its posts.
+const BOARD_AVOID = [{ x: MESSAGE_BOARD.x, z: MESSAGE_BOARD.z, r: 2.2 }]
+const COVER_AVOID = [...PEDESTAL_AVOID, ...BOAT_AVOID, ...BOARD_AVOID]
 
 // ---------------------------------------------------------------------------
 // THE PLACEMENT — where every prop goes, by design. Each region is filled from
@@ -67,11 +84,10 @@ function variants(
 
 // Stepping stones following the trail, aligned to its direction AND tilted to
 // lie flat on the terrain (so they don't stand upright on slopes).
-function pathStones(): PlacementEntry[] {
-  // Walk the SAME densified polyline the dirt trail is measured against
-  // (PATH_DENSE / distToPath), so the stones stay centered on the dirt and
-  // never drift off onto the grass — no matter how the trail curves.
-  const pts = PATH_DENSE
+// Stepping stones along ONE densified trail branch (centred on the same polyline
+// distToPath measures, so they stay on the dirt). startArc skips the first stretch
+// so a branch doesn't double up stones over its parent at the fork.
+function stonesAlong(pts: { x: number; z: number }[], seed: number, startArc: number): Placed[] {
   const cum: number[] = [0]
   for (let i = 1; i < pts.length; i++) {
     cum[i] = cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z)
@@ -95,30 +111,42 @@ function pathStones(): PlacementEntry[] {
     }
   }
 
-  const n = Math.max(16, Math.round(total / 3.8)) // closer together — proper stepping stones
-  const r = rng(900)
+  // Pick the number of GAPS from the target spacing, then place one more stone than
+  // gaps — so the actual gap is total/segs ≈ the same 4.6 on every branch (short or
+  // long), the first stone sits at startArc and the last lands on the endpoint.
+  const segs = Math.max(1, Math.round((total - startArc) / 4.6))
+  const n = segs + 1
+  const r = rng(seed)
   const items: Placed[] = []
-  const startArc = 1.5
   for (let i = 0; i < n; i++) {
-    const c = at(startArc + (i / n) * (total - startArc))
+    const c = at(startArc + (i / segs) * (total - startArc))
     const side = Math.sin(i * 1.7) * 0.06
     const x = c.x - c.tz * side
     const z = c.z + c.tx * side
-    items.push({
-      x,
-      y: getHeight(x, z) - 0.22,
-      z,
-      rotY: 0,
-      scale: 0.8 + r() * 0.45,
-    })
+    // Orient each stone along the trail's direction (plus a little random twist) so
+    // they read as a laid path, not a grid of identically-aligned slabs.
+    const rotY = Math.atan2(c.tx, c.tz) + (r() - 0.5) * 0.6
+    items.push({ x, y: getHeight(x, z) - 0.22, z, rotY, scale: 0.8 + r() * 0.45 })
+  }
+  return items
+}
+
+// Stepping stones for every trail branch (the climb to the tree + the fork to the
+// socials).
+function pathStones(): PlacementEntry[] {
+  // Every branch the same — the climb, the social fork AND the west spur, which is
+  // now flattened like the others (see terrain.ts) so its cobbles lie flush too.
+  const items: Placed[] = []
+  for (let b = 0; b < ALL_DENSE.length; b++) {
+    items.push(...stonesAlong(ALL_DENSE[b], 900 + b * 17, b === 0 ? 1.5 : 2.6))
   }
   return variants(items, PATHSTONE, 901, 0.45, { recv: true, align: true })
 }
 
-// Points strewn just to the sides of the path (for flower borders).
-function pathSides(count: number, seed: number): Placed[] {
+// Points strewn just to the sides of a trail branch (for flower borders).
+function pathSides(count: number, seed: number, waypoints: { x: number; z: number }[] = PATH_WAYPOINTS): Placed[] {
   const curve = new THREE.CatmullRomCurve3(
-    PATH_WAYPOINTS.map((w) => new THREE.Vector3(w.x, 0, w.z)),
+    waypoints.map((w) => new THREE.Vector3(w.x, 0, w.z)),
     false,
     'catmullrom',
     0.5,
@@ -133,11 +161,15 @@ function pathSides(count: number, seed: number): Placed[] {
     const tan = curve.getTangent(u)
     const nx = -tan.z
     const nz = tan.x
-    const off = (3.4 + r() * 1.8) * (r() < 0.5 ? -1 : 1)
+    const off = (3.2 + r() * 1.8) * (r() < 0.5 ? -1 : 1)
     const x = p.x + nx * off
     const z = p.z + nz * off
     const h = getHeight(x, z)
     if (h < 0.6) continue
+    // Keep flowers off the dirt itself (where branches cross at the fork the offset
+    // alone isn't enough) and clear of the social pedestals.
+    if (distToPath(x, z) < 2.4) continue
+    if (PEDESTAL_AVOID.some((a) => (x - a.x) ** 2 + (z - a.z) ** 2 < a.r * a.r)) continue
     out.push({ x, y: h, z, rotY: r() * Math.PI * 2, scale: 0.8 + r() * 0.5 })
   }
   return out
@@ -191,7 +223,7 @@ export function buildPlacements(): PlacementEntry[] {
   // ✦ Bushes — human-scale, soft borders scattered across the isle.
   e.push(
     ...variants(
-      sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS - 4, count: 95, seed: 21, minScale: 0.8, maxScale: 1.4, minDist: 2.2, awayFromPath: 1.6 }),
+      sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS - 4, count: 95, seed: 21, minScale: 0.8, maxScale: 1.4, minDist: 2.2, awayFromPath: 1.6, avoid: COVER_AVOID }),
       BUSH,
       104,
       1.4,
@@ -201,20 +233,22 @@ export function buildPlacements(): PlacementEntry[] {
 
   // ✦ Grass — a thick carpet everywhere, then even thicker in the meadow. This
   // dense ground cover is what gives the lush, painterly look.
-  e.push(...variants(sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS - 0.5, count: 6500, seed: 31, minScale: 0.7, maxScale: 1.7, awayFromPath: 4 }), GRASS, 105, 0.85, { tilt: 0.32 }))
-  e.push(...variants(sampleDisc({ cx: meadow.x, cz: meadow.z, r: meadow.r + 3, count: 2600, seed: 32, minScale: 0.8, maxScale: 1.6, awayFromPath: 4 }), GRASS, 106, 0.95, { tilt: 0.32 }))
-  e.push(...variants(sampleDisc({ cx: autumnGrove.x, cz: autumnGrove.z, r: autumnGrove.r, count: 1400, seed: 36, minScale: 0.8, maxScale: 1.5, awayFromPath: 4 }), GRASS, 37, 0.9, { tilt: 0.32 }))
+  e.push(...variants(sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS - 0.5, count: 6500, seed: 31, minScale: 0.7, maxScale: 1.7, awayFromPath: 2.4, avoid: COVER_AVOID }), GRASS, 105, 0.85, { tilt: 0.32 }))
+  e.push(...variants(sampleDisc({ cx: meadow.x, cz: meadow.z, r: meadow.r + 3, count: 2600, seed: 32, minScale: 0.8, maxScale: 1.6, awayFromPath: 2.4, avoid: [...COVER_AVOID, ...DAIS_AVOID] }), GRASS, 106, 0.95, { tilt: 0.32 }))
+  e.push(...variants(sampleDisc({ cx: autumnGrove.x, cz: autumnGrove.z, r: autumnGrove.r, count: 1400, seed: 36, minScale: 0.8, maxScale: 1.5, awayFromPath: 2.4 }), GRASS, 37, 0.9, { tilt: 0.32 }))
 
   // ✦ Flowers — fill the meadow and line the path.
-  e.push(...variants(sampleDisc({ cx: meadow.x, cz: meadow.z, r: meadow.r, count: 520, seed: 33, minScale: 0.85, maxScale: 1.5 }), FLOWER, 107, 0.65))
-  e.push(...variants(pathSides(240, 34), FLOWER, 108, 0.6))
+  e.push(...variants(sampleDisc({ cx: meadow.x, cz: meadow.z, r: meadow.r, count: 520, seed: 33, minScale: 0.85, maxScale: 1.5, awayFromPath: 2.4, avoid: [...PEDESTAL_AVOID, ...DAIS_AVOID] }), FLOWER, 107, 0.65))
+  e.push(...variants(pathSides(220, 34, PATH_WAYPOINTS), FLOWER, 108, 0.6))
+  e.push(...variants(pathSides(70, 38, SOCIAL_WAYPOINTS), FLOWER, 115, 0.6))
+  e.push(...variants(pathSides(55, 39, WEST_WAYPOINTS), FLOWER, 116, 0.6))
 
   // ✦ Clover — broad low ground cover filling between the grass.
-  e.push(...variants(sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS - 1, count: 2400, seed: 35, minScale: 0.8, maxScale: 1.5, awayFromPath: 3.5 }), CLOVER, 109, 0.34))
+  e.push(...variants(sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS - 1, count: 2400, seed: 35, minScale: 0.8, maxScale: 1.5, awayFromPath: 2.2, avoid: COVER_AVOID }), CLOVER, 109, 0.34))
 
   // ✦ Ferns — shady pine grove + along the shore.
   e.push(...variants(sampleDisc({ cx: pineGrove.x, cz: pineGrove.z, r: pineGrove.r, count: 120, seed: 41, minScale: 0.8, maxScale: 1.5 }), FERN, 110, 1.1))
-  e.push(...variants(sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS, innerR: ISLAND_RADIUS - 14, count: 150, seed: 42, zones: ['grass', 'sand'], maxSlope: 0.5, minScale: 0.8, maxScale: 1.3 }), FERN, 111, 0.95))
+  e.push(...variants(sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS, innerR: ISLAND_RADIUS - 14, count: 150, seed: 42, zones: ['grass', 'sand'], maxSlope: 0.5, minScale: 0.8, maxScale: 1.3, avoid: BOAT_AVOID }), FERN, 111, 0.95))
 
   // ✦ Mushrooms — clustered in the shady pine grove + spooky corner.
   e.push(...variants(sampleDisc({ cx: pineGrove.x, cz: pineGrove.z, r: pineGrove.r, count: 40, seed: 51, minScale: 0.8, maxScale: 1.6 }), MUSH, 112, 0.55))
@@ -238,7 +272,7 @@ export function buildPlacements(): PlacementEntry[] {
   // horizontal and look like floating planks on steep cliff faces.
   e.push(
     ...variants(
-      sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS, innerR: ISLAND_RADIUS - 12, count: 110, seed: 63, zones: ['sand', 'grass'], maxSlope: 0.75, minScale: 0.7, maxScale: 1.5 }),
+      sampleDisc({ cx: 0, cz: 0, r: ISLAND_RADIUS, innerR: ISLAND_RADIUS - 12, count: 110, seed: 63, zones: ['sand', 'grass'], maxSlope: 0.75, minScale: 0.7, maxScale: 1.5, avoid: BOAT_AVOID }),
       PEBBLE,
       64,
       0.4,
@@ -248,6 +282,32 @@ export function buildPlacements(): PlacementEntry[] {
 
   // ✦ Path — stepping stones along the trail.
   e.push(...pathStones())
+
+  // ✦ Sakura islet behind the spawn — a lone cherry tree on its little crown,
+  // softened with grass and a few pink blooms.
+  e.push({
+    model: 'SakuraTree_1',
+    targetH: 7,
+    cast: true,
+    items: [{ x: ISLET.x, y: getHeight(ISLET.x, ISLET.z), z: ISLET.z, rotY: 0.6, scale: 1.1 }],
+  })
+  e.push(
+    ...variants(
+      sampleDisc({ cx: ISLET.x, cz: ISLET.z, r: ISLET.flatR + 1.5, count: 260, seed: 71, minScale: 0.7, maxScale: 1.5 }),
+      GRASS,
+      72,
+      0.9,
+      { tilt: 0.32 },
+    ),
+  )
+  e.push(
+    ...variants(
+      sampleDisc({ cx: ISLET.x, cz: ISLET.z, r: ISLET.flatR, count: 46, seed: 73, minScale: 0.8, maxScale: 1.4 }),
+      ['FlowerPink_Group', 'FlowerPink_Single'],
+      74,
+      0.6,
+    ),
+  )
 
   return e
 }
@@ -277,32 +337,41 @@ export function buildColliders(): Collider[] {
     let base = 0
     if (e.model === 'TwistedTree_2' && e.targetH >= 14) base = 1.8 // the grand Heartwood
     else if (TREE_MODELS.has(e.model)) base = 0.55
+    else if (e.model.startsWith('SakuraTree')) base = 0.7 // the islet sakura — solid trunk
     else if (ROCK_MODELS.has(e.model)) base = 0.9
     else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: base * it.scale })
   }
   // The path lamps are solid posts you bump into.
   for (const s of buildLampSpots()) out.push({ x: s.x, z: s.z, r: 0.4 })
+  // The summit social pedestals are solid stone you bump into.
+  for (const s of summitColliders()) out.push(s)
   return out
 }
 
 // Where the path lamps stand — shared by the renderer (GlowProps) and the
-// collision system so they line up exactly. Spaced along the same trail curve.
-const LAMP_US = [0.16, 0.4, 0.64, 0.85]
-const LAMP_OFFSET = 1.5
-export function buildLampSpots(): { x: number; y: number; z: number }[] {
+// collision system so they line up exactly. Spaced along the same trail curve, and
+// they ALTERNATE sides (left, right, left, right…) like a real avenue. The offset is
+// pushed clear of the dirt half-width so a lamp never sits in the walking lane — the
+// last one used to land on the trail and block it.
+const LAMP_US = [0.16, 0.4, 0.64, 0.84]
+const LAMP_OFFSET = 2.5
+export function buildLampSpots(): { x: number; y: number; z: number; rotY: number }[] {
   const curve = new THREE.CatmullRomCurve3(
     PATH_WAYPOINTS.map((w) => new THREE.Vector3(w.x, 0, w.z)),
     false,
     'catmullrom',
     0.5,
   )
-  return LAMP_US.map((u) => {
+  return LAMP_US.map((u, i) => {
     const p = curve.getPoint(u)
     const tan = curve.getTangent(u)
-    const x = p.x + -tan.z * LAMP_OFFSET
-    const z = p.z + tan.x * LAMP_OFFSET
-    return { x, y: getHeight(x, z), z }
+    const side = i % 2 === 0 ? 1 : -1 // alternate left/right down the avenue
+    const x = p.x + -tan.z * LAMP_OFFSET * side
+    const z = p.z + tan.x * LAMP_OFFSET * side
+    // The lamp model faces a fixed way; the left-side ones need a half-turn so they
+    // lean over the trail instead of away from it.
+    return { x, y: getHeight(x, z), z, rotY: side === -1 ? Math.PI : 0 }
   })
 }
 

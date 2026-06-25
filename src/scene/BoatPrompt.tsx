@@ -26,6 +26,11 @@ import { PROP_OCCLUDERS } from './occluders'
 // Reveal window: fully a dot at FAR metres, fully open by NEAR metres.
 const NEAR = BOARD_RANGE - 0.4
 const FAR = BOARD_RANGE + 5.5
+// The resting dot only appears as you APPROACH — it fades in by DOT_SHOW and is gone
+// past DOT_HIDE, so the boat isn't permanently tagged from across the isle (matches
+// the social markers, which only show their dot when you're near).
+const DOT_SHOW = FAR + 2.5 // fully visible (just a dot) within here
+const DOT_HIDE = FAR + 5.5 // faded entirely away beyond here
 
 function smoothstep(e0: number, e1: number, x: number) {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
@@ -91,7 +96,10 @@ export function BoatPrompt() {
     }
     if (propBlocked.current) blocked = true
 
-    if (stage.current) stage.current.style.opacity = blocked ? '0' : '1'
+    // Fade the whole marker in only as you near the boat (and out when terrain/props
+    // hide it), so the dot isn't shown at all from afar.
+    const show = 1 - smoothstep(DOT_SHOW, DOT_HIDE, d)
+    if (stage.current) stage.current.style.opacity = blocked ? '0' : String(show)
 
     // Critically-damped follow: frame-rate independent, springy-smooth.
     const k = 1 - Math.exp(-9 * Math.min(dt, 0.1))

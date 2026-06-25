@@ -1,6 +1,8 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { useWorld } from '../state/useWorld'
 import { requestLock, exitLock, cancelLock, isAcquiring } from '../scene/pointerLock'
+import { BOARD_FOCUS } from '../scene/boardFocus'
+import { SIT } from '../scene/benchSit'
 import { setVol as setAudioVol } from '../audio/useAmbience'
 
 // A faithful recreation of the Alba "torn notepad" settings sheet: cream paper
@@ -79,11 +81,17 @@ export function EscMenu() {
       const ws = useWorld.getState()
       if (!ws.started || ws.mapOpen) return // the world map owns its own ESC
       e.preventDefault()
-      if (ws.menuOpen) {
+      if (ws.projectsOpen) {
+        ws.setProjectsOpen(false) // ESC leaves the projects board, then resumes play
+        requestLock()
+      } else if (ws.menuOpen) {
         ws.setMenuOpen(false)
         requestLock()
       } else if (ws.infoOpen) {
         ws.setInfoOpen(false) // ESC closes the island info popup, then resumes play
+        requestLock()
+      } else if (ws.aboutOpen) {
+        ws.setAboutOpen(false) // ESC closes the About-me panel, then resumes play
         requestLock()
       } else {
         ws.setMenuOpen(true)
@@ -106,8 +114,22 @@ export function EscMenu() {
         return
       }
       if (ws.mapOpen || isAcquiring() || ws.menuOpen) return
+      // The projects board frees the cursor on purpose, and its close animation
+      // churns the lock for a moment — never read that as an ESC-out-of-play.
+      if (ws.projectsOpen || BOARD_FOCUS.active) return
+      // ESC while seated on the bench → stand up and resume play, not the menu.
+      if (SIT.active) {
+        ws.setSitting(false)
+        requestLock()
+        return
+      }
       if (ws.infoOpen) {
         ws.setInfoOpen(false) // ESC out of an island closes the info popup, resumes
+        requestLock()
+        return
+      }
+      if (ws.aboutOpen) {
+        ws.setAboutOpen(false) // ESC out closes the About-me panel, resumes
         requestLock()
         return
       }
@@ -317,6 +339,41 @@ function CreditsTab({ onExternal }: { onExternal: (href: string) => void }) {
         sub="Giannis97"
         license="CC BY 4.0"
         href="https://sketchfab.com/3d-models/stylized-lamp-c511b5e92d39457e96c71938aad70266"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="Stylized Stone Pedestal"
+        sub="Sketchfab"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/stylized-stone-pedestal-lowpoly-game-asset-f97ed585d9ef4b7589c873a686fe6531"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="Stylized Bench"
+        sub="Sketchfab"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/stylized-bench-11deb5e3a4fa4f31b766cda4d36f8bc0"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="Message Board"
+        sub="Sketchfab"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/message-board-98f09c8c8fd04ae5aa10271b5210f86c"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="GitHub Kitten"
+        sub="Sketchfab"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/github-kitten-83d5a6d1a12b4427bbfd662fbc478f8d"
+        onExternal={onExternal}
+      />
+      <ExternalRow
+        label="Discord Wumpus Mascot"
+        sub="Sketchfab"
+        license="CC BY 4.0"
+        href="https://sketchfab.com/3d-models/discord-wumpus-mascot-3d-model-7ff6ca221cd44381850984923804ebad"
         onExternal={onExternal}
       />
       <ExternalRow
