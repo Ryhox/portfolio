@@ -176,4 +176,20 @@ export const ko: Record<StringKey, string> = {
 
   'transition.settingSail': '출항 중…',
   'transition.comingAshore': '상륙 중…',
+
+  'tier.common': '일반',
+  'tier.uncommon': '비범',
+  'tier.rare': '희귀',
+  'tier.epic': '영웅',
+  'tier.legendary': '전설',
+  'size.small': '작은 섬',
+  'size.medium': '중간 섬',
+  'size.large': '큰 섬',
+  'size.huge': '거대한 섬',
+  'luck.legendary': '전설적인 운!',
+  'luck.incredible': '믿을 수 없는 행운!',
+  'luck.lucky': '행운의 발견!',
+  'luck.tidy': '괜찮은 뽑기',
+  'luck.common': '평범한 뽑기',
+  'luck.heart': '이 지역의 중심',
 }

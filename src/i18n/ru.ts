@@ -176,4 +176,20 @@ export const ru: Record<StringKey, string> = {
 
   'transition.settingSail': 'Отплываем…',
   'transition.comingAshore': 'Причаливаем…',
+
+  'tier.common': 'обычный',
+  'tier.uncommon': 'необычный',
+  'tier.rare': 'редкий',
+  'tier.epic': 'эпический',
+  'tier.legendary': 'легендарный',
+  'size.small': 'Маленький остров',
+  'size.medium': 'Средний остров',
+  'size.large': 'Большой остров',
+  'size.huge': 'Огромный остров',
+  'luck.legendary': 'Легендарная удача!',
+  'luck.incredible': 'Невероятно повезло!',
+  'luck.lucky': 'Удачная находка!',
+  'luck.tidy': 'Неплохой расклад',
+  'luck.common': 'Обычный расклад',
+  'luck.heart': 'Сердце этого региона',
 }

@@ -200,6 +200,23 @@ export const en = {
   // ── Map fade transition captions ──────────────────────────────────────────
   'transition.settingSail': 'Setting sail…',
   'transition.comingAshore': 'Coming ashore…',
+
+  // ── Procedural island data (descriptive enums — fantasy place/look names stay) ─
+  'tier.common': 'common',
+  'tier.uncommon': 'uncommon',
+  'tier.rare': 'rare',
+  'tier.epic': 'epic',
+  'tier.legendary': 'legendary',
+  'size.small': 'Small island',
+  'size.medium': 'Medium island',
+  'size.large': 'Large island',
+  'size.huge': 'Huge island',
+  'luck.legendary': 'Legendary luck!',
+  'luck.incredible': 'Incredibly lucky!',
+  'luck.lucky': 'Lucky find!',
+  'luck.tidy': 'A tidy roll',
+  'luck.common': 'A common roll',
+  'luck.heart': 'The heart of this region',
 } as const
 
 export type StringKey = keyof typeof en

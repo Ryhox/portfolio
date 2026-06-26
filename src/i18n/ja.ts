@@ -176,4 +176,20 @@ export const ja: Record<StringKey, string> = {
 
   'transition.settingSail': '出航中…',
   'transition.comingAshore': '上陸中…',
+
+  'tier.common': 'コモン',
+  'tier.uncommon': 'アンコモン',
+  'tier.rare': 'レア',
+  'tier.epic': 'エピック',
+  'tier.legendary': 'レジェンダリー',
+  'size.small': '小さな島',
+  'size.medium': '中くらいの島',
+  'size.large': '大きな島',
+  'size.huge': '巨大な島',
+  'luck.legendary': '伝説級の幸運！',
+  'luck.incredible': '信じられない幸運！',
+  'luck.lucky': 'ラッキーな発見！',
+  'luck.tidy': 'まずまずの引き',
+  'luck.common': 'ありふれた引き',
+  'luck.heart': 'この地域の中心',
 }

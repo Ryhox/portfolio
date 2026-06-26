@@ -4,6 +4,14 @@ import { useWorld } from '../state/useWorld'
 import { IS_TOUCH } from '../input/device'
 import { useT, type StringKey } from '../i18n'
 import { HAND } from './theme'
+import { SIZE_TIERS } from '../scene/archipelago/biomes'
+
+// Size tiers carry a stable id; map their English name → i18n key so we can localize
+// the displayed size live. Unknown names (e.g. a Mother isle's region name, a proper
+// noun) fall through untranslated.
+const SIZE_KEY_BY_NAME: Record<string, StringKey> = Object.fromEntries(
+  SIZE_TIERS.map((s) => [s.name, `size.${s.id}` as StringKey]),
+)
 
 // Island information HUD. While you're on (or sailing up to) an island a small
 // "I — Information" prompt sits bottom-centre; pressing I toggles a flat panel.
@@ -52,6 +60,10 @@ type Snap = {
 
 export function IslandInfo() {
   const t = useT()
+  const tSize = (name: string) => {
+    const k = SIZE_KEY_BY_NAME[name]
+    return k ? t(k) : name
+  }
   const started = useWorld((s) => s.started)
   const menuOpen = useWorld((s) => s.menuOpen)
   const mapOpen = useWorld((s) => s.mapOpen)
@@ -143,7 +155,7 @@ export function IslandInfo() {
           <>
             <div style={sTitle}>{snap.name}</div>
             <div style={sRegion}>
-              {t('info.region', { group: snap.group, tier: snap.tier })}
+              {t('info.region', { group: snap.group, tier: t(`tier.${snap.tier}` as StringKey) })}
             </div>
             <div style={sDivider} />
 
@@ -165,7 +177,7 @@ export function IslandInfo() {
                 <div style={sSection}>{t('info.islandSizes')}</div>
                 {r.sizes.map((sz) => (
                   <div key={sz.name} style={sRow}>
-                    <span style={sValueName}>{sz.name}</span>
+                    <span style={sValueName}>{tSize(sz.name)}</span>
                     <span style={sPct}>{fmtPct(sz.pct)}</span>
                   </div>
                 ))}
@@ -179,7 +191,7 @@ export function IslandInfo() {
                 </div>
                 <div style={sRow}>
                   <span style={sLabel}>{t('info.size')}</span>
-                  <span style={sValueName}>{snap.sizeName}</span>
+                  <span style={sValueName}>{tSize(snap.sizeName)}</span>
                   <span style={sPct}>{fmtPct(snap.sizePct)}</span>
                 </div>
                 <div style={sDivider} />
@@ -188,7 +200,7 @@ export function IslandInfo() {
                   <span style={sTotalPct}>{fmtPct(snap.totalPct)}</span>
                 </div>
                 <div style={sOneIn}>{oneIn(snap.totalPct, t)}</div>
-                <div style={sLuck}>{snap.luck}</div>
+                <div style={sLuck}>{t(snap.luck as StringKey)}</div>
               </>
             )}
 

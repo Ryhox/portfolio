@@ -176,4 +176,20 @@ export const it: Record<StringKey, string> = {
 
   'transition.settingSail': 'Si salpa…',
   'transition.comingAshore': 'Si sbarca…',
+
+  'tier.common': 'comune',
+  'tier.uncommon': 'non comune',
+  'tier.rare': 'raro',
+  'tier.epic': 'epico',
+  'tier.legendary': 'leggendario',
+  'size.small': 'Isola piccola',
+  'size.medium': 'Isola media',
+  'size.large': 'Isola grande',
+  'size.huge': 'Isola enorme',
+  'luck.legendary': 'Fortuna leggendaria!',
+  'luck.incredible': 'Incredibilmente fortunato!',
+  'luck.lucky': 'Bella scoperta!',
+  'luck.tidy': 'Un buon tiro',
+  'luck.common': 'Un tiro comune',
+  'luck.heart': 'Il cuore di questa regione',
 }

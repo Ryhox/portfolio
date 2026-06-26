@@ -176,4 +176,20 @@ export const zh: Record<StringKey, string> = {
 
   'transition.settingSail': '启航中…',
   'transition.comingAshore': '靠岸中…',
+
+  'tier.common': '普通',
+  'tier.uncommon': '罕见',
+  'tier.rare': '稀有',
+  'tier.epic': '史诗',
+  'tier.legendary': '传说',
+  'size.small': '小型岛屿',
+  'size.medium': '中型岛屿',
+  'size.large': '大型岛屿',
+  'size.huge': '巨型岛屿',
+  'luck.legendary': '传说级运气！',
+  'luck.incredible': '运气爆棚！',
+  'luck.lucky': '幸运发现！',
+  'luck.tidy': '还不错的一抽',
+  'luck.common': '普通的一抽',
+  'luck.heart': '这片区域的中心',
 }

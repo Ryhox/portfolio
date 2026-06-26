@@ -414,12 +414,14 @@ export type IslandStats = {
   }
 }
 
+// Returns an i18n key (translated live in ui/IslandInfo) rather than English, so
+// the luck card follows the chosen language.
 function luckLabel(p: number): string {
-  if (p < 0.004) return 'Legendary luck!'
-  if (p < 0.02) return 'Incredibly lucky!'
-  if (p < 0.06) return 'Lucky find!'
-  if (p < 0.16) return 'A tidy roll'
-  return 'A common roll'
+  if (p < 0.004) return 'luck.legendary'
+  if (p < 0.02) return 'luck.incredible'
+  if (p < 0.06) return 'luck.lucky'
+  if (p < 0.16) return 'luck.tidy'
+  return 'luck.common'
 }
 
 export function islandStats(isl: IslandInstance): IslandStats {
@@ -434,7 +436,7 @@ export function islandStats(isl: IslandInstance): IslandStats {
       sizeName: isl.theme.name,
       sizePct: 0,
       tier: isl.theme.tier,
-      luck: 'The heart of this region',
+      luck: 'luck.heart',
       isMother: true,
       region: {
         groupPct: (isl.theme.weight / THEME_TOTAL) * 100,
