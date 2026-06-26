@@ -1,16 +1,18 @@
-import { type CSSProperties, useEffect, useState } from 'react'
-import { useWorld } from '../state/useWorld'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import { useWorld, type Lang } from '../state/useWorld'
 import { requestLock, exitLock, cancelLock, isAcquiring } from '../scene/pointerLock'
 import { BOARD_FOCUS } from '../scene/boardFocus'
 import { SIT } from '../scene/benchSit'
 import { setVol as setAudioVol } from '../audio/useAmbience'
 import { IS_TOUCH } from '../input/device'
+import { useT, type StringKey } from '../i18n'
+import { LANG_META, langMeta } from '../i18n/langs'
+import { HAND } from './theme'
 
 // A faithful recreation of the Alba "torn notepad" settings sheet: cream paper
 // with a punched spiral top edge, handwritten ink, tan sliders with a square
 // thumb, and pill toggles. Graphics cycles Low→Medium→High; Music + Sound Fx
 // drive the live audio mix. ESC (or the bottom-left back arrow) resumes play.
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 const INK = '#6f5836'
 const INK_DARK = '#5a4528'
 const INK_SOFT = 'rgba(111,88,54,0.55)'
@@ -47,6 +49,11 @@ const INJECTED_CSS = `
 `
 
 type Tab = 'Settings' | 'Credits' | 'Socials'
+const TAB_KEY: Record<Tab, StringKey> = {
+  Settings: 'tab.settings',
+  Credits: 'tab.credits',
+  Socials: 'tab.socials',
+}
 
 export function EscMenu() {
   const started  = useWorld(s => s.started)
@@ -61,6 +68,7 @@ export function EscMenu() {
   const [tab, setTab] = useState<Tab>('Settings')
   const [applying, setApplying] = useState(false)
   const [extHref, setExtHref] = useState<string | null>(null) // pending external link → warn first
+  const t = useT()
 
   // ── Menu / pointer-lock flow ───────────────────────────────────────────────
   // `menuOpen` is the single source of truth. ESC toggles it; pointer lock just
@@ -184,7 +192,7 @@ export function EscMenu() {
                 style={{ ...sTab, ...(tab === tb ? sTabActive : null) }}
                 onClick={() => setTab(tb)}
               >
-                {tb}
+                {t(TAB_KEY[tb])}
               </button>
             ))}
           </div>
@@ -192,35 +200,35 @@ export function EscMenu() {
           <div style={sContent}>
             {tab === 'Settings' && (
               <>
-                <ValueRow label="Graphics" value={quality} busy={applying} onClick={cycleGraphics} />
+                <ValueRow label={t('settings.graphics')} value={t(`quality.${quality}` as StringKey)} busy={applying} onClick={cycleGraphics} />
                 <Divider />
-                <ValueRow label="Language" value="English" />
+                <LanguageRow />
                 <Divider />
 
                 <Toggle
-                  label="Motion blur"
+                  label={t('settings.motionBlur')}
                   on={motionBlur}
                   onClick={() => useWorld.getState().toggleMotionBlur()}
                 />
                 {motionBlur && (
                   <Fader
-                    label="Blur strength"
+                    label={t('settings.blurStrength')}
                     value={motionBlurAmount}
                     onChange={(v) => useWorld.getState().setMotionBlurAmount(v)}
                   />
                 )}
                 {motionBlur && quality === 'Low' && (
-                  <div style={sMbNote}>Needs Medium or High graphics</div>
+                  <div style={sMbNote}>{t('settings.motionBlurNote')}</div>
                 )}
                 <Divider />
 
-                <Fader label="Music" value={volMusic} onChange={setMusic} />
+                <Fader label={t('settings.music')} value={volMusic} onChange={setMusic} />
                 <Divider />
-                <Fader label="Sound Fx" value={volWaves} onChange={setSfx} />
+                <Fader label={t('settings.soundFx')} value={volWaves} onChange={setSfx} />
                 <Divider />
 
-                <Toggle label="Invert X axis" on={invertX} onClick={() => useWorld.getState().toggleInvert('x')} />
-                <Toggle label="Invert Y axis" on={invertY} onClick={() => useWorld.getState().toggleInvert('y')} />
+                <Toggle label={t('settings.invertX')} on={invertX} onClick={() => useWorld.getState().toggleInvert('x')} />
+                <Toggle label={t('settings.invertY')} on={invertY} onClick={() => useWorld.getState().toggleInvert('y')} />
               </>
             )}
 
@@ -230,7 +238,7 @@ export function EscMenu() {
         </div>
 
         {/* X close — top-right of the sheet, same as the world map's close button */}
-        <button style={sCloseX} onClick={closeMenu} aria-label="Close settings">
+        <button style={sCloseX} onClick={closeMenu} aria-label={t('board.closeAria')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.4" strokeLinecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
@@ -254,6 +262,7 @@ export function EscMenu() {
 // A small confirm that pops before any link leaves for a website outside the
 // island, so visitors always opt in to navigating away.
 function ExternalWarning({ href, onCancel, onConfirm }: { href: string; onCancel: () => void; onConfirm: () => void }) {
+  const t = useT()
   let host = href
   try {
     host = new URL(href).hostname.replace(/^www\./, '')
@@ -269,12 +278,12 @@ function ExternalWarning({ href, onCancel, onConfirm }: { href: string; onCancel
           <line x1="12" y1="9" x2="12" y2="13" />
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        <div style={sWarnTitle}>Heads up — external site</div>
-        <div style={sWarnText}>This link leaves the island and opens an outside website:</div>
+        <div style={sWarnTitle}>{t('ext.title')}</div>
+        <div style={sWarnText}>{t('ext.text')}</div>
         <div style={sWarnUrl}>{host}</div>
         <div style={sWarnBtns}>
-          <button style={sWarnCancel} onClick={onCancel}>Stay here</button>
-          <button style={sWarnGo} onClick={onConfirm}>Continue</button>
+          <button style={sWarnCancel} onClick={onCancel}>{t('ext.stay')}</button>
+          <button style={sWarnGo} onClick={onConfirm}>{t('ext.continue')}</button>
         </div>
       </div>
     </div>
@@ -284,50 +293,120 @@ function ExternalWarning({ href, onCancel, onConfirm }: { href: string; onCancel
 function ValueRow({
   label, value, onClick, busy,
 }: { label: string; value: string; onClick?: () => void; busy?: boolean }) {
+  const t = useT()
   return (
     <div className="alba-row" style={{ ...sRow, cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
       <span style={sRowText}>{label}</span>
-      <span style={sValue}>{busy ? 'applying…' : value}</span>
+      <span style={sValue}>{busy ? t('settings.applying') : value}</span>
       {busy ? <Spinner /> : onClick && <Chevron />}
     </div>
   )
 }
 
+// The Language picker: closed it reads like a ValueRow (flag + native name); tapped
+// it drops a flat, slightly translucent cream popover of all languages so the world
+// stays faintly visible behind it (no glass/blur — just a low-opacity paper). Picks
+// write through to the store, which persists + re-renders the whole UI live.
+function LanguageRow() {
+  const t = useT()
+  const language = useWorld((s) => s.language)
+  const current = langMeta(language)
+  const [open, setOpen] = useState(false)
+  const wrap = useRef<HTMLDivElement>(null)
+
+  // Close when clicking anywhere outside the row/popover.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const pick = (code: Lang) => {
+    useWorld.getState().setLanguage(code)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={wrap} style={{ position: 'relative' }}>
+      <div className="alba-row" style={{ ...sRow, cursor: 'pointer' }} onClick={() => setOpen((v) => !v)}>
+        <span style={sRowText}>{t('settings.language')}</span>
+        <img src={current.flag} alt="" style={sFlag} />
+        <span style={sValue}>{current.native}</span>
+        <span style={{ display: 'flex', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+          <Chevron />
+        </span>
+      </div>
+      {open && (
+        <div className="alba-scroll" style={sLangMenu}>
+          {LANG_META.map((l) => {
+            const active = l.code === language
+            return (
+              <div
+                key={l.code}
+                className="alba-row"
+                style={{ ...sLangItem, background: active ? HIGHLIGHT : 'transparent' }}
+                onClick={() => pick(l.code)}
+              >
+                <img src={l.flag} alt="" style={sFlag} />
+                <span style={{ ...sLangName, color: active ? INK_DARK : INK }}>{l.native}</span>
+                {active && <Check />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Check() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={INK_DARK}
+      strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <polyline points="5 12 10 17 19 7" />
+    </svg>
+  )
+}
+
 function CreditsTab({ onExternal }: { onExternal: (href: string) => void }) {
+  const t = useT()
   return (
     <div style={{ padding: '2px 4px' }}>
-      <p style={sCreditLine}>A cozy island.</p>
-      <p style={sCreditLine}>Design &amp; code by Emanuel Pfeifer.</p>
-      <p style={sCreditLine}>Built with React Three Fiber &amp; three.js.</p>
+      <p style={sCreditLine}>{t('credits.line1')}</p>
+      <p style={sCreditLine}>{t('credits.line2')}</p>
+      <p style={sCreditLine}>{t('credits.line3')}</p>
 
       <div style={{ margin: '16px 0' }}><Divider /></div>
 
-      <div style={sCreditHead}>Inspiration</div>
+      <div style={sCreditHead}>{t('credits.inspiration')}</div>
       <ExternalRow
         label="Bruno Simon"
         sub="bruno-simon.com"
-        license="basic idea"
+        license={t('credits.basicIdea')}
         href="https://bruno-simon.com/"
         onExternal={onExternal}
       />
       <ExternalRow
         label="COSMOS"
         sub="darkobyte"
-        license="stargaze feature"
+        license={t('credits.stargazeFeature')}
         href="https://github.com/darkobyte/COSMOS"
         onExternal={onExternal}
       />
       <ExternalRow
         label="Helper"
         sub="Plattnericus"
-        license="for giving ideas"
+        license={t('credits.forGivingIdeas')}
         href="https://github.com/Plattnericus"
         onExternal={onExternal}
       />
 
       <div style={{ margin: '16px 0' }}><Divider /></div>
 
-      <div style={sCreditHead}>Assets</div>
+      <div style={sCreditHead}>{t('credits.assets')}</div>
       <ExternalRow
         label="Minecraft Boat"
         sub="vovash"
@@ -410,14 +489,15 @@ function CreditsTab({ onExternal }: { onExternal: (href: string) => void }) {
 }
 
 function SocialsTab({ onExternal }: { onExternal: (href: string) => void }) {
+  const t = useT()
   return (
     <div style={{ padding: '2px 4px' }}>
-      <div style={{ ...sCreditHead, marginBottom: 10 }}>{'Contact me <3'}</div>
-      <ExternalRow label="Email" sub="emanuelpfeifer1@gmail.com" href="mailto:emanuelpfeifer1@gmail.com" onExternal={onExternal} />
+      <div style={{ ...sCreditHead, marginBottom: 10 }}>{t('socials.contact')}</div>
+      <ExternalRow label={t('socials.email')} sub="emanuelpfeifer1@gmail.com" href="mailto:emanuelpfeifer1@gmail.com" onExternal={onExternal} />
       <Divider />
-      <ExternalRow label="GitHub" sub="github.com/ryhox" href="https://github.com/ryhox" onExternal={onExternal} />
+      <ExternalRow label={t('socials.github')} sub="github.com/ryhox" href="https://github.com/ryhox" onExternal={onExternal} />
       <Divider />
-      <ExternalRow label="Organisation" sub="github.com/pokyh-labs" href="https://github.com/pokyh-labs" onExternal={onExternal} />
+      <ExternalRow label={t('socials.organisation')} sub="github.com/pokyh-labs" href="https://github.com/pokyh-labs" onExternal={onExternal} />
     </div>
   )
 }
@@ -456,6 +536,7 @@ function Spinner() {
 }
 
 function Fader({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  const t = useT()
   return (
     <div style={{ padding: '8px 4px 4px' }}>
       <div style={sRowText}>{label}</div>
@@ -465,8 +546,8 @@ function Fader({ label, value, onChange }: { label: string; value: number; onCha
         style={{ marginTop: 10 }}
       />
       <div style={sMinMax}>
-        <span>Min</span>
-        <span>Max</span>
+        <span>{t('settings.min')}</span>
+        <span>{t('settings.max')}</span>
       </div>
     </div>
   )
@@ -608,6 +689,42 @@ const sRowText: CSSProperties = {
 
 const sValue: CSSProperties = {
   fontFamily: HAND, color: INK_SOFT, fontSize: 20, flexShrink: 0,
+}
+
+// Flag chip — small, rounded, with a hairline border so light flags still read
+// against the cream paper.
+const sFlag: CSSProperties = {
+  width: 24, height: 16, flexShrink: 0,
+  borderRadius: 3, objectFit: 'cover',
+  border: '1px solid #c9ba94',
+  boxShadow: '0 1px 1px rgba(90,69,40,0.2)',
+}
+
+// The language popover: low-opacity cream so the world stays faintly visible behind
+// it (the "creamy but see-through" ask) — flat, no blur/glow, in keeping with the
+// paper HUD. Scrolls if the list outgrows the cap.
+const sLangMenu: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 4px)',
+  left: 0,
+  right: 0,
+  zIndex: 5,
+  maxHeight: 230,
+  overflowY: 'auto',
+  padding: 4,
+  borderRadius: 8,
+  background: 'rgba(246,239,218,0.92)',
+  border: '1px solid #d7c8a3',
+  boxShadow: '0 10px 28px rgba(0,0,0,0.35)',
+}
+
+const sLangItem: CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 10,
+  padding: '9px 8px', borderRadius: 5, cursor: 'pointer',
+}
+
+const sLangName: CSSProperties = {
+  flex: 1, fontFamily: HAND, fontSize: 20, lineHeight: 1.1,
 }
 
 // Author name + (optional) licence stacked, right-aligned, in the asset credits.

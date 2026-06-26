@@ -10,6 +10,8 @@ import { REVEAL_DIST, REVEAL_CENTER } from './revealUniforms'
 import { InteractMarker } from './InteractMarker'
 import { registerInteract, unregisterInteract } from './interact'
 import { BENCH, SIT } from './benchSit'
+import { useT } from '../i18n'
+import { IS_TOUCH } from '../input/device'
 
 // ---------------------------------------------------------------------------
 // The campfire on the wild west shore: a ring of stones, a teepee of logs, and a
@@ -469,6 +471,7 @@ function BenchSit({ x, z }: { x: number; z: number }) {
 
 export function HilltopBenches() {
   const b0 = BENCH_DEFS[0]
+  const t = useT()
   return (
     <>
       {BENCH_DEFS.map((b, i) => (
@@ -482,8 +485,8 @@ export function HilltopBenches() {
         x={b0.x}
         y={getHeight(b0.x, b0.z) + BENCH_HEIGHT + 0.25}
         z={b0.z}
-        label="Sit"
-        hint="press E to rest"
+        label={t('marker.sit.label')}
+        hint={IS_TOUCH ? t('marker.sit.hint.touch') : t('marker.sit.hint.desktop')}
       />
     </>
   )

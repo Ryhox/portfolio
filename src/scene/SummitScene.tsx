@@ -11,6 +11,23 @@ import { Logo3D } from './Logo3D'
 import { InteractMarker } from './InteractMarker'
 import { ACTIVE, activateNearest, refreshNearest, registerInteract, unregisterInteract } from './interact'
 import { ARC_CENTER, PEDESTAL_HEIGHT, PORTRAIT, type PedestalSpot, type SocialDef, pedestalSpots } from './summit'
+import { useT, tg, type StringKey } from '../i18n'
+import { IS_TOUCH } from '../input/device'
+
+type T = (key: StringKey, vars?: Record<string, string | number>) => string
+
+// The pedestal label/hint depend on the social: brand/email names + the email
+// address / GitHub URL stay verbatim; only Discord's "copy" hint is localized.
+function socialLabel(t: T, id: string): string {
+  if (id === 'email') return t('marker.social.email')
+  if (id === 'github') return t('marker.social.github')
+  if (id === 'discord') return t('marker.social.discord')
+  return id
+}
+function socialHint(t: T, id: string, fallback: string): string {
+  if (id === 'discord') return IS_TOUCH ? t('marker.discord.hint.touch') : t('marker.discord.hint.desktop')
+  return fallback // email address / github url — not translated
+}
 
 // ---------------------------------------------------------------------------
 // The summit shrine on the Heartwood hill: a portrait of the maker nailed to the
@@ -31,7 +48,7 @@ function openSocial(s: SocialDef) {
     window.open(s.value, '_blank', 'noopener,noreferrer')
   } else {
     navigator.clipboard?.writeText(s.value).catch(() => {})
-    toast(`Discord copied — ${s.value}`)
+    toast(tg('summit.discordCopied', { handle: s.value }))
   }
 }
 
@@ -45,7 +62,7 @@ function toast(msg: string) {
     el.id = 'summit-toast'
     el.style.cssText =
       'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:140;' +
-      "font-family:'Patrick Hand','Nunito',cursive;font-size:19px;color:#3a2f1c;" +
+      "font-family:'Patrick Hand','Nunito','Noto Sans KR','Noto Sans JP','Noto Sans SC',cursive;font-size:19px;color:#3a2f1c;" +
       'background:#f6efda;border:1px solid #d7c8a3;border-radius:9px;padding:8px 15px;' +
       'box-shadow:0 4px 14px rgba(0,0,0,0.45);pointer-events:none;opacity:0;transition:opacity .2s ease;'
     document.body.appendChild(el)
@@ -300,6 +317,7 @@ function ShrineLight() {
 }
 
 export function Summit() {
+  const t = useT()
   const spots = useMemo(() => pedestalSpots(), [])
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     ;(window as unknown as { __summit: unknown }).__summit = {
@@ -324,8 +342,8 @@ export function Summit() {
           x={s.x}
           y={s.y + PEDESTAL_HEIGHT + 1.15}
           z={s.z}
-          label={s.social.label}
-          hint={s.social.hint}
+          label={socialLabel(t, s.social.id)}
+          hint={socialHint(t, s.social.id, s.social.hint)}
           showDist={6}
         />
       ))}
@@ -334,8 +352,8 @@ export function Summit() {
         x={PORTRAIT.x}
         y={getHeight(PORTRAIT.x, PORTRAIT.z) + PORTRAIT.nailY - PORTRAIT.height - 0.55}
         z={PORTRAIT.z + 0.2}
-        label="About me"
-        hint="press E to read"
+        label={t('marker.about.label')}
+        hint={IS_TOUCH ? t('marker.about.hint.touch') : t('marker.about.hint.desktop')}
       />
     </group>
   )

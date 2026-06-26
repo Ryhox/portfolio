@@ -8,6 +8,8 @@ import { getHeight } from './terrain'
 import { PROP_OCCLUDERS } from './occluders'
 import { IS_TOUCH } from '../input/device'
 import { pressKey, releaseKey } from '../input/input'
+import { useT } from '../i18n'
+import { HAND } from '../ui/theme'
 
 // The interact marker — Bruno Simon folio logic, isle-cozy dress.
 //
@@ -43,6 +45,7 @@ const _ndc = new Vector2()
 const _marker = new Vector3()
 
 export function BoatPrompt() {
+  const t = useT()
   const anchor = useRef<Group>(null)
   const stage = useRef<HTMLDivElement>(null)
   const dot = useRef<HTMLDivElement>(null)
@@ -136,15 +139,13 @@ export function BoatPrompt() {
             onPointerCancel={IS_TOUCH ? () => releaseKey('KeyE') : undefined}
           >
             {!IS_TOUCH && <span style={sCap}>E</span>}
-            <span style={sLabel}>Set sail</span>
+            <span style={sLabel}>{t('marker.setSail')}</span>
           </div>
         </div>
       </Html>
     </group>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 // A breathing pulse on the resting dot, so it catches the eye from a distance.
 const CSS = `

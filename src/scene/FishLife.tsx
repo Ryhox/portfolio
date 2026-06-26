@@ -360,7 +360,7 @@ export function JumpingFish() {
           f.speed = 3 + Math.random() * 3
           f.t0 = time
           f.active = true
-          addRipple(f.x, f.z, 0.14, 0.9) // takeoff splash — sized to a ~0.7u trout, not a boulder
+          addRipple(f.x, f.z, 0.04, 0.5) // takeoff splash — tight + weak so the ring stays a few metres, not a 100m swell
         }
         return
       }
@@ -369,7 +369,7 @@ export function JumpingFish() {
       if (p >= 1) {
         f.active = false
         f.nextAt = time + 4 + Math.random() * 9
-        addRipple(f.x, f.z, 0.2, 1.1) // landing splash — a touch bigger than takeoff (re-entry), still fish-sized
+        addRipple(f.x, f.z, 0.06, 0.6) // landing splash — a touch bigger than takeoff (re-entry), still a small local ring
         g.visible = false
         return
       }

@@ -3,6 +3,7 @@ import gsap from 'gsap'
 import { useWorld } from '../../state/useWorld'
 import { INTRO_PARALLAX } from '../../scene/introParallax'
 import { introActions } from './introActions'
+import { useT } from '../../i18n'
 
 const isTouch =
   typeof window !== 'undefined' &&
@@ -17,6 +18,7 @@ const CSS = `
 `
 
 export function IntroLabel() {
+  const t           = useT()
   const outerRef    = useRef<HTMLDivElement>(null) // GSAP owns the entrance here
   const tiltRef     = useRef<HTMLDivElement>(null) // rAF owns the parallax transform here
   const started     = useWorld((s) => s.started)
@@ -70,16 +72,16 @@ export function IntroLabel() {
       <style>{CSS}</style>
       <div ref={outerRef} style={sOuter}>
         <div ref={tiltRef} style={sTilt}>
-          <h1 style={sTitle}>WELCOME</h1>
+          <h1 style={sTitle}>{t('intro.welcome')}</h1>
           <div style={sDivider} />
-          <div style={sPrompt}>{isTouch ? 'TAP ANYWHERE TO BEGIN' : 'CLICK ANYWHERE TO BEGIN'}</div>
+          <div style={sPrompt}>{isTouch ? t('intro.beginTouch') : t('intro.beginDesktop')}</div>
         </div>
       </div>
     </div>
   )
 }
 
-const NUNITO = "'Nunito', system-ui, sans-serif"
+const NUNITO = "'Nunito', 'Noto Sans KR', 'Noto Sans JP', 'Noto Sans SC', system-ui, sans-serif"
 const BRIGHT  = '#fff7ea' // bright warm white — the call to action
 const LEGIBLE = '0 1px 3px rgba(35,20,8,0.45)' // tight dark shadow for contrast, not a glow
 

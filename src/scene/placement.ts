@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { ALL_DENSE, HEART, ISLAND_RADIUS, ISLET, MESSAGE_BOARD, NOOK, PATH_WAYPOINTS, REGIONS, SOCIAL_ARC, SOCIAL_WAYPOINTS, WEST_WAYPOINTS, distToPath } from './layout'
-import { type Placed, getHeight, sampleDisc } from './terrain'
+import { type Placed, getHeight, getNormal, sampleDisc } from './terrain'
 import { pedestalSpots, summitColliders } from './summit'
 import { BOAT_X, BOAT_Z } from './boatConfig'
 
@@ -338,6 +338,24 @@ const PATHSTONE_MODELS = new Set(PATHSTONE)
 
 export type Collider = { x: number; z: number; r: number }
 
+// Props aligned to the ground normal (the path lamps, the archipelago rocks) LEAN
+// downhill on a slope, so their body at waist height sits well off the placement
+// point — a collider on the buried base lets you walk straight through the visible
+// lean (or bump empty air uphill). Shift the circle toward the lean by the
+// horizontal travel of a point `bodyH` up the tilted axis, and grow its radius by
+// half that shift so it still covers the base. On flat ground the normal is up, so
+// this is a no-op. getNormal/getHeight read the active map, so this must run while
+// the prop's own map is active (it is — colliders are rebuilt per map).
+const _tn = new THREE.Vector3()
+export function tiltCollider(x: number, z: number, r: number, bodyH: number): Collider {
+  getNormal(x, z, _tn)
+  const ny = Math.max(_tn.y, 0.25)
+  const k = bodyH / ny
+  const dx = _tn.x * k
+  const dz = _tn.z * k
+  return { x: x + dx, z: z + dz, r: r + Math.hypot(dx, dz) * 0.5 }
+}
+
 export function buildColliders(): Collider[] {
   const out: Collider[] = []
   for (const e of getPlacements()) {
@@ -349,8 +367,9 @@ export function buildColliders(): Collider[] {
     else continue
     for (const it of e.items) out.push({ x: it.x, z: it.z, r: base * it.scale })
   }
-  // The path lamps are solid posts you bump into.
-  for (const s of buildLampSpots()) out.push({ x: s.x, z: s.z, r: 0.4 })
+  // The path lamps are solid posts you bump into. They tilt to the ground normal
+  // (GlowProps), so their collider follows the lean (waist-height ≈ 1.2u up the post).
+  for (const s of buildLampSpots()) out.push(tiltCollider(s.x, s.z, 0.4, 1.2))
   // The summit social pedestals are solid stone you bump into.
   for (const s of summitColliders()) out.push(s)
   // The hilltop bench + the west-path notice board are solid too. The collision

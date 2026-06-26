@@ -15,6 +15,8 @@ import {
 } from '../scene/archipelago/archipelago'
 import { nextRefreshAt } from '../scene/archipelago/stargazers'
 import { buildMap, hexToRgb, landRamp, seaRamp } from './mapRender'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // Paint each archipelago map pixel with the biome palette of the island beneath
 // it (grey Bleakshoal, white Frostfell, sandy desert, …); open sea uses the ramp.
@@ -52,6 +54,7 @@ function formatCountdown(ms: number): string {
 }
 
 export function WorldMap() {
+  const t = useT()
   const mapOpen = useWorld((s) => s.mapOpen)
   const setMapOpen = useWorld((s) => s.setMapOpen)
   const islands = useArchipelago((s) => s.islands)
@@ -314,7 +317,7 @@ export function WorldMap() {
           // Tint the name with its island type's signature land colour.
           tipWho.current.style.color = '#' + isl.biome.palette.grassHi.toString(16).padStart(6, '0')
         }
-        if (tipMeta.current) tipMeta.current.textContent = isl.isMother ? 'Mother Isle' : isl.biome.name
+        if (tipMeta.current) tipMeta.current.textContent = isl.isMother ? t('map.motherIsle') : isl.biome.name
       } else {
         tip.style.display = 'none'
       }
@@ -389,8 +392,8 @@ export function WorldMap() {
     <div style={sBackdrop}>
       <div style={sPanel}>
         <div style={sHeader}>
-          <span style={sTitle}>The Archipelago</span>
-          <button style={sClose} onClick={close} aria-label="Close map">
+          <span style={sTitle}>{t('map.title')}</span>
+          <button style={sClose} onClick={close} aria-label={t('map.closeAria')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.4" strokeLinecap="round">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
@@ -399,16 +402,16 @@ export function WorldMap() {
 
         <div style={sCta}>
           <div style={sCtaLeft}>
-            <span style={sCtaText}>Do you want your own island?</span>
+            <span style={sCtaText}>{t('map.cta')}</span>
             <a style={sCtaLink} href={REPO_URL} target="_blank" rel="noopener noreferrer">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
                 <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.57L12 17.56 6.1 20.66l1.13-6.57-4.78-4.66 6.6-.96z" />
               </svg>
-              Star this repo
+              {t('map.star')}
             </a>
           </div>
           <div style={sCountdown}>
-            <span style={sCountdownLabel}>Next possible update in:</span>
+            <span style={sCountdownLabel}>{t('map.nextUpdate')}</span>
             <span ref={countdownRef} style={sCountdownTime}>--:--:--</span>
           </div>
         </div>
@@ -416,7 +419,7 @@ export function WorldMap() {
         <div style={sSearchWrap}>
           <input
             style={sInput}
-            placeholder="Search a stargazer…"
+            placeholder={t('map.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -444,12 +447,12 @@ export function WorldMap() {
             onClick={onClick}
           />
           <div style={sZoomCtrls}>
-            <button style={sZoomBtn} onClick={() => zoomBy(ZOOM_STEP)} aria-label="Zoom in">
+            <button style={sZoomBtn} onClick={() => zoomBy(ZOOM_STEP)} aria-label={t('map.zoomIn')}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.6" strokeLinecap="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </button>
-            <button style={sZoomBtn} onClick={() => zoomBy(1 / ZOOM_STEP)} aria-label="Zoom out">
+            <button style={sZoomBtn} onClick={() => zoomBy(1 / ZOOM_STEP)} aria-label={t('map.zoomOut')}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.6" strokeLinecap="round">
                 <path d="M5 12h14" />
               </svg>
@@ -457,13 +460,13 @@ export function WorldMap() {
           </div>
         </div>
 
-        <div style={sHint}>{IS_TOUCH ? 'Tap an island to travel there · ✕ to close' : 'Hover an island for its owner · click to travel there · Esc to close'}</div>
+        <div style={sHint}>{IS_TOUCH ? t('map.hintTouch') : t('map.hintDesktop')}</div>
       </div>
 
       <div ref={tipRef} style={sTip}>
         <div style={sTipName}>
-          <span style={sTipTeleport}>Teleport</span>{' '}
-          <span style={sTipTo}>To</span>{' '}
+          <span style={sTipTeleport}>{t('map.teleport')}</span>{' '}
+          <span style={sTipTo}>{t('map.to')}</span>{' '}
           <span ref={tipWho} style={sTipWho} />
         </div>
         <div ref={tipMeta} style={sTipMeta} />
@@ -472,7 +475,6 @@ export function WorldMap() {
   )
 }
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const sBackdrop: CSSProperties = {
   position: 'fixed',

@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { TRANSITION } from '../scene/mapTransition'
+import { HAND } from './theme'
 
 // Full-screen fade that hides the map swap. Solid ink veil + a handwritten label
 // ("Setting sail…" / "Coming ashore…"). Reads the TRANSITION singleton via rAF —
@@ -34,8 +35,6 @@ export function MapTransition() {
     </div>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const sVeil: CSSProperties = {
   position: 'fixed',

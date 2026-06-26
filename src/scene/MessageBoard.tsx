@@ -12,6 +12,9 @@ import { InteractMarker } from './InteractMarker'
 import { registerInteract, unregisterInteract } from './interact'
 import { PROJECTS } from './projects'
 import { BOARD, BOARD_FOCUS } from './boardFocus'
+import { translate, useT } from '../i18n'
+import { IS_TOUCH } from '../input/device'
+import { HAND } from '../ui/theme'
 
 // ---------------------------------------------------------------------------
 // The projects message board at the western end of the west spur. The BOARD stays
@@ -70,8 +73,6 @@ function useBoardModel() {
   }, [scene])
 }
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
-
 // Break a string into rows that each fit within maxW at the current ctx.font.
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
   const words = text.split(' ')
@@ -103,7 +104,8 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 }
 
 // Draw one project onto the wide cream paper (handwritten ink, image on the side).
-function drawPaper(ctx: CanvasRenderingContext2D, i: number, img?: HTMLImageElement) {
+// `desc` is the already-localized description string.
+function drawPaper(ctx: CanvasRenderingContext2D, i: number, desc: string, img?: HTMLImageElement) {
   const W = ctx.canvas.width
   const H = ctx.canvas.height
   const p = PROJECTS[i] ?? PROJECTS[0]
@@ -164,13 +166,11 @@ function drawPaper(ctx: CanvasRenderingContext2D, i: number, img?: HTMLImageElem
   ctx.moveTo(lx, ty + 18)
   ctx.lineTo(lx + lw, ty + 18)
   ctx.stroke()
-  // description (each authored line further wraps to the column)
+  // description (wraps to the column)
   ctx.fillStyle = '#6f5836'
   ctx.font = `31px ${HAND}`
   let y = ty + 62
-  for (const line of p.desc) {
-    for (const row of wrap(ctx, line, lw)) { ctx.fillText(row, lx, y); y += 42 }
-  }
+  for (const row of wrap(ctx, desc, lw)) { ctx.fillText(row, lx, y); y += 42 }
 }
 
 // A single fluttering paper pinned at the top, deformed on the CPU (cheap — one
@@ -180,6 +180,7 @@ function drawPaper(ctx: CanvasRenderingContext2D, i: number, img?: HTMLImageElem
 // flat, so no clipping).
 function Paper() {
   const projectIndex = useWorld((s) => s.projectIndex)
+  const language = useWorld((s) => s.language)
   const meshRef = useRef<THREE.Mesh>(null)
   const imgCache = useRef(new Map<string, HTMLImageElement>())
 
@@ -206,8 +207,9 @@ function Paper() {
   // in the side image (cached) when it loads.
   useEffect(() => {
     const p = PROJECTS[projectIndex]
+    const desc = translate(language, p.descKey)
     const paint = () => {
-      drawPaper(ctx, projectIndex, p.image ? imgCache.current.get(p.image) : undefined)
+      drawPaper(ctx, projectIndex, desc, p.image ? imgCache.current.get(p.image) : undefined)
       texture.needsUpdate = true
     }
     paint()
@@ -218,7 +220,7 @@ function Paper() {
       im.onload = () => { imgCache.current.set(p.image!, im); paint() }
       im.src = p.image
     }
-  }, [projectIndex, ctx, texture])
+  }, [projectIndex, ctx, texture, language])
 
   useFrame((state) => {
     const mesh = meshRef.current
@@ -252,6 +254,7 @@ function Paper() {
 
 export function MessageBoard() {
   const model = useBoardModel()
+  const t = useT()
   const groundY = useMemo(() => getHeight(MESSAGE_BOARD.x, MESSAGE_BOARD.z), [])
   const light = useRef<THREE.PointLight>(null!)
 
@@ -302,8 +305,8 @@ export function MessageBoard() {
         x={MESSAGE_BOARD.x}
         y={groundY + (PAPER_Y - PAPER_H / 2) * BOARD_SCALE - 0.2}
         z={MESSAGE_BOARD.z}
-        label="Projects"
-        hint="press E to read"
+        label={t('marker.projects.label')}
+        hint={IS_TOUCH ? t('marker.projects.hint.touch') : t('marker.projects.hint.desktop')}
       />
     </>
   )

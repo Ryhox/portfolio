@@ -2,6 +2,8 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { ENTERING } from '../scene/mapTransition'
 import { useWorld } from '../state/useWorld'
 import { IS_TOUCH } from '../input/device'
+import { useT, type StringKey } from '../i18n'
+import { HAND } from './theme'
 
 // Island information HUD. While you're on (or sailing up to) an island a small
 // "I — Information" prompt sits bottom-centre; pressing I toggles a flat panel.
@@ -23,9 +25,9 @@ const fmtPct = (p: number) => {
 }
 
 // "≈ 1 in N islands" — a tangible feel for the combined odds.
-const oneIn = (pctTotal: number) => {
+const oneIn = (pctTotal: number, t: (k: StringKey, v?: Record<string, string | number>) => string) => {
   if (pctTotal <= 0) return ''
-  return `≈ 1 in ${Math.round(100 / pctTotal).toLocaleString()} islands`
+  return t('info.oneIn', { n: Math.round(100 / pctTotal).toLocaleString() })
 }
 
 type Snap = {
@@ -49,6 +51,7 @@ type Snap = {
 }
 
 export function IslandInfo() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const menuOpen = useWorld((s) => s.menuOpen)
   const mapOpen = useWorld((s) => s.mapOpen)
@@ -124,7 +127,7 @@ export function IslandInfo() {
         }}
       >
         <span style={sCap}>I</span>
-        <span style={sPromptLabel}>Information</span>
+        <span style={sPromptLabel}>{t('info.information')}</span>
       </div>
 
       {/* Info panel */}
@@ -140,18 +143,18 @@ export function IslandInfo() {
           <>
             <div style={sTitle}>{snap.name}</div>
             <div style={sRegion}>
-              {snap.group} · {snap.tier} region
+              {t('info.region', { group: snap.group, tier: snap.tier })}
             </div>
             <div style={sDivider} />
 
             {snap.isMother && r ? (
               <>
                 <div style={sRow}>
-                  <span style={sValueName}>Land in this region</span>
+                  <span style={sValueName}>{t('info.landInRegion')}</span>
                   <span style={sPct}>{fmtPct(r.groupPct)}</span>
                 </div>
                 <div style={sDivider} />
-                <div style={sSection}>Types you can roll here</div>
+                <div style={sSection}>{t('info.typesHere')}</div>
                 {r.variants.map((v) => (
                   <div key={v.name} style={sRow}>
                     <span style={sValueName}>{v.name}</span>
@@ -159,7 +162,7 @@ export function IslandInfo() {
                   </div>
                 ))}
                 <div style={sDivider} />
-                <div style={sSection}>Island sizes</div>
+                <div style={sSection}>{t('info.islandSizes')}</div>
                 {r.sizes.map((sz) => (
                   <div key={sz.name} style={sRow}>
                     <span style={sValueName}>{sz.name}</span>
@@ -170,26 +173,26 @@ export function IslandInfo() {
             ) : (
               <>
                 <div style={sRow}>
-                  <span style={sLabel}>Look</span>
+                  <span style={sLabel}>{t('info.look')}</span>
                   <span style={sValueName}>{snap.biomeName}</span>
                   <span style={sPct}>{fmtPct(snap.biomePct)}</span>
                 </div>
                 <div style={sRow}>
-                  <span style={sLabel}>Size</span>
+                  <span style={sLabel}>{t('info.size')}</span>
                   <span style={sValueName}>{snap.sizeName}</span>
                   <span style={sPct}>{fmtPct(snap.sizePct)}</span>
                 </div>
                 <div style={sDivider} />
                 <div style={sTotalRow}>
-                  <span style={sTotalLabel}>Overall rarity</span>
+                  <span style={sTotalLabel}>{t('info.overallRarity')}</span>
                   <span style={sTotalPct}>{fmtPct(snap.totalPct)}</span>
                 </div>
-                <div style={sOneIn}>{oneIn(snap.totalPct)}</div>
+                <div style={sOneIn}>{oneIn(snap.totalPct, t)}</div>
                 <div style={sLuck}>{snap.luck}</div>
               </>
             )}
 
-            <div style={sHint}>{IS_TOUCH ? 'Tap the i button to close' : 'Press I or ESC to close'}</div>
+            <div style={sHint}>{IS_TOUCH ? t('info.closeTouch') : t('info.closeDesktop')}</div>
           </>
         )}
       </div>
@@ -197,7 +200,6 @@ export function IslandInfo() {
   )
 }
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 const INK = '#6f5836'
 const INK_DARK = '#5a4528'
 
@@ -306,8 +308,13 @@ const sRow: CSSProperties = {
 }
 
 const sLabel: CSSProperties = {
-  width: 50,
+  // Was a fixed 50px box, which longer translations (e.g. German "Aussehen")
+  // overflowed, colliding with the value. Auto-size with a floor so short labels
+  // still line up, and never wrap onto the value.
+  minWidth: 50,
   flexShrink: 0,
+  whiteSpace: 'nowrap',
+  marginRight: 10,
   color: 'rgba(111,88,54,0.6)',
 }
 

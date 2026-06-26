@@ -6,11 +6,16 @@
 //
 // Images live in public/projects/<name>.png and are referenced as /projects/<name>.png.
 // `live` is optional — add a URL once a project has a hosted preview.
+//
+// The description is localized: `descKey` points at an i18n string (see src/i18n/en.ts)
+// rather than living here, so MessageBoard re-paints it in the chosen language. The
+// title (`name`), `meta` tech tags and URLs are proper nouns and stay as-is.
+import type { StringKey } from '../i18n'
 
 export type Project = {
   name: string
   meta?: string
-  desc: string[] // short description, a few lines
+  descKey: StringKey // i18n key for the short description
   image?: string // optional thumbnail shown on the side (a public/ path)
   source?: string // "Source" button URL
   live?: string // "Live preview" button URL
@@ -20,23 +25,14 @@ export const PROJECTS: Project[] = [
   {
     name: 'Portfolio',
     meta: 'React Three Fiber · three.js',
-    desc: [
-      'This cozy island itself — an interactive',
-      '3D portfolio with a day/night cycle, a',
-      'sailable boat and a hilltop shrine.',
-      'Built from scratch, no engine.',
-    ],
+    descKey: 'project.portfolio.desc',
     image: '/projects/portfolio.png',
     source: 'https://github.com/Ryhox/portfolio',
   },
   {
     name: 'Pokyh',
     meta: 'Frontend · TypeScript',
-    desc: [
-      'The frontend for Pokyh — a clean,',
-      'modern web app interface built with',
-      'a component-driven TypeScript stack.',
-    ],
+    descKey: 'project.pokyh.desc',
     image: '/projects/pokyh.png',
     source: 'https://github.com/bedchem/pokyh-frontend',
     live: 'https://pokyh.com',
@@ -44,11 +40,7 @@ export const PROJECTS: Project[] = [
   {
     name: 'Wieland-AI',
     meta: 'AI · TypeScript',
-    desc: [
-      'A personal AI assistant project —',
-      'wiring up a language model into a',
-      'helpful, conversational tool.',
-    ],
+    descKey: 'project.wieland.desc',
     image: '/projects/wieland.png',
     source: 'https://github.com/Ryhox/Wieland-AI',
     live: 'https://ai.ryhox.dev',
@@ -56,11 +48,7 @@ export const PROJECTS: Project[] = [
   {
     name: 'Minesweeper',
     meta: 'TypeScript · Web',
-    desc: [
-      'The classic Minesweeper, rebuilt for',
-      'the web — quick, clean and playable',
-      'right in the browser.',
-    ],
+    descKey: 'project.minesweeper.desc',
     image: '/projects/minesweeper.png',
     source: 'https://github.com/Ryhox/minesweeper.ryhox.dev',
     live: 'https://minesweeper.ryhox.dev',

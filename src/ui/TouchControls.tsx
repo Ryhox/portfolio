@@ -4,6 +4,8 @@ import { IS_TOUCH } from '../input/device'
 import { INPUT, pressKey, releaseKey, tapKey } from '../input/input'
 import { BOAT } from '../scene/boatState'
 import { ENTERING, returnHome } from '../scene/mapTransition'
+import { useT, type StringKey } from '../i18n'
+import { HAND } from './theme'
 
 // On-screen controls for phones / tablets (only when IS_TOUCH). Two things touch
 // can't do through the keyboard: an analog joystick (left) writing INPUT.move, and
@@ -15,35 +17,36 @@ import { ENTERING, returnHome } from '../scene/mapTransition'
 // bottom-right button that is EXIT-only — Close / Leave / Stand up / Step ashore,
 // and "Home" to leave a stargazer isle. No initiation labels live in the corner.
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 const JOY_R = 56 // joystick travel radius (px)
 // Touch look feels sluggish at the mouse sensitivity (a finger only travels a
 // screen-width), so amplify the drag delta — one comfortable swipe ≈ a big turn.
 const LOOK_GAIN = 3.2
 
-type Exit = { label: string; hold: boolean; fn?: () => void }
+type Exit = { label: StringKey; hold: boolean; fn?: () => void }
 
 // The bottom-right button, derived each frame. `hold` presses/holds KeyE (tap =
 // step ashore, long-hold in the archipelago = sail home); the rest flip state.
+// `label` is an i18n key, translated where it's rendered.
 function currentExit(): Exit | null {
   const ws = useWorld.getState()
   // The projects board has its OWN ✕ on the card, and island info closes via its
   // own button turning into an ✕ — so neither shows a bottom-right button.
-  if (ws.aboutOpen) return { label: 'Close', hold: false, fn: () => ws.setAboutOpen(false) }
-  if (ws.sitting) return { label: 'Stand up', hold: false, fn: () => ws.setSitting(false) }
-  if (BOAT.mode === 'sailing') return { label: 'Step ashore', hold: true }
-  if (ws.mapId === 'archipelago') return { label: 'Home', hold: false, fn: () => returnHome() }
+  if (ws.aboutOpen) return { label: 'touch.close', hold: false, fn: () => ws.setAboutOpen(false) }
+  if (ws.sitting) return { label: 'touch.standUp', hold: false, fn: () => ws.setSitting(false) }
+  if (BOAT.mode === 'sailing') return { label: 'touch.stepAshore', hold: true }
+  if (ws.mapId === 'archipelago') return { label: 'touch.home', hold: false, fn: () => returnHome() }
   return null
 }
 
 export function TouchControls() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const menuOpen = useWorld((s) => s.menuOpen)
   const mapOpen = useWorld((s) => s.mapOpen)
   const mapId = useWorld((s) => s.mapId)
   const infoOpen = useWorld((s) => s.infoOpen)
 
-  const [exitLabel, setExitLabel] = useState<string | null>(null)
+  const [exitLabel, setExitLabel] = useState<StringKey | null>(null)
   const [infoAvail, setInfoAvail] = useState(false)
   const [hint, setHint] = useState(true)
 
@@ -184,7 +187,7 @@ export function TouchControls() {
       {/* Left cluster: Info + Map, bottom-left at the SAME height as the exit button. */}
       <div style={{ ...sLeft, bottom: exitBottom }}>
         {infoAvail && (
-          <button type="button" style={sRound} onPointerDown={(e) => { e.preventDefault(); useWorld.getState().toggleInfo() }} aria-label={infoOpen ? 'Close information' : 'Island information'}>
+          <button type="button" style={sRound} onPointerDown={(e) => { e.preventDefault(); useWorld.getState().toggleInfo() }} aria-label={infoOpen ? t('touch.closeInfoAria') : t('touch.infoAria')}>
             {infoOpen ? (
               <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" aria-hidden="true">
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -196,7 +199,7 @@ export function TouchControls() {
           </button>
         )}
         {archipelago && (
-          <button type="button" style={sRound} onPointerDown={(e) => { e.preventDefault(); tapKey('KeyM') }} aria-label="World map">
+          <button type="button" style={sRound} onPointerDown={(e) => { e.preventDefault(); tapKey('KeyM') }} aria-label={t('touch.worldMapAria')}>
             <MapGlyph />
           </button>
         )}
@@ -211,12 +214,12 @@ export function TouchControls() {
           onPointerUp={onExitUp}
           onPointerCancel={onExitUp}
         >
-          {exitLabel}
+          {t(exitLabel)}
         </button>
       )}
 
       <div style={{ ...sHint, bottom: archipelago ? 'calc(env(safe-area-inset-bottom, 0px) + 150px)' : 'calc(env(safe-area-inset-bottom, 0px) + 96px)', opacity: hint ? 0.92 : 0 }}>
-        Left to move · drag right to look
+        {t('touch.moveLookHint')}
       </div>
     </>
   )

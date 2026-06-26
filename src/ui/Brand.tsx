@@ -1,8 +1,8 @@
 import { type CSSProperties, type ReactNode, useEffect } from 'react'
 import { useWorld } from '../state/useWorld'
 import { IS_TOUCH } from '../input/device'
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 function clock(t: number) {
   const total = t * 24
@@ -29,6 +29,7 @@ function Clock() {
 }
 
 export function Brand() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const muted = useWorld((s) => s.muted)
   const boatMode = useWorld((s) => s.boatMode)
@@ -59,7 +60,7 @@ export function Brand() {
         {IS_TOUCH && (
           <button
             type="button"
-            aria-label="Open menu"
+            aria-label={t('brand.openMenuAria')}
             onClick={openMenu}
             style={{ ...sGear, pointerEvents: started ? 'auto' : 'none' }}
           >
@@ -74,20 +75,20 @@ export function Brand() {
         <div style={{ ...sHints, opacity: started ? 1 : 0, transition: 'opacity 0.7s ease' }}>
           {boatMode === 'sailing' ? (
             <>
-              <Hint cap="WASD" label="Steer" />
-              <Hint cap="Mouse" label="Look" />
-              <Hint cap="E" label="Step ashore" />
-              {mapId !== 'archipelago' && <Hint cap="Horizon" label="New isles" />}
-              <Hint cap="N" label="Mute" indicator={<SpeakerIcon muted={muted} />} />
-              <Hint cap="ESC" label="Settings" />
+              <Hint cap="WASD" label={t('hint.steer')} />
+              <Hint cap="Mouse" label={t('hint.look')} />
+              <Hint cap="E" label={t('hint.stepAshore')} />
+              {mapId !== 'archipelago' && <Hint cap="Horizon" label={t('hint.newIsles')} />}
+              <Hint cap="N" label={t('hint.mute')} indicator={<SpeakerIcon muted={muted} />} />
+              <Hint cap="ESC" label={t('hint.settings')} />
             </>
           ) : (
             <>
-              <Hint cap="WASD" label="Move" />
-              <Hint cap="Mouse" label="Look" />
-              <Hint cap="Shift" label="Sprint" />
-              <Hint cap="N" label="Mute" indicator={<SpeakerIcon muted={muted} />} />
-              <Hint cap="ESC" label="Settings" />
+              <Hint cap="WASD" label={t('hint.move')} />
+              <Hint cap="Mouse" label={t('hint.look')} />
+              <Hint cap="Shift" label={t('hint.sprint')} />
+              <Hint cap="N" label={t('hint.mute')} indicator={<SpeakerIcon muted={muted} />} />
+              <Hint cap="ESC" label={t('hint.settings')} />
             </>
           )}
         </div>

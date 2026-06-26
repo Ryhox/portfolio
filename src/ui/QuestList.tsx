@@ -1,6 +1,8 @@
 import { type CSSProperties, useState } from 'react'
 import { useWorld, type QuestId } from '../state/useWorld'
 import { IS_TOUCH } from '../input/device'
+import { useT, type StringKey } from '../i18n'
+import { HAND } from './theme'
 
 // The cozy bottom-left to-do list. Collapsed to a small "To-Do" button by default
 // (so the corner stays clear); tap it to unfurl the torn-paper checklist, and an X
@@ -13,24 +15,25 @@ import { IS_TOUCH } from '../input/device'
 
 type Item = {
   id: QuestId | 'enjoy'
-  label: string
-  hint: string
+  labelKey: StringKey
+  hintKey: StringKey
   soon?: boolean // greyed "coming soon" (Projects) — shown but never tickable
   always?: boolean // never crossed off (Enjoy)
 }
 
 const ITEMS: Item[] = [
-  { id: 'about', label: 'Who am I?', hint: 'Find the cat keeping watch on the hilltop' },
-  { id: 'socials', label: 'Socials', hint: 'Catch me out there in the world' },
-  { id: 'projects', label: 'Projects', hint: 'Read the board at the end of the west path' },
-  { id: 'sail', label: 'Set Sail', hint: "Drift out to other wanderers' isles" },
-  { id: 'enjoy', label: 'Enjoy the isle!', hint: 'Wander, sit a while, breathe', always: true },
+  { id: 'about', labelKey: 'quest.about.label', hintKey: 'quest.about.hint' },
+  { id: 'socials', labelKey: 'quest.socials.label', hintKey: 'quest.socials.hint' },
+  { id: 'projects', labelKey: 'quest.projects.label', hintKey: 'quest.projects.hint' },
+  { id: 'sail', labelKey: 'quest.sail.label', hintKey: 'quest.sail.hint' },
+  { id: 'enjoy', labelKey: 'quest.enjoy.label', hintKey: 'quest.enjoy.hint', always: true },
 ]
 
 // The tickable goals (Enjoy is the mood, not a goal) — drives the "n / 4" badge.
 const GOALS = ITEMS.filter((it) => !it.always && !it.soon) as { id: QuestId }[]
 
 export function QuestList() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const menuOpen = useWorld((s) => s.menuOpen)
   const mapOpen = useWorld((s) => s.mapOpen)
@@ -61,7 +64,7 @@ export function QuestList() {
         }}
       >
         <div style={sPanel}>
-          <div style={sTitleOnly}>To-Do</div>
+          <div style={sTitleOnly}>{t('quest.todo')}</div>
           <div style={sList}>{rows}</div>
         </div>
       </div>
@@ -81,8 +84,8 @@ export function QuestList() {
       {open ? (
         <div style={sPanel}>
           <div style={sHeader}>
-            <span style={sTitle}>To-Do</span>
-            <button type="button" aria-label="Close to-do" onClick={() => setOpen(false)} style={sClose}>
+            <span style={sTitle}>{t('quest.todo')}</span>
+            <button type="button" aria-label={t('quest.closeAria')} onClick={() => setOpen(false)} style={sClose}>
               <XIcon />
             </button>
           </div>
@@ -91,7 +94,7 @@ export function QuestList() {
       ) : (
         <button type="button" onClick={() => setOpen(true)} style={sPill}>
           <ListIcon />
-          <span>To-Do</span>
+          <span>{t('quest.todo')}</span>
           <span style={sCount}>{done}/{GOALS.length}</span>
         </button>
       )}
@@ -102,6 +105,7 @@ export function QuestList() {
 function Row({ item, done, n }: { item: Item; done: boolean; n: number }) {
   // No checkbox — a line-through is enough. The NAME turns green when done (the
   // description stays as it is).
+  const t = useT()
   const nameColor = item.soon ? INK_SOFT : done ? DONE_GREEN : INK
   return (
     <div style={sRow}>
@@ -114,10 +118,10 @@ function Row({ item, done, n }: { item: Item; done: boolean; n: number }) {
             textDecorationColor: DONE_GREEN,
           }}
         >
-          <span style={sNum}>{n}.</span> {item.label}
-          {item.soon && <span style={sSoon}>soon</span>}
+          <span style={sNum}>{n}.</span> {t(item.labelKey)}
+          {item.soon && <span style={sSoon}>{t('quest.soon')}</span>}
         </span>
-        <span style={sHint}>{item.hint}</span>
+        <span style={sHint}>{t(item.hintKey)}</span>
       </div>
     </div>
   )
@@ -146,7 +150,6 @@ function XIcon() {
   )
 }
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 const INK = '#6f5836'
 const INK_DARK = '#5a4528'
 const INK_SOFT = 'rgba(111,88,54,0.55)'

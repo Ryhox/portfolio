@@ -1,6 +1,8 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { EHOLD } from '../scene/mapTransition'
 import { IS_TOUCH } from '../input/device'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 const R = 26
 const C = 2 * Math.PI * R
@@ -8,6 +10,7 @@ const C = 2 * Math.PI * R
 // Radial "hold E for 3s to sail home" indicator. The ring fills as you hold E in
 // the archipelago; reads the EHOLD singleton via rAF. Flat cream-on-ink, no glow.
 export function HoldReturnIndicator() {
+  const t = useT()
   const wrap = useRef<HTMLDivElement>(null)
   const ring = useRef<SVGCircleElement>(null)
 
@@ -43,12 +46,10 @@ export function HoldReturnIndicator() {
         </svg>
         {!IS_TOUCH && <span style={sKey}>E</span>}
       </div>
-      <div style={sLabel}>Sail home</div>
+      <div style={sLabel}>{t('hold.sailHome')}</div>
     </div>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const sWrap: CSSProperties = {
   position: 'fixed',

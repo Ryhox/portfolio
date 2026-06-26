@@ -1,12 +1,15 @@
 import { type CSSProperties } from 'react'
 import { useWorld } from '../state/useWorld'
 import { IS_TOUCH } from '../input/device'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // A small bottom-centre paper hint shown while resting on the bench, telling the
 // player how to get back up. Matches the cozy cream-paper HUD (no glow/gradient).
 // On touch the on-screen "Stand up" button owns this, so the hint is hidden.
 
 export function SitHint() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const sitting = useWorld((s) => s.sitting)
   const menuOpen = useWorld((s) => s.menuOpen)
@@ -24,12 +27,10 @@ export function SitHint() {
         visibility: show ? 'visible' : 'hidden',
       }}
     >
-      Press <b style={sKey}>E</b> or <b style={sKey}>ESC</b> to stand up
+      {t('sit.standUp')}
     </div>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const sHint: CSSProperties = {
   position: 'fixed',

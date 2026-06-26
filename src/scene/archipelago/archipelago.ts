@@ -21,7 +21,7 @@ import {
   type Placed,
 } from '../terrain'
 import { smoothstep } from '../palette'
-import type { Collider, MapProp, Step } from '../placement'
+import { type Collider, type MapProp, type Step, tiltCollider } from '../placement'
 import {
   pickWeighted,
   SIZE_TIERS,
@@ -611,7 +611,13 @@ export function archColliders(islands: IslandInstance[]): Collider[] {
     if (TREE_SET.has(e.model)) base = 0.55
     else if (ROCK_SET.has(e.model)) base = 0.9
     else continue
-    for (const it of e.items) out.push({ x: it.x, z: it.z, r: base * it.scale })
+    for (const it of e.items) {
+      // Rocks tilt to the surface normal (align), so on a slope they lean off their
+      // base — follow the lean (collide ≈ a third of the way up). Trees stand
+      // upright, so their collider stays on the trunk.
+      if (e.align) out.push(tiltCollider(it.x, it.z, base * it.scale, e.targetH * 0.33 * it.scale))
+      else out.push({ x: it.x, z: it.z, r: base * it.scale })
+    }
   }
   return out
 }

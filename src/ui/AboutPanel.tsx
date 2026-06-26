@@ -2,23 +2,18 @@ import { type CSSProperties, useEffect } from 'react'
 import { useWorld } from '../state/useWorld'
 import { PORTRAIT } from '../scene/summit'
 import { IS_TOUCH } from '../input/device'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // The "About me" panel — opened by pressing E at the portrait nailed to the
 // Heartwood. A flat cream-paper card (Patrick Hand ink, no glow/glass/gradient/
 // emoji) that floats as a HUD over the locked first-person view, like IslandInfo.
 // Close with E (re-press at the tree) or ESC. Edit ABOUT_* below to taste.
 
-const ABOUT_NAME = 'Emanuel' 
-const ABOUT_TAGLINE = "♥ committing straight to production ♥"
-const ABOUT_BODY = [
-  'Hey! I\'m Ryhox. I like building random stuff and seeing where it goes.',
-  'Mostly working on websites, 3D stuff, plugins, and whatever sounds fun',
-  'at the moment.',
-  'A lot of my projects start with "this could be cool" and somehow turn',
-  'into a real thing after way too many hours of debugging.',
-]
+const ABOUT_NAME = 'Emanuel'
 
 export function AboutPanel() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const aboutOpen = useWorld((s) => s.aboutOpen)
   const menuOpen = useWorld((s) => s.menuOpen)
@@ -59,23 +54,18 @@ export function AboutPanel() {
         />
         <div style={sHead}>
           <div style={sTitle}>{ABOUT_NAME}</div>
-          <div style={sTagline}>{ABOUT_TAGLINE}</div>
+          <div style={sTagline}>{t('about.tagline')}</div>
         </div>
       </div>
       <div style={sDivider} />
       <div style={sBody}>
-        {ABOUT_BODY.map((line, i) => (
-          <p key={i} style={sLine}>
-            {line}
-          </p>
-        ))}
+        <p style={sLine}>{t('about.body')}</p>
       </div>
-      <div style={sHint}>{IS_TOUCH ? 'Tap Close to close' : 'Press E or ESC to close'}</div>
+      <div style={sHint}>{IS_TOUCH ? t('about.closeTouch') : t('about.closeDesktop')}</div>
     </div>
   )
 }
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 const INK = '#6f5836'
 const INK_DARK = '#5a4528'
 

@@ -1,11 +1,14 @@
 import { type CSSProperties, useState } from 'react'
 import { useWorld } from '../state/useWorld'
 import { IS_TOUCH } from '../input/device'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // A short, dismissible note on phones/tablets: the world is richest on desktop.
 // Shown on the idle "tap to begin" screen and gone once you enter (or dismiss it).
 // Stops its own taps from bubbling so it never triggers the click-to-start.
 export function TouchDisclaimer() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const [dismissed, setDismissed] = useState(false)
 
@@ -19,10 +22,10 @@ export function TouchDisclaimer() {
       onPointerDown={(e) => e.stopPropagation()}
     >
       <MonitorIcon />
-      <span style={sText}>Best experienced on desktop</span>
+      <span style={sText}>{t('disclaimer.text')}</span>
       <button
         type="button"
-        aria-label="Dismiss"
+        aria-label={t('disclaimer.dismissAria')}
         style={sClose}
         onClick={(e) => { e.stopPropagation(); setDismissed(true) }}
       >
@@ -44,8 +47,6 @@ function MonitorIcon() {
     </svg>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const sWrap: CSSProperties = {
   position: 'fixed', zIndex: 130,

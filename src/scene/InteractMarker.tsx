@@ -6,14 +6,13 @@ import { useWorld } from '../state/useWorld'
 import { getHeight } from './terrain'
 import { ACTIVE, activateNearest } from './interact'
 import { IS_TOUCH } from '../input/device'
+import { HAND } from '../ui/theme'
 
 // A cozy "press E" interact marker. A small resting dot appears when you're near;
 // it blooms into the key-cap + label ONLY when this is the armed entry — i.e. the
 // one you're both close to AND looking at (interact.ts decides, one at a time).
 // Terrain occlusion is analytic (a few getHeight samples — no scene raycast). All
 // per-frame work is written straight to the DOM via refs, never re-rendering.
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 export function InteractMarker({
   id,
@@ -84,8 +83,8 @@ export function InteractMarker({
 
   if (!started || boatMode === 'sailing' || menuOpen || mapOpen || projectsOpen || sitting) return null
 
-  // On touch there's no E key — reword "press E to …" hints to "tap to …".
-  const shownHint = IS_TOUCH && hint ? hint.replace(/press\s+e\b/i, 'tap') : hint
+  // Callers pass an already touch-aware, localized hint.
+  const shownHint = hint
 
   return (
     <group ref={groupRef} position={[x, y, z]}>

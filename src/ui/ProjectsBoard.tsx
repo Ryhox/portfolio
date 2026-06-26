@@ -2,6 +2,8 @@ import { type CSSProperties, useEffect } from 'react'
 import { useWorld } from '../state/useWorld'
 import { PROJECTS } from '../scene/projects'
 import { IS_TOUCH } from '../input/device'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // Control bar for the projects board. The project text + image live on the
 // fluttering PAPER pinned to the board itself (scene/MessageBoard.tsx) — this bar
@@ -10,6 +12,7 @@ import { IS_TOUCH } from '../input/device'
 // arrow keys; leave with E or ESC.
 
 export function ProjectsBoard() {
+  const t = useT()
   const started = useWorld((s) => s.started)
   const projectsOpen = useWorld((s) => s.projectsOpen)
   const menuOpen = useWorld((s) => s.menuOpen)
@@ -48,14 +51,14 @@ export function ProjectsBoard() {
     >
       {/* Touch: a close X right on the card (no separate corner button). */}
       {IS_TOUCH && (
-        <button aria-label="Close" style={sCardClose} onClick={() => useWorld.getState().setProjectsOpen(false)}>
+        <button aria-label={t('board.closeAria')} style={sCardClose} onClick={() => useWorld.getState().setProjectsOpen(false)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.6" strokeLinecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
       )}
 
-      <button aria-label="Previous" style={sArrow} onClick={() => go(-1)}>
+      <button aria-label={t('board.prevAria')} style={sArrow} onClick={() => go(-1)}>
         <Chevron dir="left" />
       </button>
 
@@ -63,24 +66,24 @@ export function ProjectsBoard() {
         <div style={sLinks}>
           {p?.source && (
             <button style={sSource} onClick={() => open(p.source!)}>
-              <GitIcon color={CREAM} /> Source
+              <GitIcon color={CREAM} /> {t('board.source')}
             </button>
           )}
           {p?.live && (
             <button style={sLive} onClick={() => open(p.live!)}>
-              <PlayIcon color={CREAM} /> {IS_TOUCH ? 'Preview' : 'Live preview'}
+              <PlayIcon color={CREAM} /> {IS_TOUCH ? t('board.preview') : t('board.livePreview')}
             </button>
           )}
-          {!p?.source && !p?.live && <span style={sNoLink}>no links</span>}
+          {!p?.source && !p?.live && <span style={sNoLink}>{t('board.noLinks')}</span>}
         </div>
         <div style={sFoot}>
           <span style={sCount}>{i + 1} / {n}</span>
           <span style={sDot}>·</span>
-          <span style={sHint}>{IS_TOUCH ? 'Tap ✕ to close' : 'E or ESC to leave'}</span>
+          <span style={sHint}>{IS_TOUCH ? t('board.leaveTouch') : t('board.leaveDesktop')}</span>
         </div>
       </div>
 
-      <button aria-label="Next" style={sArrow} onClick={() => go(1)}>
+      <button aria-label={t('board.nextAria')} style={sArrow} onClick={() => go(1)}>
         <Chevron dir="right" />
       </button>
     </div>
@@ -111,7 +114,6 @@ function PlayIcon({ color = INK_DARK }: { color?: string }) {
   )
 }
 
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 const INK = '#6f5836'
 const INK_DARK = '#5a4528'
 const CREAM = '#f6efda'

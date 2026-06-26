@@ -14,6 +14,8 @@ import {
 } from '../scene/archipelago/archipelago'
 import { nextRefreshAt } from '../scene/archipelago/stargazers'
 import { buildMap, hexToRgb, landRamp, seaRamp } from './mapRender'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // Same UTC-aligned 5-min refresh clock the big World map counts down to, so both
 // readouts hit zero together when the stargazer list re-pulls. Mirrors WorldMap's
@@ -49,6 +51,7 @@ const MM = 148 // on-screen size (css px)
 const PROP_COLOR = { tree: '#2f5e2a', rock: '#8b8b92', lamp: '#f3c969' } as const
 
 export function Minimap() {
+  const t = useT()
   const mapId = useWorld((s) => s.mapId)
   const sailing = useWorld((s) => s.boatMode === 'sailing')
   const islands = useArchipelago((s) => s.islands)
@@ -215,10 +218,10 @@ export function Minimap() {
           <div style={sStarCard}>
             <span style={sStarCount}>
               <span style={sStarNum}>{stargazerCount}</span>{' '}
-              {stargazerCount === 1 ? 'Stargazer' : 'Stargazers'} {'<3'}
+              {stargazerCount === 1 ? t('minimap.stargazer') : t('minimap.stargazers')} {'<3'}
             </span>
             <span style={sStarDot}>·</span>
-            <span style={sStarLabel}>Next possible update in</span>
+            <span style={sStarLabel}>{t('minimap.nextUpdate')}</span>
             <span ref={countdownRef} style={sStarTime}>
               --:--
             </span>
@@ -229,11 +232,11 @@ export function Minimap() {
             <div style={sHintStack}>
               <div style={sHintRow}>
                 <span style={sHintCap}>Hold E</span>
-                <span style={sHintLabel}>Sail home</span>
+                <span style={sHintLabel}>{t('minimap.sailHome')}</span>
               </div>
               <div style={sHintRow}>
                 <span style={sHintCap}>M</span>
-                <span style={sHintLabel}>World map</span>
+                <span style={sHintLabel}>{t('minimap.worldMap')}</span>
               </div>
             </div>
           )}
@@ -242,8 +245,6 @@ export function Minimap() {
     </>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const sWrap: CSSProperties = {
   position: 'fixed',

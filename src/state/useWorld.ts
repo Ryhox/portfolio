@@ -12,6 +12,22 @@ export type VolKey = 'master' | 'music' | 'waves' | 'wind' | 'ambient'
 export type Quality = 'Low' | 'Medium' | 'High'
 export const QUALITY_ORDER: Quality[] = ['Low', 'Medium', 'High']
 
+// UI language. The settings sheet's flag dropdown writes this; every piece of
+// user-facing text reads it through src/i18n. Persisted to localStorage and, on a
+// fresh visit, guessed from the browser's preferred language.
+export type Lang = 'en' | 'de' | 'it' | 'zh' | 'es' | 'fr' | 'ru' | 'ja' | 'pt' | 'ko'
+export const LANGS: Lang[] = ['en', 'de', 'it', 'zh', 'es', 'fr', 'ru', 'ja', 'pt', 'ko']
+
+function initialLang(): Lang {
+  if (typeof window === 'undefined') return 'en'
+  try {
+    const saved = window.localStorage.getItem('lang') as Lang | null
+    if (saved && LANGS.includes(saved)) return saved
+  } catch { /* localStorage may be blocked */ }
+  const nav = (navigator.languages?.[0] || navigator.language || 'en').slice(0, 2).toLowerCase()
+  return (LANGS as string[]).includes(nav) ? (nav as Lang) : 'en'
+}
+
 // The little to-do list shown bottom-left. Each flag flips true the first time the
 // player does the thing, and the entry gets crossed off. `projects` has no trigger
 // yet (it's "coming soon"); `enjoy` is never crossed off — it's always the mood.
@@ -27,6 +43,7 @@ export type WorldState = {
   muted: boolean
   menuOpen: boolean
   quality: Quality
+  language: Lang
   motionBlur: boolean       // temporal motion-blur post effect (Medium/High quality)
   motionBlurAmount: number  // 0..1 strength of the motion-blur trail
   invertX: boolean
@@ -60,6 +77,7 @@ export type WorldState = {
   setSunMesh: (m: Object3D | null) => void
   setMenuOpen: (open: boolean) => void
   cycleQuality: () => void
+  setLanguage: (l: Lang) => void
   setMotionBlur: (v: boolean) => void
   toggleMotionBlur: () => void
   setMotionBlurAmount: (v: number) => void
@@ -103,6 +121,7 @@ export const useWorld = create<WorldState>((set) => ({
   // variants are the ones Warmup precompiles during the loading screen. Desktop
   // keeps High. The user can still change it in settings.
   quality: IS_TOUCH ? 'Medium' : 'High',
+  language: initialLang(),
   motionBlur: true,
   motionBlurAmount: 0.25,
   invertX: false,
@@ -139,6 +158,11 @@ export const useWorld = create<WorldState>((set) => ({
     set((s) => ({
       quality: QUALITY_ORDER[(QUALITY_ORDER.indexOf(s.quality) + 1) % QUALITY_ORDER.length],
     })),
+  setLanguage: (language) =>
+    set(() => {
+      try { window.localStorage.setItem('lang', language) } catch { /* ignore */ }
+      return { language }
+    }),
   setMotionBlur: (motionBlur) => set({ motionBlur }),
   toggleMotionBlur: () => set((s) => ({ motionBlur: !s.motionBlur })),
   setMotionBlurAmount: (motionBlurAmount) => set({ motionBlurAmount }),

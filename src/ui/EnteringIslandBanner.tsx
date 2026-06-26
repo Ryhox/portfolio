@@ -1,6 +1,8 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { ENTERING } from '../scene/mapTransition'
 import { IS_TOUCH } from '../input/device'
+import { useT } from '../i18n'
+import { HAND } from './theme'
 
 // Big centred HUD that announces the island you're sailing up to:
 // "You are entering — <login>'s Island". Reads the ENTERING singleton via rAF
@@ -10,6 +12,7 @@ import { IS_TOUCH } from '../input/device'
 const DURATION = 4
 
 export function EnteringIslandBanner() {
+  const t = useT()
   const wrap = useRef<HTMLDivElement>(null)
   const name = useRef<HTMLDivElement>(null)
   const lastKey = useRef(-1)
@@ -45,14 +48,12 @@ export function EnteringIslandBanner() {
       <style>{CSS}</style>
       {/* On phones, drop the "You are entering" eyebrow — just the island name,
           small but still noticeable. */}
-      {!IS_TOUCH && <div style={sEyebrow}>You are entering</div>}
+      {!IS_TOUCH && <div style={sEyebrow}>{t('entering.eyebrow')}</div>}
       <div ref={name} style={sName} />
       <div style={sRule} />
     </div>
   )
 }
-
-const HAND = "'Patrick Hand', 'Nunito', cursive"
 
 const CSS = `
 @keyframes enterIslandPop {

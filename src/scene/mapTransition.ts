@@ -9,6 +9,7 @@
 import gsap from 'gsap'
 import * as THREE from 'three'
 import { useWorld } from '../state/useWorld'
+import { tg } from '../i18n'
 import { setActiveMap, getHeight } from './terrain'
 import { SPAWN_X, SPAWN_Z, SPAWN_LOOK } from './spawnConstants'
 import { BOAT, NAV, strandBoat } from './boatState'
@@ -102,7 +103,7 @@ export function enterArchipelago(target?: IslandInstance) {
   // Build the islands during the fade-out so they're ready when we flip.
   useArchipelago.getState().ensureLoaded()
 
-  TRANSITION.label = 'Setting sail…'
+  TRANSITION.label = tg('transition.settingSail')
   const tl = gsap.timeline({
     onComplete: () => {
       busy = false
@@ -143,7 +144,7 @@ export function returnHome() {
   EHOLD.progress = 0
   clearBanner()
 
-  TRANSITION.label = 'Coming ashore…'
+  TRANSITION.label = tg('transition.comingAshore')
   const tl = gsap.timeline({
     onComplete: () => {
       busy = false
