@@ -1,5 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect } from 'react'
 import { useWorld } from '../state/useWorld'
+import { IS_TOUCH } from '../input/device'
 
 const HAND = "'Patrick Hand', 'Nunito', cursive"
 
@@ -10,14 +11,13 @@ function clock(t: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-// Persistent corner overlay: the logo (top-left, every phase), the live island
-// clock (top-centre, in-game), and the player movement hints (bottom-right, shown
-// the whole time you're exploring but hidden while the settings sheet is open).
-// Click-through except where noted.
-// The live clock readout. Subscribes to the DERIVED "HH:MM" string rather than
-// the raw `t` (which the day/night driver mutates every frame), so zustand only
-// re-renders this tiny node when the displayed minute actually changes (~10×/s)
-// instead of 60×/s — and the rest of Brand never re-renders on time at all.
+// Persistent corner overlay: the logo (top-left, every phase), a top-right cluster
+// with the live island clock (+ a menu button on touch), and the keyboard legend
+// (bottom-right) on desktop. Touch hides the legend (keys are meaningless there)
+// and uses the on-screen buttons instead. Click-through except the gear button.
+// The live clock readout subscribes to the DERIVED "HH:MM" string rather than the
+// raw `t` (which the day/night driver mutates every frame), so zustand only
+// re-renders this tiny node when the displayed minute actually changes.
 function Clock() {
   const label = useWorld((s) => clock(s.t))
   return (
@@ -29,12 +29,12 @@ function Clock() {
 }
 
 export function Brand() {
-  const started  = useWorld(s => s.started)
-  const muted    = useWorld(s => s.muted)
-  const boatMode = useWorld(s => s.boatMode)
-  const mapId    = useWorld(s => s.mapId)
+  const started = useWorld((s) => s.started)
+  const muted = useWorld((s) => s.muted)
+  const boatMode = useWorld((s) => s.boatMode)
+  const mapId = useWorld((s) => s.mapId)
 
-  // "N" toggles mute (M now opens the world map — handled by WorldMap).
+  // "N" toggles mute (M opens the world map — handled by WorldMap).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'KeyN') useWorld.getState().toggleMuted()
@@ -43,30 +43,51 @@ export function Brand() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const openMenu = () => useWorld.getState().setMenuOpen(true)
+
   return (
     <div style={sContainer}>
       <img src="/ui/logo.png" alt="logo" style={sLogo} />
 
-      {started && <Clock />}
+      {/* Menu + clock FADE in once the intro fly-in lands (started). Always mounted
+          so the opacity transition runs; the logo stays through every phase. */}
+      <div style={{ ...sTopRight, opacity: started ? 1 : 0, transition: 'opacity 0.7s ease' }}>
+        <Clock />
+        {/* The on-screen menu button is for touch only — on desktop, Esc opens
+            settings (keyboard-driven), so no button clutters the corner. It sits to
+            the RIGHT of the clock, cream like the rest of the HUD. */}
+        {IS_TOUCH && (
+          <button
+            type="button"
+            aria-label="Open menu"
+            onClick={openMenu}
+            style={{ ...sGear, pointerEvents: started ? 'auto' : 'none' }}
+          >
+            <MenuIcon />
+          </button>
+        )}
+      </div>
 
-      {started && (
-        <div style={sHints}>
+      {/* Desktop keyboard legend (bottom-right). Hidden on touch — there the
+          on-screen buttons replace it. */}
+      {!IS_TOUCH && (
+        <div style={{ ...sHints, opacity: started ? 1 : 0, transition: 'opacity 0.7s ease' }}>
           {boatMode === 'sailing' ? (
             <>
-              <Hint cap="WASD"  label="Steer" />
+              <Hint cap="WASD" label="Steer" />
               <Hint cap="Mouse" label="Look" />
-              <Hint cap="E"     label="Step ashore" />
+              <Hint cap="E" label="Step ashore" />
               {mapId !== 'archipelago' && <Hint cap="Horizon" label="New isles" />}
-              <Hint cap="N"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
-              <Hint cap="ESC"   label="Settings" />
+              <Hint cap="N" label="Mute" indicator={<SpeakerIcon muted={muted} />} />
+              <Hint cap="ESC" label="Settings" />
             </>
           ) : (
             <>
-              <Hint cap="WASD"  label="Move" />
+              <Hint cap="WASD" label="Move" />
               <Hint cap="Mouse" label="Look" />
               <Hint cap="Shift" label="Sprint" />
-              <Hint cap="N"     label="Mute" indicator={<SpeakerIcon muted={muted} />} />
-              <Hint cap="ESC"   label="Settings" />
+              <Hint cap="N" label="Mute" indicator={<SpeakerIcon muted={muted} />} />
+              <Hint cap="ESC" label="Settings" />
             </>
           )}
         </div>
@@ -75,21 +96,7 @@ export function Brand() {
   )
 }
 
-// A hand-drawn-feeling clock face, sized and weighted to sit beside the Patrick
-// Hand digits. Slightly rounded strokes so it reads as part of the same lettering.
-function ClockIcon() {
-  return (
-    <svg width={26} height={26} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-      style={{ display: 'block' }}>
-      <circle cx="12" cy="12" r="9" />
-      <polyline points="12 7.5 12 12 15.5 14" />
-    </svg>
-  )
-}
-
-// Small speaker glyph used as the live mute/sound indicator beside the M hint.
-// Sized to sit inline with the handwritten label text.
+// Small speaker glyph used as the live mute/sound indicator beside the N hint.
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
     <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -123,25 +130,70 @@ function Hint({ cap, label, indicator }: { cap: string; label: string; indicator
   )
 }
 
+// A hand-drawn-feeling clock face, sized and weighted to sit beside the Patrick
+// Hand digits. Slightly rounded strokes so it reads as part of the same lettering.
+function ClockIcon() {
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      style={{ display: 'block' }}>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7.5 12 12 15.5 14" />
+    </svg>
+  )
+}
+
+// Menu glyph (three lines + a settings dot) for the top-right button that opens
+// the settings sheet — the on-screen replacement for "ESC".
+function MenuIcon() {
+  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      style={{ display: 'block' }}>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+    </svg>
+  )
+}
+
 const sContainer: CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 120,
   pointerEvents: 'none',
 }
 
 const sLogo: CSSProperties = {
-  position: 'fixed', top: 16, left: 18,
-  height: 42, width: 'auto',
+  position: 'fixed',
+  top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+  left: 'calc(env(safe-area-inset-left, 0px) + 16px)',
+  height: 'clamp(32px, 4.6vw, 42px)', width: 'auto',
   filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.55))',
   userSelect: 'none',
 }
 
+const sTopRight: CSSProperties = {
+  position: 'fixed',
+  top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+  right: 'calc(env(safe-area-inset-right, 0px) + 16px)',
+  display: 'flex', alignItems: 'center', gap: 12,
+}
+
 const sClock: CSSProperties = {
-  position: 'fixed', top: 16, right: 20,
   display: 'flex', alignItems: 'center', gap: 8,
-  fontFamily: HAND, fontSize: 30, color: '#fff',
+  fontFamily: HAND, fontSize: 'clamp(22px, 2.6vw, 30px)', color: '#fff',
   letterSpacing: 1, lineHeight: 1,
   textShadow: '0 2px 5px rgba(0,0,0,0.55)',
   filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.55))',
+}
+
+const sGear: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 44, height: 44, padding: 0,
+  borderRadius: 12,
+  background: '#f6efda', color: '#5a4528',
+  border: '1px solid #d7c8a3', cursor: 'pointer',
+  boxShadow: '0 3px 10px rgba(0,0,0,0.4)',
+  WebkitTapHighlightColor: 'transparent',
 }
 
 const sHints: CSSProperties = {

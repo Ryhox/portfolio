@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { WATER_LEVEL } from './layout'
 import { getSky } from './palette'
 import { useWorld } from '../state/useWorld'
+import { useLoadStatus } from '../ui/intro/loadStatus'
 import { WORLD_ALPHA } from './revealUniforms'
 import { waveHeight, waveNormal } from './oceanWave'
 import { n } from './config'
@@ -166,10 +167,21 @@ function FloatingDebris() {
     [],
   )
   const refs = useRef<THREE.Mesh[]>([])
-  const started = useWorld((s) => s.started)
+  const root = useRef<THREE.Group>(null!)
 
   useFrame((state) => {
-    if (!useWorld.getState().started) return
+    // The debris is MOUNTED from the first frame — never `return null`-ed — so the
+    // loading-screen warm-up compiles these shadow-casting standard materials and
+    // uploads their geometry up front. Mounting them only when `started` flips made
+    // all of that happen on their first draw the instant control took over: a
+    // one-frame compile/upload stall right at the end of the intro (the falling
+    // leaves visibly jumped as the clock lurched past the stall). Now visibility,
+    // not mounting, is gated: shown while warming (behind the loading veil, unseen)
+    // and once the game is live, but hidden on the idle/reveal screen so no trash
+    // drifts across the cinematic.
+    const started = useWorld.getState().started
+    root.current.visible = !useLoadStatus.getState().warmReady || started
+    if (!started) return
     const time = state.clock.elapsedTime
     items.forEach((l, i) => {
       const mesh = refs.current[i]
@@ -185,9 +197,8 @@ function FloatingDebris() {
     })
   })
 
-  if (!started) return null // no debris on the idle "click to start" screen
   return (
-    <>
+    <group ref={root}>
       {items.map((it, i) => (
         <mesh
           key={i}
@@ -197,7 +208,7 @@ function FloatingDebris() {
           castShadow
         />
       ))}
-    </>
+    </group>
   )
 }
 

@@ -4,6 +4,7 @@ import { requestLock, exitLock, cancelLock, isAcquiring } from '../scene/pointer
 import { BOARD_FOCUS } from '../scene/boardFocus'
 import { SIT } from '../scene/benchSit'
 import { setVol as setAudioVol } from '../audio/useAmbience'
+import { IS_TOUCH } from '../input/device'
 
 // A faithful recreation of the Alba "torn notepad" settings sheet: cream paper
 // with a punched spiral top edge, handwritten ink, tan sliders with a square
@@ -506,7 +507,8 @@ const sOverlay: CSSProperties = {
 
 const sSheetWrap: CSSProperties = {
   position: 'relative',
-  width: 'min(90vw, 384px)',
+  // Smaller on touch so the sheet doesn't blanket the screen / cover the corner buttons.
+  width: IS_TOUCH ? 'min(80vw, 330px)' : 'min(90vw, 384px)',
   transform: 'rotate(-0.6deg)',
 }
 
@@ -530,8 +532,14 @@ const sCloseX: CSSProperties = {
 }
 
 const sHoleRow: CSSProperties = {
-  position: 'absolute', top: 11, left: 0, right: 0, zIndex: 2,
-  display: 'flex', justifyContent: 'space-evenly', padding: '0 14px',
+  // An OPAQUE band pinned to the sheet top so scrolling content slides cleanly
+  // underneath the spiral holes instead of showing through them.
+  position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2,
+  height: 42,
+  display: 'flex', justifyContent: 'space-evenly', alignItems: 'center', padding: '0 14px',
+  background: 'linear-gradient(176deg, #f6efda 0%, #f3ebd2 100%)',
+  borderRadius: '5px 5px 0 0',
+  boxShadow: '0 6px 7px -4px rgba(120,98,64,0.22)',
   pointerEvents: 'none',
 }
 
@@ -544,8 +552,8 @@ const sHole: CSSProperties = {
 const sSheet: CSSProperties = {
   position: 'relative',
   // Fixed height so every tab is the same size; short tabs centre their content,
-  // long ones scroll.
-  height: 'min(80vh, 520px)',
+  // long ones scroll. Shorter on touch so it never blankets the screen.
+  height: IS_TOUCH ? 'min(66vh, 440px)' : 'min(80vh, 520px)',
   overflowY: 'auto',
   display: 'flex',
   flexDirection: 'column',

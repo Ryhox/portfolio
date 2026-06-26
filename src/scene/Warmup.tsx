@@ -94,12 +94,17 @@ function countMeshes(scene: THREE.Object3D): number {
 
 // Collect every unique texture hanging off a built-in material (its slots — map,
 // normalMap, … — are top-level properties) so we can upload them in slices.
+// Covers Points/Sprites/Lines too, NOT just meshes: the falling-leaf clouds are
+// THREE.Points and their leaf-atlas textures (a separate GPU copy from the
+// foliage's) would otherwise decode + upload on their first draw — which happens
+// as the reveal ring sweeps over them near the end of the fly-in, the exact
+// "leaves change / half-second freeze at the end" the player saw.
 function gatherTextures(scene: THREE.Object3D): THREE.Texture[] {
   const seen = new Set<THREE.Texture>()
   scene.traverse((o) => {
-    const mesh = o as THREE.Mesh
-    if (!mesh.isMesh) return
-    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    const obj = o as THREE.Mesh & { isPoints?: boolean; isSprite?: boolean; isLine?: boolean }
+    if (!(obj.isMesh || obj.isPoints || obj.isSprite || obj.isLine)) return
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
     for (const m of mats) {
       if (!m) continue
       for (const key in m) {

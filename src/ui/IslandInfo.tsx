@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { ENTERING } from '../scene/mapTransition'
 import { useWorld } from '../state/useWorld'
+import { IS_TOUCH } from '../input/device'
 
 // Island information HUD. While you're on (or sailing up to) an island a small
 // "I — Information" prompt sits bottom-centre; pressing I toggles a flat panel.
@@ -107,7 +108,8 @@ export function IslandInfo() {
   }, [])
 
   const blocked = !started || menuOpen || mapOpen
-  const showPrompt = !!snap && !infoOpen && !blocked
+  // On touch the round "i" button (TouchControls) opens this, so hide the chip.
+  const showPrompt = !!snap && !infoOpen && !blocked && !IS_TOUCH
   const showPanel = !!snap && infoOpen && !blocked
   const r = snap?.region
 
@@ -187,7 +189,7 @@ export function IslandInfo() {
               </>
             )}
 
-            <div style={sHint}>Press I or ESC to close</div>
+            <div style={sHint}>{IS_TOUCH ? 'Tap the i button to close' : 'Press I or ESC to close'}</div>
           </>
         )}
       </div>

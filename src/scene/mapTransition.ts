@@ -7,9 +7,11 @@
 // ---------------------------------------------------------------------------
 
 import gsap from 'gsap'
+import * as THREE from 'three'
 import { useWorld } from '../state/useWorld'
-import { setActiveMap } from './terrain'
-import { BOAT, NAV, disembarkSpot, strandBoat } from './boatState'
+import { setActiveMap, getHeight } from './terrain'
+import { SPAWN_X, SPAWN_Z, SPAWN_LOOK } from './spawnConstants'
+import { BOAT, NAV, strandBoat } from './boatState'
 import {
   ARCH_SPAWN,
   useArchipelago,
@@ -43,7 +45,13 @@ export const TELEPORT = {
   pitch: 0,
 }
 
-const _scratch = { x: 0, y: 0, z: 0 }
+// Scratch used to derive the spawn-facing yaw/pitch for the return-home teleport.
+const EYE_H = 1.7
+const _eye = new THREE.Vector3()
+const _tgt = new THREE.Vector3()
+const _m = new THREE.Matrix4()
+const _up = new THREE.Vector3(0, 1, 0)
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ')
 let busy = false
 export function isTransitioning(): boolean {
   return busy
@@ -144,19 +152,25 @@ export function returnHome() {
   tl.to(TRANSITION, { alpha: 1, duration: 0.5, ease: 'power2.in' })
   tl.add(() => {
     setActiveMap('home')
-    strandBoat() // back on the south beach
+    strandBoat() // the boat goes back to the south beach…
     BOAT.mode = 'parked'
     NAV.sailing = false
-    const d = disembarkSpot(_scratch) // step out beside the beached boat
-    NAV.px = d.x
-    NAV.pz = d.z
+    // …but YOU land back at the original spawn pose (not beside the boat). Derive
+    // the spawn-facing yaw/pitch the same way Player seeds it: look at SPAWN_LOOK.
+    const sy = Math.max(getHeight(SPAWN_X, SPAWN_Z), 0.15) + EYE_H
+    _eye.set(SPAWN_X, sy, SPAWN_Z)
+    _tgt.set(SPAWN_LOOK.x, SPAWN_LOOK.y, SPAWN_LOOK.z)
+    _m.lookAt(_eye, _tgt, _up)
+    _euler.setFromRotationMatrix(_m)
+    NAV.px = SPAWN_X
+    NAV.pz = SPAWN_Z
     TELEPORT.pending = true
     TELEPORT.setPos = true
     TELEPORT.ground = true
-    TELEPORT.x = d.x
-    TELEPORT.z = d.z
-    TELEPORT.yaw = BOAT.heading + Math.PI
-    TELEPORT.pitch = 0
+    TELEPORT.x = SPAWN_X
+    TELEPORT.z = SPAWN_Z
+    TELEPORT.yaw = _euler.y
+    TELEPORT.pitch = _euler.x
     useWorld.getState().setBoatMode('parked')
     useWorld.getState().setBoardPrompt(false)
     useWorld.getState().setMapId('home')

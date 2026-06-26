@@ -1,6 +1,7 @@
-import { type CSSProperties } from 'react'
+import { type CSSProperties, useEffect } from 'react'
 import { useWorld } from '../state/useWorld'
 import { PORTRAIT } from '../scene/summit'
+import { IS_TOUCH } from '../input/device'
 
 // The "About me" panel — opened by pressing E at the portrait nailed to the
 // Heartwood. A flat cream-paper card (Patrick Hand ink, no glow/glass/gradient/
@@ -24,6 +25,21 @@ export function AboutPanel() {
   const mapOpen = useWorld((s) => s.mapOpen)
 
   const show = started && aboutOpen && !menuOpen && !mapOpen
+
+  // E closes the About panel from ANYWHERE (the portrait only opens it), so you
+  // can press E again after walking off. ESC-to-close is owned by EscMenu.
+  useEffect(() => {
+    if (!aboutOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyE') return
+      const ws = useWorld.getState()
+      if (ws.menuOpen || ws.mapOpen) return
+      e.preventDefault()
+      ws.setAboutOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [aboutOpen])
 
   return (
     <div
@@ -54,7 +70,7 @@ export function AboutPanel() {
           </p>
         ))}
       </div>
-      <div style={sHint}>Press E or ESC to close</div>
+      <div style={sHint}>{IS_TOUCH ? 'Tap Close to close' : 'Press E or ESC to close'}</div>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { smoothstep } from './palette'
 import { buildColliders, buildSteps } from './placement'
 import { setLockFn, requestLock } from './pointerLock'
 import { WATER_LEVEL, getHeight } from './terrain'
+import { SPAWN_X, SPAWN_Z, SPAWN_LOOK } from './spawnConstants'
 import { waveHeight } from './oceanWave'
 import { seabedHeight } from './seabedField'
 import { SWIM } from './swimState'
@@ -23,6 +24,7 @@ import { BOARD_FOCUS } from './boardFocus'
 import { SIT } from './benchSit'
 import { archColliders, archSteps, archipelagoExtent, islandStats, nearestIsland, useArchipelago } from './archipelago/archipelago'
 import { EHOLD, ENTERING, TELEPORT, enterArchipelago, isTransitioning, returnHome } from './mapTransition'
+import { INPUT } from '../input/input'
 
 // Scratch objects reused each frame (no per-frame allocation).
 const _seat = { x: 0, y: 0, z: 0 }
@@ -171,11 +173,11 @@ export function Player() {
 
   useEffect(() => {
     if (!started) return
-    const spawnX = 2
-    const spawnZ = 72
-    const spawnY = Math.max(getHeight(spawnX, spawnZ), 0.15) + EYE
-    camera.position.set(spawnX, spawnY, spawnZ)
-    camera.lookAt(2, 1.5, 55)
+    // Spawn at EXACTLY the fly-in's end pose (shared SPAWN_X/Z/LOOK) so control hands
+    // over with no jump in position or look direction.
+    const spawnY = Math.max(getHeight(SPAWN_X, SPAWN_Z), 0.15) + EYE
+    camera.position.set(SPAWN_X, spawnY, SPAWN_Z)
+    camera.lookAt(SPAWN_LOOK.x, SPAWN_LOOK.y, SPAWN_LOOK.z)
     // Seed the look controller's yaw/pitch from the spawn orientation so the first
     // mouse move continues smoothly instead of snapping.
     euler.setFromQuaternion(camera.quaternion)
@@ -283,6 +285,22 @@ export function Player() {
       TELEPORT.pending = false
     }
 
+    // Touch drag-look: pointer lock is desktop-only, so on touch the look comes
+    // from a drag delta accumulated by the on-screen controls. Same yaw/pitch
+    // math + invert flags as the mouse path. Sailing composes its own final
+    // orientation below, so only set the quaternion when walking.
+    if (INPUT.look.dx !== 0 || INPUT.look.dy !== 0) {
+      yaw.current -= INPUT.look.dx * LOOK_SENS * (ws.invertX ? -1 : 1)
+      pitch.current -= INPUT.look.dy * LOOK_SENS * (ws.invertY ? -1 : 1)
+      pitch.current = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch.current))
+      INPUT.look.dx = 0
+      INPUT.look.dy = 0
+      if (BOAT.mode !== 'sailing') {
+        euler.set(pitch.current, yaw.current, 0)
+        camera.quaternion.setFromEuler(euler)
+      }
+    }
+
     // E — a tap boards / disembarks; a 3s hold in the archipelago sails you home.
     // Acting on the RELEASE edge is what lets us tell a quick tap from a long hold.
     if (isTransitioning()) {
@@ -363,8 +381,11 @@ export function Player() {
     // ── BOAT: sailing the open sea (first-person, seated) ──────────────────
     if (BOAT.mode === 'sailing') {
       const bk = keys.current
-      const thrIn = (bk['KeyW'] || bk['ArrowUp'] ? 1 : 0) - (bk['KeyS'] || bk['ArrowDown'] ? 1 : 0)
-      const trnIn = (bk['KeyA'] || bk['ArrowRight'] ? 1 : 0) - (bk['KeyD'] || bk['ArrowLeft'] ? 1 : 0)
+      const thrKey = (bk['KeyW'] || bk['ArrowUp'] ? 1 : 0) - (bk['KeyS'] || bk['ArrowDown'] ? 1 : 0)
+      const trnKey = (bk['KeyA'] || bk['ArrowRight'] ? 1 : 0) - (bk['KeyD'] || bk['ArrowLeft'] ? 1 : 0)
+      // Touch joystick: up = throttle forward, right = steer right (trn is +left).
+      const thrIn = Math.max(-1, Math.min(1, thrKey + INPUT.move.y))
+      const trnIn = Math.max(-1, Math.min(1, trnKey - INPUT.move.x))
       // Smooth the inputs — these also drive the oar power/asymmetry.
       BOAT.throttle += (thrIn - BOAT.throttle) * Math.min(1, dt * 6)
       BOAT.turn += (trnIn - BOAT.turn) * Math.min(1, dt * 6)
@@ -442,12 +463,16 @@ export function Player() {
     if (k['KeyS'] || k['ArrowDown']) m.sub(forward)
     if (k['KeyD'] || k['ArrowRight']) m.add(right.current)
     if (k['KeyA'] || k['ArrowLeft']) m.sub(right.current)
+    // Touch joystick (analog): forward along the look basis, x strafes.
+    if (INPUT.move.y) m.addScaledVector(forward, INPUT.move.y)
+    if (INPUT.move.x) m.addScaledVector(right.current, INPUT.move.x)
 
     const sprint = k['ShiftLeft'] || k['ShiftRight'] ? SPRINT : 1
-    const moving = m.lengthSq() > 0
+    const mag = Math.min(1, m.length()) // analog: a gentle joystick push = slow walk
+    const moving = mag > 1e-3
     const speed = (SPEED * (1 - w) + SWIM_SPEED * w) * sprint
     if (moving) {
-      m.normalize().multiplyScalar(speed * dt)
+      m.normalize().multiplyScalar(speed * mag * dt)
       camera.position.x += m.x
       camera.position.z += m.z
     }

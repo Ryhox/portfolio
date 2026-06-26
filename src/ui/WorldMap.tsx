@@ -1,5 +1,6 @@
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { useWorld } from '../state/useWorld'
+import { IS_TOUCH } from '../input/device'
 import { NAV } from '../scene/boatState'
 import { goToIsland } from '../scene/mapTransition'
 import { requestLock } from '../scene/pointerLock'
@@ -200,17 +201,9 @@ export function WorldMap() {
       const sy = (cz - rView + rWorld) * pxPerWorld
       ctx.drawImage(raster, sx, sy, sw, sw, 0, 0, CANVAS, CANVAS)
 
-      // The islands themselves are drawn by the biome-coloured raster; here we add
-      // only a faint footprint ring so even the tiniest isles stay findable — no
-      // dark centre dot (it was distracting and hid the island's real colour).
-      for (const isl of islands) {
-        const c = toCanvas(isl.cx, isl.cz)
-        ctx.beginPath()
-        ctx.arc(c.x, c.y, Math.max(3, isl.radius * scale) + 1.5, 0, Math.PI * 2)
-        ctx.strokeStyle = 'rgba(40,32,20,0.28)'
-        ctx.lineWidth = 1
-        ctx.stroke()
-      }
+      // The islands themselves are drawn by the biome-coloured raster — no outline
+      // ring around each isle (the dark footprint border read as a hard grey edge and
+      // muddied the island colours; removed at the user's request).
 
       // hover highlight ring
       const hv = hoverRef.current
@@ -345,6 +338,45 @@ export function WorldMap() {
     if (isl) travel(isl)
   }
 
+  // Touch: pointer events drive the same pan as the mouse, plus two-finger pinch
+  // to zoom. (Mouse keeps working — pointer events cover it too.)
+  const ptrs = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ dist: number; zoom: number } | null>(null)
+  const onPointerDown = (e: ReactPointerEvent) => {
+    canvasRef.current?.setPointerCapture(e.pointerId)
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (ptrs.current.size === 2) {
+      const [a, b] = [...ptrs.current.values()]
+      pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: viewRef.current.zoom }
+      dragRef.current = null
+      draggedRef.current = true
+    } else {
+      onDown(e)
+    }
+  }
+  const onPointerMove = (e: ReactPointerEvent) => {
+    if (ptrs.current.has(e.pointerId)) ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pinch.current && ptrs.current.size >= 2) {
+      const [a, b] = [...ptrs.current.values()]
+      const dist = Math.hypot(a.x - b.x, a.y - b.y)
+      viewRef.current.zoom = clamp(pinch.current.zoom * (dist / pinch.current.dist), ZOOM_MIN, ZOOM_MAX)
+      clampPan()
+      draggedRef.current = true
+      return
+    }
+    onMove(e)
+  }
+  const onPointerEnd = (e: ReactPointerEvent) => {
+    ptrs.current.delete(e.pointerId)
+    if (ptrs.current.size < 2) pinch.current = null
+    if (ptrs.current.size === 0) onUp()
+  }
+  const onPointerLeaveCanvas = () => {
+    ptrs.current.clear()
+    pinch.current = null
+    onLeave()
+  }
+
   if (!mapOpen) return null
 
   const q = query.trim().toLowerCase()
@@ -387,7 +419,6 @@ export function WorldMap() {
             placeholder="Search a stargazer…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            autoFocus
           />
           {results.length > 0 && (
             <div style={sResults}>
@@ -405,10 +436,11 @@ export function WorldMap() {
           <canvas
             ref={canvasRef}
             style={sCanvas}
-            onMouseDown={onDown}
-            onMouseMove={onMove}
-            onMouseUp={onUp}
-            onMouseLeave={onLeave}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerEnd}
+            onPointerLeave={onPointerLeaveCanvas}
             onClick={onClick}
           />
           <div style={sZoomCtrls}>
@@ -425,7 +457,7 @@ export function WorldMap() {
           </div>
         </div>
 
-        <div style={sHint}>Hover an island for its owner · click to travel there · Esc to close</div>
+        <div style={sHint}>{IS_TOUCH ? 'Tap an island to travel there · ✕ to close' : 'Hover an island for its owner · click to travel there · Esc to close'}</div>
       </div>
 
       <div ref={tipRef} style={sTip}>
@@ -462,6 +494,10 @@ const sPanel: CSSProperties = {
   background: '#f6efda',
   border: '1px solid #d7c8a3',
   boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+  width: 'min(560px, 94vw)',
+  maxHeight: '92vh',
+  overflowY: 'auto',
+  boxSizing: 'border-box',
 }
 
 const sHeader: CSSProperties = {
@@ -599,8 +635,9 @@ const sResultMeta: CSSProperties = { color: 'rgba(111,88,54,0.7)', fontSize: 15 
 
 const sMapBox: CSSProperties = {
   position: 'relative',
-  width: 'min(58vmin, 520px)',
-  height: 'min(58vmin, 520px)',
+  alignSelf: 'center', // keep the square map centred when the panel is wider than it
+  width: 'min(520px, 84vw, 64vh)',
+  height: 'min(520px, 84vw, 64vh)',
   borderRadius: 12,
   overflow: 'hidden',
   border: '1px solid #d7c8a3',
@@ -637,6 +674,7 @@ const sCanvas: CSSProperties = {
   height: '100%',
   display: 'block',
   cursor: 'grab',
+  touchAction: 'none', // we handle pan + pinch ourselves; stop the browser hijacking touch
 }
 
 const sHint: CSSProperties = {

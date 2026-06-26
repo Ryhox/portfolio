@@ -7,6 +7,7 @@ import { getHeight } from './terrain'
 import { WIND } from './loadNature'
 import { useWorld } from '../state/useWorld'
 import { WORLD_ALPHA, REVEAL_DIST, REVEAL_CENTER } from './revealUniforms'
+import { n } from './config'
 
 // Soft round sprite for every particle.
 function useDotTexture() {
@@ -42,6 +43,9 @@ function PointCloud({ count, center, area, color, size, mode, maxOpacity = 1, ad
   const tex = useDotTexture()
   const points = useRef<THREE.Points>(null!)
   const mat = useRef<THREE.PointsMaterial>(null!)
+  // Clamped drift accumulator (see FallingLeaves) — keeps a frame stall from
+  // lurching clock.elapsedTime and snapping every particle to a new offset at once.
+  const driftT = useRef(0)
 
   // Distance from this cloud's center to the reveal ring origin — ring must
   // sweep past this point before the cloud becomes visible.
@@ -69,7 +73,7 @@ function PointCloud({ count, center, area, color, size, mode, maxOpacity = 1, ad
     return { geometry: g, base, phase }
   }, [count, center, area])
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!useWorld.getState().worldVisible || REVEAL_DIST.value <= 0) { points.current.visible = false; return }
     const ringReveal = THREE.MathUtils.smoothstep(REVEAL_DIST.value, cloudDist - 4, cloudDist + 6)
     if (ringReveal <= 0.01) { points.current.visible = false; return }
@@ -79,7 +83,8 @@ function PointCloud({ count, center, area, color, size, mode, maxOpacity = 1, ad
     points.current.visible = vis > 0.02 && WORLD_ALPHA.value > 0.01
 
     if (points.current.visible) {
-      const time = state.clock.elapsedTime
+      driftT.current += Math.min(delta, 0.05)
+      const time = driftT.current
       const pos = geometry.attributes.position as THREE.BufferAttribute
       for (let i = 0; i < count; i++) {
         const ph = phase[i]
@@ -95,7 +100,10 @@ function PointCloud({ count, center, area, color, size, mode, maxOpacity = 1, ad
   })
 
   return (
-    <points ref={points} geometry={geometry} frustumCulled={false}>
+    // renderOrder 3 puts the cloud AFTER the water (renderOrder 2): the water writes
+    // depth, so particles behind it are still occluded, but those in FRONT draw crisply
+    // on top instead of the half-transparent water blending over and washing them out.
+    <points ref={points} geometry={geometry} frustumCulled={false} renderOrder={3}>
       <pointsMaterial
         ref={mat}
         map={tex}
@@ -145,6 +153,12 @@ function FallingLeaves({
 }) {
   const points = useRef<THREE.Points>(null!)
   const mat = useRef<THREE.PointsMaterial>(null!)
+  // Sway is driven by an accumulator advanced by the per-frame (clamped) delta, NOT
+  // by clock.elapsedTime: a frame stall lurches elapsedTime forward, which fed
+  // straight into sin(t·1.5) and teleported every leaf in a single frame. The
+  // clamped accumulator caps how far the sway can advance per frame, so a hitch can
+  // never make the leaves visibly jump.
+  const swayT = useRef(0)
 
   const cloudDist = useMemo(() => {
     const rc = REVEAL_CENTER.value
@@ -192,8 +206,9 @@ function FallingLeaves({
     const ws = WIND.strength.value
     const swayMul = 0.5 + ws // calmer or more tumbling with the wind
     const fallMul = 0.75 + ws * 0.5
-    const t = state.clock.elapsedTime
     const dt = Math.min(delta, 0.05)
+    swayT.current += dt
+    const t = swayT.current
     const pos = data.geo.attributes.position as THREE.BufferAttribute
     for (let i = 0; i < count; i++) {
       let y = pos.getY(i) - data.spd[i] * fallMul * dt
@@ -206,7 +221,10 @@ function FallingLeaves({
   })
 
   return (
-    <points ref={points} geometry={data.geo} frustumCulled={false}>
+    // renderOrder 3 → draw after the water (renderOrder 2) so leaves in front of the sea
+    // aren't washed out by the half-transparent water blending over them. Depth is still
+    // written by the water, so leaves behind it stay correctly occluded.
+    <points ref={points} geometry={data.geo} frustumCulled={false} renderOrder={3}>
       <pointsMaterial ref={mat} map={texture} size={size} sizeAttenuation transparent depthWrite={false} opacity={0} alphaTest={0.35} />
     </points>
   )
@@ -220,20 +238,20 @@ export function Particles() {
   return (
     <>
       {/* warm fireflies drifting across the whole isle at night */}
-      <PointCloud count={90} center={[0, 1.4, 0]} area={[58, 3.2, 58]} color={0xffd27a} size={0.5} mode="night" maxOpacity={0.95} drift={0.9} />
+      <PointCloud count={n(90)} center={[0, 1.4, 0]} area={[58, 3.2, 58]} color={0xffd27a} size={0.5} mode="night" maxOpacity={0.95} drift={0.9} />
       {/* a denser glimmer over the meadow */}
-      <PointCloud count={55} center={[REGIONS.meadow.x, 1.4, REGIONS.meadow.z]} area={[REGIONS.meadow.r * 2, 3, REGIONS.meadow.r * 2]} color={0xfff0a0} size={0.45} mode="night" maxOpacity={0.9} drift={0.8} />
+      <PointCloud count={n(55)} center={[REGIONS.meadow.x, 1.4, REGIONS.meadow.z]} area={[REGIONS.meadow.r * 2, 3, REGIONS.meadow.r * 2]} color={0xfff0a0} size={0.45} mode="night" maxOpacity={0.9} drift={0.8} />
       {/* warm embers drifting around the campfire clearing */}
-      <PointCloud count={60} center={[NOOK.x, 1.3, NOOK.z]} area={[7, 3, 7]} color={0xff9d4d} size={0.5} mode="night" maxOpacity={0.9} drift={0.6} />
+      <PointCloud count={n(60)} center={[NOOK.x, 1.3, NOOK.z]} area={[7, 3, 7]} color={0xff9d4d} size={0.5} mode="night" maxOpacity={0.9} drift={0.6} />
       {/* pale pollen catching the daylight over the meadow */}
-      <PointCloud count={70} center={[REGIONS.meadow.x, 1.8, REGIONS.meadow.z]} area={[REGIONS.meadow.r * 2.2, 4, REGIONS.meadow.r * 2.2]} color={0xfff6cf} size={0.3} mode="day" maxOpacity={0.5} additive={false} drift={1.1} />
+      <PointCloud count={n(70)} center={[REGIONS.meadow.x, 1.8, REGIONS.meadow.z]} area={[REGIONS.meadow.r * 2.2, 4, REGIONS.meadow.r * 2.2]} color={0xfff6cf} size={0.3} mode="day" maxOpacity={0.5} additive={false} drift={1.1} />
 
       {/* falling leaves shed from the canopies (daytime), using the real kit
           leaf textures — green over the green groves, red around the red trees */}
-      <FallingLeaves count={12} center={[REGIONS.autumnGrove.x, REGIONS.autumnGrove.z]} area={REGIONS.autumnGrove.r * 2.2} texture={greenLeaf} size={1.4} />
-      <FallingLeaves count={7} center={[REGIONS.pineGrove.x, REGIONS.pineGrove.z]} area={REGIONS.pineGrove.r * 2.2} texture={greenLeaf} size={1.2} speed={1.1} />
-      <FallingLeaves count={11} center={[HEART.x, HEART.z]} area={34} texture={redLeaf} size={1.4} />
-      <FallingLeaves count={6} center={[REGIONS.spookyCorner.x, REGIONS.spookyCorner.z]} area={REGIONS.spookyCorner.r * 2.2} texture={redLeaf} size={1.3} />
+      <FallingLeaves count={n(12)} center={[REGIONS.autumnGrove.x, REGIONS.autumnGrove.z]} area={REGIONS.autumnGrove.r * 2.2} texture={greenLeaf} size={1.4} />
+      <FallingLeaves count={n(7)} center={[REGIONS.pineGrove.x, REGIONS.pineGrove.z]} area={REGIONS.pineGrove.r * 2.2} texture={greenLeaf} size={1.2} speed={1.1} />
+      <FallingLeaves count={n(11)} center={[HEART.x, HEART.z]} area={34} texture={redLeaf} size={1.4} />
+      <FallingLeaves count={n(6)} center={[REGIONS.spookyCorner.x, REGIONS.spookyCorner.z]} area={REGIONS.spookyCorner.r * 2.2} texture={redLeaf} size={1.3} />
     </>
   )
 }

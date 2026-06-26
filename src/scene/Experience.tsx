@@ -5,8 +5,9 @@ import { updateAmbience } from '../audio/useAmbience'
 import { patchReveal } from './patchReveal'
 import { FLY, useWorld } from '../state/useWorld'
 import { INTRO_PARALLAX } from './introParallax'
+import { IS_PHONE, IS_TOUCH } from '../input/device'
 import { getHeight } from './terrain'
-import { SPAWN_X, SPAWN_Z, RING_X, RING_Z, RING_GROUND_Y } from './spawnConstants'
+import { SPAWN_X, SPAWN_Z, SPAWN_LOOK, RING_X, RING_Z, RING_GROUND_Y } from './spawnConstants'
 import { smoothstep } from './palette'
 import { WIND } from './loadNature'
 import { DayNight } from './DayNight'
@@ -118,17 +119,19 @@ function RevealPatcher() {
     let meshCount = 0
     let patchedNew = false
     scene.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return
-      meshCount++
-      const mat = obj.material
-      if (Array.isArray(mat)) {
-        for (const m of mat) {
-          if (patchOne(m)) patchedNew = true
-          if (m) queueTextures(m, texSeen.current, q)
-        }
-      } else {
-        if (patchOne(mat)) patchedNew = true
-        if (mat) queueTextures(mat, texSeen.current, q)
+      // Reveal-patching + the warm-up mesh count are mesh-only, but texture
+      // pre-upload also covers Points/Sprites/Lines (the falling-leaf clouds are
+      // THREE.Points): their textures otherwise upload on first draw and hitch.
+      const o = obj as THREE.Mesh & { isPoints?: boolean; isSprite?: boolean; isLine?: boolean }
+      const isMesh = obj instanceof THREE.Mesh
+      if (!(isMesh || o.isPoints || o.isSprite || o.isLine)) return
+      if (isMesh) meshCount++
+      const mat = (obj as THREE.Mesh).material
+      const mats = Array.isArray(mat) ? mat : [mat]
+      for (const m of mats) {
+        if (!m) continue
+        if (isMesh && patchOne(m)) patchedNew = true
+        queueTextures(m, texSeen.current, q)
       }
     })
 
@@ -164,7 +167,8 @@ function QualityDPR() {
   const quality = useWorld((s) => s.quality)
   useEffect(() => {
     const cap = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 2
-    const dpr = quality === 'Low' ? 1 : quality === 'Medium' ? 1.5 : cap
+    let dpr = quality === 'Low' ? 1 : quality === 'Medium' ? 1.5 : cap
+    if (IS_PHONE) dpr = Math.min(dpr, 1.25) // phones: keep the fill rate sane
     setDpr(dpr)
   }, [quality, setDpr])
   return null
@@ -193,11 +197,14 @@ const _spawnPos = new THREE.Vector3(SPAWN_X, Math.max(getHeight(SPAWN_X, SPAWN_Z
 const _idleCamPos  = new THREE.Vector3(SPAWN_X, _spawnPos.y + 7, SPAWN_Z + 6)
 const _idleCamLook = new THREE.Vector3(0, -2, 22)
 
-// Fly-in target look (same direction — camera just moves forward into spawn)
-const _lookSpawn = new THREE.Vector3(0, 3, 0)
+// Fly-in target look — the EXACT point Player will look at the instant control takes
+// over (shared SPAWN_LOOK), so the hand-off is seamless: no sudden re-aim.
+const _lookSpawn = new THREE.Vector3(SPAWN_LOOK.x, SPAWN_LOOK.y, SPAWN_LOOK.z)
 const _lookTmp   = new THREE.Vector3()
 // Last idle look target + a scratch vector, so the fly-in can glide the camera's
-// orientation from wherever it was at click → spawn (instead of snapping).
+// orientation from wherever it ACTUALLY was at click → spawn (instead of snapping).
+// Updated every idle frame to the real (parallax-offset) look so the glide starts
+// from the live pose, not a stale default.
 const _lastLook  = new THREE.Vector3(0, -2, 22)
 const _lookCur   = new THREE.Vector3()
 
@@ -207,7 +214,9 @@ const _parallax = { x: 0, y: 0 }
 // swallow its pointer events, so r3f's state.pointer goes stale on the idle
 // screen — this listener keeps the camera parallax responding to the mouse.
 const _winPtr = { x: 0, y: 0 }
-if (typeof window !== 'undefined') {
+// Touch devices have no hovering pointer — a finger drag would otherwise swing the
+// idle camera around. Skip the lean entirely there (the gentle auto-drift stays).
+if (typeof window !== 'undefined' && !IS_TOUCH) {
   window.addEventListener('pointermove', (e) => {
     _winPtr.x = (e.clientX / window.innerWidth) * 2 - 1
     _winPtr.y = -((e.clientY / window.innerHeight) * 2 - 1)
@@ -235,7 +244,11 @@ function CinematicCamera() {
       INTRO_PARALLAX.x = _parallax.x / 3.5
       INTRO_PARALLAX.y = _parallax.y / 2.0
       camera.position.lerpVectors(flyStartRef.current, _spawnPos, p)
-      _lookCur.lerpVectors(flyLookRef.current, _lookSpawn, p) // ease orientation, no snap
+      // Glide orientation with an extra ease-in-out (smoothstep of the already-eased
+      // progress) so the camera rotates gently at BOTH ends — no whip at the start,
+      // no snap as it settles into the spawn look.
+      const lookT = p * p * (3 - 2 * p)
+      _lookCur.lerpVectors(flyLookRef.current, _lookSpawn, lookT)
       camera.lookAt(_lookCur)
       return
     }
@@ -263,6 +276,7 @@ function CinematicCamera() {
     // water and the far horizon as the mouse moves
     _lookTmp.set(_idleCamLook.x - _parallax.x * 0.7, _idleCamLook.y - _parallax.y * 0.4, _idleCamLook.z)
     camera.lookAt(_lookTmp)
+    _lastLook.copy(_lookTmp) // remember the LIVE look so a click→fly-in starts from here
   })
   return null
 }

@@ -4,7 +4,8 @@ import { type CSSProperties, useRef } from 'react'
 import { Group } from 'three'
 import { useWorld } from '../state/useWorld'
 import { getHeight } from './terrain'
-import { ACTIVE } from './interact'
+import { ACTIVE, activateNearest } from './interact'
+import { IS_TOUCH } from '../input/device'
 
 // A cozy "press E" interact marker. A small resting dot appears when you're near;
 // it blooms into the key-cap + label ONLY when this is the armed entry — i.e. the
@@ -76,22 +77,31 @@ export function InteractMarker({
     if (card.current) {
       card.current.style.opacity = String(v)
       card.current.style.transform = `translate(-50%,-50%) scale(${0.55 + 0.45 * v})`
+      // On touch the bloomed card IS the button — only tappable while armed & shown.
+      if (IS_TOUCH) card.current.style.pointerEvents = armed && visible ? 'auto' : 'none'
     }
   })
 
   if (!started || boatMode === 'sailing' || menuOpen || mapOpen || projectsOpen || sitting) return null
 
+  // On touch there's no E key — reword "press E to …" hints to "tap to …".
+  const shownHint = IS_TOUCH && hint ? hint.replace(/press\s+e\b/i, 'tap') : hint
+
   return (
     <group ref={groupRef} position={[x, y, z]}>
-      <Html center pointerEvents="none" zIndexRange={[40, 0]} style={{ pointerEvents: 'none' }}>
+      <Html center pointerEvents="none" zIndexRange={IS_TOUCH ? [100, 100] : [40, 0]} style={{ pointerEvents: 'none' }}>
         <div ref={stage} style={sStage}>
           <style>{CSS}</style>
           <div ref={dot} style={sDot} />
-          <div ref={card} style={sCard}>
-            <span style={sCap}>E</span>
+          <div
+            ref={card}
+            style={sCard}
+            onPointerDown={IS_TOUCH ? (e) => { e.stopPropagation(); activateNearest() } : undefined}
+          >
+            {!IS_TOUCH && <span style={sCap}>E</span>}
             <span style={sCol}>
               <span style={sLabel}>{label}</span>
-              {hint && <span style={sHint}>{hint}</span>}
+              {shownHint && <span style={sHint}>{shownHint}</span>}
             </span>
           </div>
         </div>

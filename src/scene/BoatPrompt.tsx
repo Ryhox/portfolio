@@ -6,6 +6,8 @@ import { useWorld } from '../state/useWorld'
 import { BOAT, BOARD_RANGE } from './boatState'
 import { getHeight } from './terrain'
 import { PROP_OCCLUDERS } from './occluders'
+import { IS_TOUCH } from '../input/device'
+import { pressKey, releaseKey } from '../input/input'
 
 // The interact marker — Bruno Simon folio logic, isle-cozy dress.
 //
@@ -113,6 +115,8 @@ export function BoatPrompt() {
     if (card.current) {
       card.current.style.opacity = String(v)
       card.current.style.transform = `translate(-50%,-50%) scale(${0.55 + 0.45 * v})`
+      // On touch the bloomed "Set sail" card IS the button — tappable when open.
+      if (IS_TOUCH) card.current.style.pointerEvents = v > 0.5 && stage.current?.style.opacity !== '0' ? 'auto' : 'none'
     }
   })
 
@@ -120,12 +124,18 @@ export function BoatPrompt() {
 
   return (
     <group ref={anchor}>
-      <Html center pointerEvents="none" zIndexRange={[40, 0]} style={{ pointerEvents: 'none' }}>
+      <Html center pointerEvents="none" zIndexRange={IS_TOUCH ? [100, 100] : [40, 0]} style={{ pointerEvents: 'none' }}>
         <div ref={stage} style={sStage}>
           <style>{CSS}</style>
           <div ref={dot} style={sDot} />
-          <div ref={card} style={sCard}>
-            <span style={sCap}>E</span>
+          <div
+            ref={card}
+            style={sCard}
+            onPointerDown={IS_TOUCH ? (e) => { e.stopPropagation(); pressKey('KeyE') } : undefined}
+            onPointerUp={IS_TOUCH ? (e) => { e.stopPropagation(); releaseKey('KeyE') } : undefined}
+            onPointerCancel={IS_TOUCH ? () => releaseKey('KeyE') : undefined}
+          >
+            {!IS_TOUCH && <span style={sCap}>E</span>}
             <span style={sLabel}>Set sail</span>
           </div>
         </div>

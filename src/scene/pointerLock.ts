@@ -9,6 +9,8 @@
 // cooldown during which re-locking is rejected, and the browser can briefly
 // grant-then-revoke the lock — `isAcquiring()` lets the controller ignore those
 // bounces so the menu doesn't flicker.
+import { IS_TOUCH } from '../input/device'
+
 let lockFn: (() => void) | null = null
 let acquiring = false
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -33,6 +35,9 @@ export function cancelLock() {
 }
 
 export function requestLock() {
+  // Touch devices have no pointer lock (and look is driven by drag instead), so
+  // skip the whole acquire/poll dance — it would only fail 40× in a row.
+  if (IS_TOUCH) return
   if (typeof document === 'undefined' || document.pointerLockElement) return
   cancelLock()
   acquiring = true

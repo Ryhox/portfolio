@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { ENTERING } from '../scene/mapTransition'
+import { IS_TOUCH } from '../input/device'
 
 // Big centred HUD that announces the island you're sailing up to:
 // "You are entering — <login>'s Island". Reads the ENTERING singleton via rAF
@@ -42,7 +43,9 @@ export function EnteringIslandBanner() {
   return (
     <div ref={wrap} style={sWrap}>
       <style>{CSS}</style>
-      <div style={sEyebrow}>You are entering</div>
+      {/* On phones, drop the "You are entering" eyebrow — just the island name,
+          small but still noticeable. */}
+      {!IS_TOUCH && <div style={sEyebrow}>You are entering</div>}
       <div ref={name} style={sName} />
       <div style={sRule} />
     </div>
@@ -84,14 +87,14 @@ const sEyebrow: CSSProperties = {
 
 const sName: CSSProperties = {
   fontFamily: HAND,
-  fontSize: 46,
+  fontSize: IS_TOUCH ? 22 : 46,
   lineHeight: 1.05,
   color: '#ffffff',
   textShadow: '0 3px 10px rgba(0,0,0,0.75)',
 }
 
 const sRule: CSSProperties = {
-  width: 120,
+  width: IS_TOUCH ? 72 : 120,
   height: 2,
   borderRadius: 2,
   background: 'rgba(245,233,207,0.85)',

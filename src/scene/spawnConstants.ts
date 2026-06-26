@@ -2,7 +2,13 @@ import { getHeight } from './terrain'
 import { HEART } from './layout'
 
 export const SPAWN_X = 2
-export const SPAWN_Z = 72
+export const SPAWN_Z = 66 // on the sakura headland crown (moved in with ISLET.z)
+
+// The exact world point the camera looks at at the END of the intro fly-in AND the
+// instant first-person control takes over — SHARED by Experience (fly-in) and Player
+// (spawn) so the hand-off is seamless (no snap / sudden re-aim). Looks north, level,
+// up the island toward the Heartwood hill, inviting the player inward.
+export const SPAWN_LOOK = { x: 0, y: 3, z: 0 }
 
 // Ring/reveal is on the hilltop Heartwood tree, not the beach spawn.
 export const RING_X = HEART.x

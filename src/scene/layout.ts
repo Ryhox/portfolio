@@ -93,13 +93,15 @@ export const MESSAGE_BOARD = { x: -14.4, z: 1.0 }
 export const PLAYER_SPAWN = { x: 2, z: 54, lookAt: { x: 0, z: 0 } }
 
 // ---------------------------------------------------------------------------
-// THE SAKURA ISLET — a small detached island raised out in the water BEHIND the
-// spawn (to the south), reached by a little wooden bridge. You spawn on it, under
-// a lone sakura. Purely additive: terrain.ts only RAISES new land here (Math.max),
-// so the main island and its hill are never touched. `wobble` warps the outline so
-// it reads as a natural island rather than a perfect disc.
+// THE SAKURA HEADLAND — a cherry-blossom rise on the island's south shore where you
+// spawn, under a lone sakura. It is JOINED to the main island by a broad land neck
+// (the isthmus in terrain.ts) so the two read as ONE island — no water gap, no
+// bridge. Sat close in (z) so it's a short, chunky headland rather than a long
+// peninsula. Purely additive: terrain.ts only RAISES new land here (Math.max), so
+// the main island and its hill are never touched. `wobble` warps the outline so it
+// reads as natural land rather than a perfect disc.
 // ---------------------------------------------------------------------------
-export const ISLET = { x: 2, z: 74, r: 10, flatR: 5.5, top: 1.6, wobble: 2.2 }
+export const ISLET = { x: 2, z: 68, r: 10, flatR: 7.5, top: 1.6, wobble: 2.2 }
 
 // The bridge across the gap: end A on the main south shore, end B on the islet.
 // length/yaw/modelY fine-tune the GLB so its deck spans both shores. The walk

@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { EHOLD } from '../scene/mapTransition'
+import { IS_TOUCH } from '../input/device'
 
 const R = 26
 const C = 2 * Math.PI * R
@@ -40,7 +41,7 @@ export function HoldReturnIndicator() {
             strokeDashoffset={C}
           />
         </svg>
-        <span style={sKey}>E</span>
+        {!IS_TOUCH && <span style={sKey}>E</span>}
       </div>
       <div style={sLabel}>Sail home</div>
     </div>

@@ -229,7 +229,9 @@ function SummitInteract({ spots }: { spots: PedestalSpot[] }) {
       y: getHeight(PORTRAIT.x, PORTRAIT.z) + PORTRAIT.nailY - 0.6,
       z: PORTRAIT.z,
       range: Math.max(PORTRAIT.range, 4.5),
-      activate: () => useWorld.getState().toggleAbout(),
+      // Open-only: walking up + E opens the panel. Closing is handled globally
+      // (E anywhere, or ESC) by AboutPanel, so you can dismiss it after walking off.
+      activate: () => { if (!useWorld.getState().aboutOpen) useWorld.getState().setAboutOpen(true) },
     })
     return () => {
       for (const s of spots) unregisterInteract(`social-${s.social.id}`)

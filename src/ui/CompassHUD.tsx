@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { useWorld } from '../state/useWorld'
+import { useCompact } from '../input/device'
 import { NAV } from '../scene/boatState'
 
 // Top-centre compass strip. Shows the eight compass points (N, NE, E, SE, S, SW,
@@ -28,7 +29,10 @@ export function CompassHUD() {
   const started = useWorld((s) => s.started)
   const menuOpen = useWorld((s) => s.menuOpen)
   const mapOpen = useWorld((s) => s.mapOpen)
-  const visible = started && !menuOpen && !mapOpen
+  // On small/narrow screens the top-centre strip crowds the logo + clock/menu, so
+  // we just hide it there (the world map / on-screen buttons cover navigation).
+  const compact = useCompact(560)
+  const visible = started && !menuOpen && !mapOpen && !compact
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -104,10 +108,10 @@ export function CompassHUD() {
     return () => cancelAnimationFrame(raf)
   }, [visible])
 
-  if (!visible) return null
-
+  // Always mounted so the opacity transition can run — FADES in with the rest of the
+  // HUD when the intro fly-in lands (and back out when a menu/map opens), never snaps.
   return (
-    <div style={sWrap}>
+    <div style={{ ...sWrap, opacity: visible ? 1 : 0, transition: 'opacity 0.7s ease' }}>
       <canvas ref={canvasRef} style={sCanvas} />
     </div>
   )
@@ -115,7 +119,7 @@ export function CompassHUD() {
 
 const sWrap: CSSProperties = {
   position: 'fixed',
-  top: 14,
+  top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
   left: '50%',
   transform: 'translateX(-50%)',
   zIndex: 119,
@@ -126,7 +130,7 @@ const sWrap: CSSProperties = {
 const FADE = 'linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%)'
 
 const sCanvas: CSSProperties = {
-  width: 420,
+  width: 'min(420px, 88vw)',
   height: 40,
   display: 'block',
   maskImage: FADE,

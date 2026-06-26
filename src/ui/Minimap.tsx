@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { useWorld } from '../state/useWorld'
+import { IS_TOUCH } from '../input/device'
 import { getHeight } from '../scene/terrain'
 import { NAV } from '../scene/boatState'
 import { buildMapProps, type MapProp } from '../scene/placement'
@@ -197,9 +198,13 @@ export function Minimap() {
 
   return (
     <>
-      <div style={sWrap}>
-        <canvas ref={canvasRef} style={sCanvas} />
-      </div>
+      {/* The square minimap is desktop-only — on touch it crowds the joystick, and
+          the world-map button covers navigation. The stargazer tally stays. */}
+      {!IS_TOUCH && (
+        <div style={sWrap}>
+          <canvas ref={canvasRef} style={sCanvas} />
+        </div>
+      )}
       {/* Right-of-minimap column (archipelago only): the stargazer tally + the
           synced "next update" countdown pinned to the top, the control-hint chips
           to the bottom — both aligned to the minimap's height. */}
@@ -218,17 +223,20 @@ export function Minimap() {
               --:--
             </span>
           </div>
-          {/* Control hints to the right of the minimap. */}
-          <div style={sHintStack}>
-            <div style={sHintRow}>
-              <span style={sHintCap}>Hold E</span>
-              <span style={sHintLabel}>Sail home</span>
+          {/* Control hints to the right of the minimap — keys are desktop-only; on
+              touch the on-screen action + map buttons cover these. */}
+          {!IS_TOUCH && (
+            <div style={sHintStack}>
+              <div style={sHintRow}>
+                <span style={sHintCap}>Hold E</span>
+                <span style={sHintLabel}>Sail home</span>
+              </div>
+              <div style={sHintRow}>
+                <span style={sHintCap}>M</span>
+                <span style={sHintLabel}>World map</span>
+              </div>
             </div>
-            <div style={sHintRow}>
-              <span style={sHintCap}>M</span>
-              <span style={sHintLabel}>World map</span>
-            </div>
-          </div>
+          )}
         </>
       )}
     </>

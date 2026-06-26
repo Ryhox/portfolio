@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Object3D } from 'three'
+import { IS_TOUCH } from '../input/device'
 
 // Time of day is normalized 0..1:
 //   0.00 = midnight   0.25 = sunrise   0.50 = noon   0.75 = sunset
@@ -98,7 +99,10 @@ export const useWorld = create<WorldState>((set) => ({
   started: false,
   muted: false,
   menuOpen: false,
-  quality: 'High',
+  // Touch devices (phones/tablets) auto-start on Medium so the Medium shader/post
+  // variants are the ones Warmup precompiles during the loading screen. Desktop
+  // keeps High. The user can still change it in settings.
+  quality: IS_TOUCH ? 'Medium' : 'High',
   motionBlur: true,
   motionBlurAmount: 0.25,
   invertX: false,

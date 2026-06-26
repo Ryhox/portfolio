@@ -138,12 +138,50 @@ function homeHeight(x: number, z: number): number {
     const iz = z - ISLET.z
     const ang = Math.atan2(iz, ix)
     const wob = noise(Math.cos(ang) * 1.3 + 40, Math.sin(ang) * 1.3 - 20) * ISLET.wobble
-    const rEff = ISLET.r + wob
     const dIslet = Math.hypot(ix, iz)
-    if (dIslet < rEff) {
-      const flat = smoothstep(rEff, ISLET.flatR + wob * 0.5, dIslet)
-      const islet = (WATER_LEVEL - 1.4) + (ISLET.top - (WATER_LEVEL - 1.4)) * flat
-      if (islet > h) h = islet
+    const crownR = ISLET.flatR + wob * 0.5 // wobbled flat-crown radius
+    const slopeLen = 18 // length of the ONE continuous side slope (beach → seabed)
+    if (dIslet < crownR + slopeLen) {
+      // A SINGLE smooth grade down the side — flat crown, easing into a shallow beach,
+      // continuing on the same curve straight under the waterline and flattening onto
+      // the seabed. smoothstep eases the slope at BOTH ends, so there is no shelf and
+      // no kink where the beach meets the underwater part: the headland just melts into
+      // the water. Additive (Math.max) — the neck and main shore (higher) are untouched.
+      const fall = smoothstep(crownR, crownR + slopeLen, dIslet)
+      const sideH = ISLET.top + (WATER_LEVEL - 12 - ISLET.top) * fall
+      if (sideH > h) h = sideH
+    }
+  }
+
+  // The spawn isthmus — UNITE the sakura headland with the main island. A BROAD,
+  // short land neck fills the shallows between the south shore (~z56) and the islet,
+  // so the two read as ONE island (no bridge, no channel). Purely additive (Math.max):
+  // it only ever RAISES land in the southern shallows, so the hill and the existing
+  // shores upstream are never reshaped. The neck tapers into the main shore (along)
+  // and slopes to its own beaches on the east/west flanks (flank); its width + crown
+  // are warped by noise so it reads as real land, not a flat causeway.
+  {
+    const nx = x - ISLET.x // neck runs north→south on the islet's x
+    // Longitudinal envelope: reaches well INTO the main island (low z) so the plateau
+    // ties into already-high ground with no saddle/dip, and hands off to the islet
+    // crown (high z).
+    const along = smoothstep(45, 50, z) * (1 - smoothstep(63, 69, z))
+    if (along > 0.001) {
+      const ang = Math.atan2(z - 58, nx)
+      const wob = noise(Math.cos(ang) * 1.5 + 12, Math.sin(ang) * 1.5 + 7) * 2.6
+      const halfW = 15 + wob // wide connection — a chunky headland, not a thin bridge
+      const d = Math.abs(nx)
+      if (d < halfW) {
+        const flank = smoothstep(halfW, halfW * 0.4, d) // 1 along the spine → 0 at the beach
+        const crown = ISLET.top + fbm(x, z, 3, 0.04) * 0.12 // SAME height as the headland — even
+        // RAISE the ground toward the plateau by (flank*along) — never lower it, so the
+        // higher inland island always wins and the connection becomes ONE level surface
+        // flush with the island (no sandy dip, no step), while the flanks still slope to
+        // their own beaches.
+        const lift = flank * along
+        const nh = h + (crown - h) * lift
+        if (nh > h) h = nh
+      }
     }
   }
   return h

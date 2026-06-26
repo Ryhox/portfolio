@@ -6,14 +6,17 @@ import { getSky } from './palette'
 import { getHeight } from './terrain'
 import { patchReveal } from './patchReveal'
 import { useWorld } from '../state/useWorld'
+import { REVEAL_DIST, REVEAL_CENTER } from './revealUniforms'
 import { InteractMarker } from './InteractMarker'
 import { registerInteract, unregisterInteract } from './interact'
 import { BENCH, SIT } from './benchSit'
 
 // ---------------------------------------------------------------------------
-// The campfire at the end of the trail: a ring of stones, a teepee of logs, a
-// witch's cauldron on a tripod, log benches, and a GPU-driven fire + smoke +
-// ember FX that burns day AND night.
+// The campfire on the wild west shore: a ring of stones, a teepee of logs, and a
+// GPU-driven fire + smoke + ember FX that burns day AND night. It rides the island's
+// reveal like everything else — the SOLID parts clip via patchReveal, the FX fade via
+// a reveal factor — so it's hidden on the idle "click to begin" screen (no stray smoke
+// plume) yet always rendered, so nothing pops in to compile and hitch mid-fly-in.
 // ---------------------------------------------------------------------------
 
 // --- GPU particle field -----------------------------------------------------
@@ -71,7 +74,7 @@ type FieldCfg = {
   additive: boolean
 }
 
-function ParticleField({ cfg }: { cfg: FieldCfg }) {
+function ParticleField({ cfg, revealRef }: { cfg: FieldCfg; revealRef: { current: number } }) {
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry()
     const pos = new Float32Array(cfg.count * 3)
@@ -125,6 +128,10 @@ function ParticleField({ cfg }: { cfg: FieldCfg }) {
   useFrame((state) => {
     material.uniforms.uTime.value = state.clock.elapsedTime
     material.uniforms.uSizeScale.value = state.size.height * 0.5
+    // Fade with the reveal instead of being hidden — the field keeps rendering (its
+    // shader stays warm, nothing pops in to compile mid-fly-in), it's just invisible
+    // (uAlpha 0) on the idle screen and until the ring sweeps out to the campfire.
+    material.uniforms.uAlpha.value = cfg.alpha * revealRef.current
   })
 
   return <points geometry={geometry} material={material} frustumCulled={false} />
@@ -204,15 +211,14 @@ const CAMP_Z = 30
 export function Campfire() {
   const base: [number, number, number] = [CAMP_X, getHeight(CAMP_X, CAMP_Z), CAMP_Z]
 
-  // materials
-  const rockMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x787a82, roughness: 0.95, flatShading: true }), [])
-  const woodMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x5a3c22, roughness: 0.92 }), [])
-  const charMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.95 }), [])
-  const ironMat = useMemo(() => new THREE.MeshStandardMaterial({ color: 0x201e24, roughness: 0.5, metalness: 0.6 }), [])
-  const brewMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: 0x6bd66b, emissive: 0x49ff8a, emissiveIntensity: 1.4, roughness: 0.4, toneMapped: false }),
-    [],
-  )
+  // materials — the SOLID parts (stones, logs, scorched ground) ride the island's
+  // reveal clip via patchReveal, exactly like the rest of the isle: hidden on the idle
+  // screen, warmed during the warm-up pass (they still render, just clipped), and swept
+  // in smoothly with the ground — never toggled on/off (which would pop + compile).
+  const rockMat = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x787a82, roughness: 0.95, flatShading: true }); patchReveal(m); return m }, [])
+  const woodMat = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x5a3c22, roughness: 0.92 }); patchReveal(m); return m }, [])
+  const charMat = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.95 }); patchReveal(m); return m }, [])
+  const scorchMat = useMemo(() => { const m = new THREE.MeshStandardMaterial({ color: 0x1a1512, roughness: 1 }); patchReveal(m); return m }, [])
   const flameOuterMat = useMemo(
     () => new THREE.MeshBasicMaterial({ color: 0xff5a16, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
     [],
@@ -256,48 +262,48 @@ export function Campfire() {
     return logs
   }, [])
 
-  const tripod = useMemo(() => {
-    const legs: ReturnType<typeof bar>[] = []
-    const n = 3
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + 0.5
-      legs.push(bar(Math.cos(a) * 0.62, 0.0, Math.sin(a) * 0.62, 0, 1.5, 0))
-    }
-    return legs
-  }, [])
-
   // animation
   const light = useRef<THREE.PointLight>(null!)
   const flameOuter = useRef<THREE.Mesh>(null!)
   const flameInner = useRef<THREE.Mesh>(null!)
   const core = useRef<THREE.Mesh>(null!)
+  // The FX (custom shaders / additive flames) can't ride patchReveal's clip, so they
+  // FADE with this factor instead — always rendered (warm), just invisible on idle and
+  // until the ring reaches the campfire. Matches the solids' clip so they reveal as one.
+  const revealRef = useRef(0)
+
+  const campDist = useMemo(() => {
+    const rc = REVEAL_CENTER.value
+    return Math.hypot(CAMP_X - rc.x, CAMP_Z - rc.y)
+  }, [])
 
   useFrame((state) => {
+    const reveal = THREE.MathUtils.smoothstep(REVEAL_DIST.value, campDist - 4, campDist + 6)
+    revealRef.current = reveal // drained by the ParticleFields for their uAlpha
+
     const t = state.clock.elapsedTime
     const nf = getSky(useWorld.getState().t).nightFactor
     // layered flicker
     const flick = 0.82 + Math.sin(t * 11) * 0.1 + Math.sin(t * 23.3 + 1.3) * 0.05 + Math.sin(t * 4.7) * 0.04
 
-    light.current.intensity = (2.3 + nf * 2.4) * flick
+    light.current.intensity = (2.3 + nf * 2.4) * flick * reveal // no firelight on the idle sea
 
-    // flame bodies sway + breathe
+    // flame bodies sway + breathe (opacity also scaled by reveal so they fade in cleanly)
     flameOuter.current.scale.set(1 + Math.sin(t * 7) * 0.07, flick * 1.05, 1 + Math.cos(t * 6.3) * 0.07)
     flameOuter.current.rotation.z = Math.sin(t * 3.1) * 0.07
-    flameOuter.current.material && ((flameOuter.current.material as THREE.MeshBasicMaterial).opacity = 0.45 * flick)
+    flameOuter.current.material && ((flameOuter.current.material as THREE.MeshBasicMaterial).opacity = 0.45 * flick * reveal)
     flameInner.current.scale.set(1 + Math.sin(t * 9 + 1) * 0.08, (0.7 + flick * 0.35), 1 + Math.cos(t * 8 + 1) * 0.08)
     flameInner.current.rotation.z = Math.sin(t * 3.7 + 2) * 0.08
+    ;(flameInner.current.material as THREE.MeshBasicMaterial).opacity = 0.85 * flick * reveal
     core.current.scale.setScalar(0.9 + flick * 0.25)
-    ;(core.current.material as THREE.MeshBasicMaterial).opacity = 0.7 * flick
-
-    brewMat.emissiveIntensity = 1.0 + nf * 0.8 + Math.sin(t * 2) * 0.2
+    ;(core.current.material as THREE.MeshBasicMaterial).opacity = 0.7 * flick * reveal
   })
 
   return (
     <group position={base}>
       {/* scorched ground under the fire */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
+      <mesh material={scorchMat} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
         <circleGeometry args={[1.05, 24]} />
-        <meshStandardMaterial color={0x1a1512} roughness={1} />
       </mesh>
 
       {/* stone ring */}
@@ -328,34 +334,9 @@ export function Campfire() {
       </mesh>
 
       {/* GPU fire + smoke + embers */}
-      <ParticleField cfg={FIRE_CFG} />
-      <ParticleField cfg={SMOKE_CFG} />
-      <ParticleField cfg={EMBER_CFG} />
-
-      {/* tripod + witch cauldron over the flames */}
-      {tripod.map((l, i) => (
-        <mesh key={i} material={ironMat} position={l.pos} quaternion={l.quat} castShadow>
-          <cylinderGeometry args={[0.022, 0.028, l.len, 6]} />
-        </mesh>
-      ))}
-      <group position={[0, 0.92, 0]}>
-        {/* hanging chain */}
-        <mesh material={ironMat} position={[0, 0.42, 0]}>
-          <cylinderGeometry args={[0.012, 0.012, 0.5, 5]} />
-        </mesh>
-        {/* cauldron body */}
-        <mesh material={ironMat} scale={[1, 0.86, 1]} castShadow>
-          <sphereGeometry args={[0.32, 18, 14]} />
-        </mesh>
-        {/* rim */}
-        <mesh material={ironMat} position={[0, 0.17, 0]}>
-          <torusGeometry args={[0.29, 0.045, 8, 20]} />
-        </mesh>
-        {/* glowing brew */}
-        <mesh material={brewMat} position={[0, 0.16, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.27, 18]} />
-        </mesh>
-      </group>
+      <ParticleField cfg={FIRE_CFG} revealRef={revealRef} />
+      <ParticleField cfg={SMOKE_CFG} revealRef={revealRef} />
+      <ParticleField cfg={EMBER_CFG} revealRef={revealRef} />
 
       {/* warm firelight — burns day and night, with a lively flicker */}
       <pointLight ref={light} position={[0, 0.7, 0]} color={0xff7a2e} distance={13} decay={2} />

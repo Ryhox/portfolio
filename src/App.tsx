@@ -22,6 +22,8 @@ import { SitHint } from './ui/SitHint'
 import { CompassHUD } from './ui/CompassHUD'
 import { HoldReturnIndicator } from './ui/HoldReturnIndicator'
 import { QuestList } from './ui/QuestList'
+import { TouchControls } from './ui/TouchControls'
+import { TouchDisclaimer } from './ui/TouchDisclaimer'
 
 export default function App() {
   return (
@@ -57,6 +59,8 @@ export default function App() {
       <CompassHUD />
       <HoldReturnIndicator />
       <QuestList />
+      <TouchControls />
+      <TouchDisclaimer />
       <MapTransition />
     </>
   )

@@ -138,17 +138,35 @@ const fragment = /* glsl */ `
     vec3 lineCol = mix(uFoam, vec3(0.92, 0.82, 0.55), 0.35);
     col = mix(col, lineCol, clamp(lines * 0.2 + ripFoam * 0.15, 0.0, 1.0));
 
-    // --- foam: a clean, solid shore line (hidden on the idle screen) ---
+    // --- foam: a clean shore line that hugs the coast (hidden on the idle screen) ---
     float foam = 0.0;
-    // Home isle: one big shore ring around the origin (+ optional sea-stack rings).
+    // Home isle: a thin foam line tracing the shore (+ the south sakura peninsula and
+    // any sea-stacks). Crisp + soft-edged, not a fat glowing band.
     if (uHomeFoamOn > 0.5) {
+      // The sakura headland (south): the islet + isthmus form one land lobe reaching
+      // due +z. An elongated ring traces its shore; the arcs of either ring that fall
+      // over the now-joined land are hidden by the terrain, so it reads as one coast.
+      vec2 prel = vWorld.xz - vec2(2.0, 66.0);
+      float pang = atan(prel.y, prel.x);
+      float pw = 1.0 + 0.09 * sin(pang * 3.0 + 1.3) + 0.06 * sin(pang * 6.0 - 0.7); // wobbled outline
+      vec2 pn = prel / (vec2(13.0, 11.5) * pw);
+      float pd = length(pn);
+      float pring = smoothstep(1.10, 1.0, pd) * smoothstep(0.90, 1.0, pd); // crisp thin band at the shore
+      float pbands = smoothstep(0.4, 0.95, sin(pd * 26.0 - uTime * 1.3) * 0.5 + 0.5);
+      float pfoam = clamp(pring * (0.5 + 0.25 * pbands), 0.0, 1.0);
+
+      // Main island shore: a thin foam line tracing the coast, faded OUT where the
+      // headland ring takes over so the two never stack into a fat band.
       float ang = atan(vWorld.z, vWorld.x);
       float coast = sin(ang * 5.0) * 2.5 + sin(ang * 11.0) * 1.2;
       float r = length(vWorld.xz) + coast;
-      float ring = smoothstep(uIslandR + 4.0, uIslandR + 0.5, r) *
-                   smoothstep(uIslandR - 8.0, uIslandR - 2.0, r);
-      float bands = smoothstep(0.45, 0.95, sin(r * 0.8 - uTime * 1.4) * 0.5 + 0.5);
-      foam = clamp(ring * (0.82 + 0.18 * bands), 0.0, 1.0) * uShoreFoam;
+      float ring = smoothstep(uIslandR + 1.6, uIslandR + 0.3, r) *
+                   smoothstep(uIslandR - 1.8, uIslandR - 0.4, r);
+      ring *= smoothstep(0.92, 1.4, pd); // suppress over the headland (no doubling)
+      float bands = smoothstep(0.4, 0.95, sin(r * 0.9 - uTime * 1.3) * 0.5 + 0.5);
+      float mfoam = clamp(ring * (0.5 + 0.25 * bands), 0.0, 1.0);
+
+      foam = max(mfoam, pfoam) * uShoreFoam;
 
       // optional foam rings around sea-stacks (none unless SEA_ROCKS is populated)
       for (int i = 0; i < ${SEA_ROCK_MAX}; i++) {
@@ -210,7 +228,7 @@ const fragment = /* glsl */ `
       col += uFoam * graze * 0.2 * uUnder;
     }
 
-    float alpha = clamp(uOpacity + foam * 0.4, 0.0, 1.0);
+    float alpha = clamp(uOpacity + foam * 0.2, 0.0, 1.0);
     gl_FragColor = vec4(col, alpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>

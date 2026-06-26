@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect } from 'react'
 import { useWorld } from '../state/useWorld'
 import { PROJECTS } from '../scene/projects'
+import { IS_TOUCH } from '../input/device'
 
 // Control bar for the projects board. The project text + image live on the
 // fluttering PAPER pinned to the board itself (scene/MessageBoard.tsx) — this bar
@@ -38,12 +39,22 @@ export function ProjectsBoard() {
     <div
       style={{
         ...sBar,
+        bottom: IS_TOUCH ? 'calc(env(safe-area-inset-bottom, 0px) + 40px)' : 38,
         opacity: show ? 1 : 0,
         transform: show ? 'translate(-50%, 0)' : 'translate(-50%, 10px)',
         visibility: show ? 'visible' : 'hidden',
         pointerEvents: show ? 'auto' : 'none',
       }}
     >
+      {/* Touch: a close X right on the card (no separate corner button). */}
+      {IS_TOUCH && (
+        <button aria-label="Close" style={sCardClose} onClick={() => useWorld.getState().setProjectsOpen(false)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5a4528" strokeWidth="2.6" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      )}
+
       <button aria-label="Previous" style={sArrow} onClick={() => go(-1)}>
         <Chevron dir="left" />
       </button>
@@ -57,7 +68,7 @@ export function ProjectsBoard() {
           )}
           {p?.live && (
             <button style={sLive} onClick={() => open(p.live!)}>
-              <PlayIcon color={CREAM} /> Live preview
+              <PlayIcon color={CREAM} /> {IS_TOUCH ? 'Preview' : 'Live preview'}
             </button>
           )}
           {!p?.source && !p?.live && <span style={sNoLink}>no links</span>}
@@ -65,7 +76,7 @@ export function ProjectsBoard() {
         <div style={sFoot}>
           <span style={sCount}>{i + 1} / {n}</span>
           <span style={sDot}>·</span>
-          <span style={sHint}>E or ESC to leave</span>
+          <span style={sHint}>{IS_TOUCH ? 'Tap ✕ to close' : 'E or ESC to leave'}</span>
         </div>
       </div>
 
@@ -122,6 +133,25 @@ const sBar: CSSProperties = {
   boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
   transition: 'opacity 0.22s ease, transform 0.22s ease',
   userSelect: 'none',
+}
+
+// Touch close button, pinned to the bar's top-right corner.
+const sCardClose: CSSProperties = {
+  position: 'absolute',
+  top: -14,
+  right: -10,
+  width: 34,
+  height: 34,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+  borderRadius: '50%',
+  background: '#efe4c6',
+  border: '1px solid #d7c8a3',
+  boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+  cursor: 'pointer',
+  WebkitTapHighlightColor: 'transparent',
 }
 
 const sArrow: CSSProperties = {

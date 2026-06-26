@@ -111,15 +111,18 @@ function stonesAlong(pts: { x: number; z: number }[], seed: number, startArc: nu
     }
   }
 
-  // Pick the number of GAPS from the target spacing, then place one more stone than
-  // gaps — so the actual gap is total/segs ≈ the same 4.6 on every branch (short or
-  // long), the first stone sits at startArc and the last lands on the endpoint.
-  const segs = Math.max(1, Math.round((total - startArc) / 4.6))
-  const n = segs + 1
+  // Count stones from the FULL trail length so the gap (~4.6) is the SAME on every
+  // branch, then simply SKIP the ones before startArc. (Earlier this counted from
+  // total-startArc, which stretched the few survivors on a short fork apart and made
+  // them read as bigger/more isolated than the main climb.) Stones land on the
+  // endpoint (i = segs → arc = total) so each branch still reaches its destination.
+  const segs = Math.max(1, Math.round(total / 4.6))
   const r = rng(seed)
   const items: Placed[] = []
-  for (let i = 0; i < n; i++) {
-    const c = at(startArc + (i / segs) * (total - startArc))
+  for (let i = 0; i <= segs; i++) {
+    const arc = (i / segs) * total
+    if (arc < startArc - 1e-3) continue // hold the fork branches clear of the straight path
+    const c = at(arc)
     const side = Math.sin(i * 1.7) * 0.06
     const x = c.x - c.tz * side
     const z = c.z + c.tx * side
@@ -138,7 +141,11 @@ function pathStones(): PlacementEntry[] {
   // now flattened like the others (see terrain.ts) so its cobbles lie flush too.
   const items: Placed[] = []
   for (let b = 0; b < ALL_DENSE.length; b++) {
-    items.push(...stonesAlong(ALL_DENSE[b], 900 + b * 17, b === 0 ? 1.5 : 2.6))
+    // Hold the forked branches clear of the straight climb where they separate so the
+    // stones don't pile up. The social fork (b=1) shares the hilltop crossing, so it
+    // needs a wider gap; the west spur (b=2) only needs to skip its junction stone.
+    const startArc = b === 0 ? 1.5 : b === 1 ? 5.0 : 2.6
+    items.push(...stonesAlong(ALL_DENSE[b], 900 + b * 17, startArc))
   }
   return variants(items, PATHSTONE, 901, 0.45, { recv: true, align: true })
 }
@@ -346,6 +353,30 @@ export function buildColliders(): Collider[] {
   for (const s of buildLampSpots()) out.push({ x: s.x, z: s.z, r: 0.4 })
   // The summit social pedestals are solid stone you bump into.
   for (const s of summitColliders()) out.push(s)
+  // The hilltop bench + the west-path notice board are solid too. The collision
+  // system is circle-only, so a few circles strung along each object's long axis
+  // approximate its real footprint (a capsule) instead of one fat blocking disc.
+  // Bench: Campfire's BENCH_DEFS[0] @ (2.3, 3.4), seat facing west (rotY = π) → its
+  // length runs along world Z.
+  {
+    const bx = 2.3, bz = 3.4, byaw = Math.PI
+    const sx = Math.sin(byaw), sz = Math.cos(byaw) // seat-length axis (the GLB's local +Z)
+    for (const t of [-0.8, 0, 0.8]) out.push({ x: bx + sx * t, z: bz + sz * t, r: 0.5 })
+  }
+  // Notice board: layout's MESSAGE_BOARD, facing the west path (MessageBoard's
+  // FACE_YAW). It's a flat panel, so the collider is a THIN line of small circles
+  // strung across its width (perpendicular to the facing) — barely any depth
+  // front-to-back, just enough to stop you walking through the sign.
+  {
+    const ap = WEST_WAYPOINTS[WEST_WAYPOINTS.length - 2]
+    const yaw = Math.atan2(ap.x - MESSAGE_BOARD.x, ap.z - MESSAGE_BOARD.z)
+    const px = Math.cos(yaw), pz = -Math.sin(yaw) // width axis (⟂ to the facing normal)
+    // Small radius → thin front-to-back; centres reach ±1.1 so the WIDTH matches the
+    // original (outer edge ≈ ±1.4), just as a flat slab instead of a fat one.
+    for (const t of [-1.1, -0.73, -0.37, 0, 0.37, 0.73, 1.1]) {
+      out.push({ x: MESSAGE_BOARD.x + px * t, z: MESSAGE_BOARD.z + pz * t, r: 0.28 })
+    }
+  }
   return out
 }
 

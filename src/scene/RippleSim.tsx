@@ -3,6 +3,11 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useWorld } from '../state/useWorld'
 import { LITE } from './config'
+import { IS_TOUCH } from '../input/device'
+
+// Phones/tablets skip the interactive ripple physics entirely (a per-frame
+// ping-pong GPU sim) — the stylized ocean waves stay, just no live ripples.
+const SKIP_RIPPLES = LITE || IS_TOUCH
 import { WATER_LEVEL } from './layout'
 import { RIPPLE, RIPPLE_BLANK, drainRipples } from './rippleField'
 import { createRippleSimMaterial, MAX_SPLATS, SIM_RES } from './rippleSimMaterial'
@@ -17,7 +22,7 @@ export function RippleSim() {
   const camera = useThree((s) => s.camera)
 
   const sim = useMemo(() => {
-    if (LITE) return null
+    if (SKIP_RIPPLES) return null
     const opts = {
       type: THREE.HalfFloatType,
       format: THREE.RGBAFormat,
@@ -51,7 +56,7 @@ export function RippleSim() {
   const prevNdc = useRef(new THREE.Vector2(-2, -2))
 
   useEffect(() => {
-    if (LITE) return
+    if (SKIP_RIPPLES) return
     const move = (e: PointerEvent) => {
       const r = gl.domElement.getBoundingClientRect()
       ndc.current.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
