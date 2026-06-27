@@ -187,6 +187,48 @@ function homeHeight(x: number, z: number): number {
   return h
 }
 
+// --- baked shore field ------------------------------------------------------
+// The home coastline is carved by simplex noise, so the water shader can't rebuild
+// it analytically the way the (sine-harmonic) archipelago isles do — a sine guess
+// drifts off the real shore. Instead, bake a signed distance-to-shoreline field from
+// homeHeight: the R channel holds the SEAWARD distance from the waterline (positive
+// in the sea, negative on land), normalised to ±SHORE_FIELD_RANGE. The water shader
+// samples it to lay a foam band that hugs the REAL coast. Built once, lazily.
+export const SHORE_FIELD_HALF = 96 // world half-extent the field covers (centred on origin)
+export const SHORE_FIELD_RANGE = 24 // metres of shore distance packed into the byte channel
+let _shoreTex: THREE.DataTexture | null = null
+export function homeShoreField(): THREE.DataTexture {
+  if (_shoreTex) return _shoreTex
+  const N = 320
+  const span = SHORE_FIELD_HALF * 2
+  const eps = 0.75
+  const data = new Uint8Array(N * N * 4)
+  for (let j = 0; j < N; j++) {
+    const z = -SHORE_FIELD_HALF + ((j + 0.5) / N) * span
+    for (let i = 0; i < N; i++) {
+      const x = -SHORE_FIELD_HALF + ((i + 0.5) / N) * span
+      const h = homeHeight(x, z)
+      const gx = homeHeight(x + eps, z) - homeHeight(x - eps, z)
+      const gz = homeHeight(x, z + eps) - homeHeight(x, z - eps)
+      const grad = Math.hypot(gx, gz) / (2 * eps)
+      // (waterLevel - height)/slope ≈ signed distance to the shoreline, + out at sea
+      const dist = (WATER_LEVEL - h) / Math.max(grad, 1e-3)
+      const v = Math.max(-1, Math.min(1, dist / SHORE_FIELD_RANGE))
+      const o = (j * N + i) * 4
+      data[o] = Math.round((v * 0.5 + 0.5) * 255)
+      data[o + 3] = 255
+    }
+  }
+  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat)
+  tex.minFilter = THREE.LinearFilter
+  tex.magFilter = THREE.LinearFilter
+  tex.wrapS = THREE.ClampToEdgeWrapping
+  tex.wrapT = THREE.ClampToEdgeWrapping
+  tex.needsUpdate = true
+  _shoreTex = tex
+  return tex
+}
+
 // The level height of the social dais — matched to the LOCAL ground at the dais
 // centre (out on the eastern shelf, ~1u below the tree crown) so the platform sits
 // flush with the shelf instead of as a raised terrace. Sampled once with the

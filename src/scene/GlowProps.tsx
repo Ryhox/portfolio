@@ -59,9 +59,14 @@ function Lamp({ pos, rotY }: { pos: [number, number, number]; rotY: number }) {
     type Hit = { mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial }
     const hits: Hit[] = []
     let maxLum = 0
+    // The lantern is one mesh per part, all sharing a single vertex-coloured
+    // material, so the "brightest material" test can't tell the glass from the
+    // post — anchor the light to the glass panel mesh by name instead.
+    let lanternMesh: THREE.Mesh | null = null
     root.traverse((o) => {
       const mesh = o as THREE.Mesh
       if (!(mesh as { isMesh?: boolean }).isMesh) return
+      if (mesh.name.includes('lamp7')) lanternMesh = mesh
       mesh.castShadow = true
       // Build a FRESH MeshStandardMaterial (rather than cloning the GLB's) so the
       // reveal patch reliably takes — cloned materials can skip the shader patch
@@ -108,8 +113,11 @@ function Lamp({ pos, rotY }: { pos: [number, number, number]; rotY: number }) {
         glowBox.expandByObject(mesh)
       }
     }
+    // Seat the point light in the centre of the lantern glass (where the flame
+    // is), not at the centroid of the whole lamp.
     const lp = new THREE.Vector3()
-    if (!glowBox.isEmpty()) glowBox.getCenter(lp)
+    if (lanternMesh) new THREE.Box3().setFromObject(lanternMesh).getCenter(lp)
+    else if (!glowBox.isEmpty()) glowBox.getCenter(lp)
     else lp.set(0, LAMP_HEIGHT * 0.82, 0)
 
     glowMats.current = mats
