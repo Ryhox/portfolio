@@ -214,15 +214,3 @@ export const FLY = {
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as { useWorld: typeof useWorld }).useWorld = useWorld
 }
-
-// Human-readable phase label for the HUD.
-export function phaseLabel(t: number): string {
-  if (t < 0.22 || t >= 0.96) return 'Deep Night'
-  if (t < 0.3) return 'Dawn'
-  if (t < 0.45) return 'Morning'
-  if (t < 0.55) return 'Midday'
-  if (t < 0.7) return 'Afternoon'
-  if (t < 0.78) return 'Sunset'
-  if (t < 0.86) return 'Dusk'
-  return 'Night'
-}

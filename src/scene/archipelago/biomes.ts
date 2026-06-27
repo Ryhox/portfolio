@@ -11,7 +11,7 @@
 // the shared .glb kit per-instance — no new models needed.
 // ---------------------------------------------------------------------------
 
-import type { Zone } from '../terrain'
+import type { Zone } from '../terrain/terrain'
 
 // Quaternius kit model names (same set the home island draws from).
 const COMMON = ['CommonTree_1', 'CommonTree_2', 'CommonTree_3', 'CommonTree_4', 'CommonTree_5']

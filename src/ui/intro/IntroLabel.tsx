@@ -3,7 +3,7 @@ import gsap from 'gsap'
 import { useWorld } from '../../state/useWorld'
 import { INTRO_PARALLAX } from '../../scene/introParallax'
 import { introActions } from './introActions'
-import { useT } from '../../i18n'
+import { useT } from '../../i18n/index'
 
 const isTouch =
   typeof window !== 'undefined' &&

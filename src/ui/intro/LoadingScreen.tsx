@@ -2,7 +2,7 @@ import gsap from 'gsap'
 import { type CSSProperties, useEffect, useRef } from 'react'
 import { introActions } from './introActions'
 import { useLoadStatus } from './loadStatus'
-import { useT, type StringKey } from '../../i18n'
+import { useT, type StringKey } from '../../i18n/index'
 import { HAND } from '../theme'
 
 // The Warmup component (inside the Canvas) writes free-form English phase strings;

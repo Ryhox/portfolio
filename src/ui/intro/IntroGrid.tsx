@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import gsap from 'gsap'
 import { useWorld } from '../../state/useWorld'
 import { introActions } from './introActions'
-import { RING_X, RING_Z, RING_EDGE_Y } from '../../scene/spawnConstants'
-import { REVEAL_DIST, REVEAL_COLOR_U, REVEAL_INTENSITY, REVEAL_THICKNESS } from '../../scene/revealUniforms'
+import { RING_X, RING_Z, RING_EDGE_Y } from '../../scene/core/spawnConstants'
+import { REVEAL_DIST, REVEAL_COLOR_U, REVEAL_INTENSITY, REVEAL_THICKNESS } from '../../scene/terrain/revealUniforms'
 
 const RING_RADIUS = 5.0
 
 export function IntroGrid() {
   const hoverZoneRef  = useRef<THREE.Mesh>(null)
-  const [hoverActive, setHoverActive] = useState(false)
+  // Hover-preview was disabled (onHoverEnter/Leave are null'd below); the zone
+  // stays hidden until the reveal runs.
+  const hoverActive   = false
   const started       = useWorld((s) => s.started)
 
   useEffect(() => {

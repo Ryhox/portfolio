@@ -1,5 +1,5 @@
-import { clamp01, smoothstep } from '../scene/palette'
-import { SWIM } from '../scene/swimState'
+import { clamp01, smoothstep } from '../scene/core/palette'
+import { SWIM } from '../scene/ocean/swimState'
 
 // Procedural ambience — no audio files, generated entirely with the Web Audio
 // API and crossfaded by time of day:

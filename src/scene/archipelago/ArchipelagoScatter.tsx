@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { useNature } from '../loadNature'
-import { Instanced } from '../Scatter'
+import { useNature } from '../terrain/loadNature'
+import { Instanced } from '../terrain/Scatter'
 import { getArchPlacements, type IslandInstance } from './archipelago'
 
 // Scatters every island's biome props in one pass, reusing the home island's

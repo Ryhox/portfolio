@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import { patchReveal } from '../patchReveal'
-import { setActiveMap } from '../terrain'
+import { patchReveal } from '../terrain/patchReveal'
+import { setActiveMap } from '../terrain/terrain'
 import { ArchipelagoScatter } from './ArchipelagoScatter'
 import { archColorAt, islandHeightAt, useArchipelago, type IslandInstance } from './archipelago'
 

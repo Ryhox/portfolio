@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { startAmbience, setVol as setAudioVol } from '../../audio/useAmbience'
-import { requestLock } from '../../scene/pointerLock'
+import { requestLock } from '../../scene/core/pointerLock'
 import { FLY, useWorld } from '../../state/useWorld'
 import { introActions } from './introActions'
 import { useLoadStatus } from './loadStatus'

@@ -19,9 +19,9 @@ import {
   sampleDisc,
   setActiveMap,
   type Placed,
-} from '../terrain'
-import { smoothstep } from '../palette'
-import { type Collider, type MapProp, type Step, tiltCollider } from '../placement'
+} from '../terrain/terrain'
+import { smoothstep } from '../core/palette'
+import { type Collider, type MapProp, type Step, tiltCollider } from '../terrain/placement'
 import {
   pickWeighted,
   SIZE_TIERS,
