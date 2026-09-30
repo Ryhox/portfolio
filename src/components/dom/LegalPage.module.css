@@ -1,0 +1,131 @@
+.sheet {
+  position: relative;
+  z-index: 2;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: calc(var(--nav-h) + 12vh) var(--gutter) 14vh;
+}
+
+.head {
+  padding-bottom: 36px;
+  border-bottom: 1px solid rgba(235, 225, 203, 0.16);
+  margin-bottom: 40px;
+}
+.title {
+  font-size: clamp(56px, 10vw, 150px);
+  margin: 0;
+}
+.flourish {
+  display: block;
+  width: 220px;
+  height: auto;
+  margin: 20px 0 22px;
+  color: var(--brass);
+}
+.lead {
+  font-family: var(--font-text);
+  font-size: clamp(18px, 1.6vw, 24px);
+  line-height: 1.4;
+  color: var(--bone-dim);
+  max-width: 40ch;
+}
+
+.body {
+  display: grid;
+  gap: 40px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--bone-dim);
+}
+.body section {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 8px 36px;
+}
+.body h2 {
+  grid-row: span 8;
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--bone);
+}
+.body p,
+.body ul {
+  grid-column: 2;
+  max-width: 62ch;
+}
+.body ul {
+  display: grid;
+  gap: 10px;
+}
+.body li {
+  position: relative;
+  padding-left: 18px;
+}
+.body li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.8em;
+  width: 7px;
+  height: 1px;
+  background: var(--brass);
+}
+.body a {
+  color: var(--bone);
+  text-decoration: underline;
+  text-decoration-color: rgba(201, 154, 88, 0.55);
+  text-underline-offset: 0.22em;
+  transition: text-decoration-color 0.3s;
+}
+.body a:hover {
+  text-decoration-color: var(--brass-hi);
+}
+.body code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  color: var(--bone);
+  padding: 1px 5px;
+  background: rgba(235, 225, 203, 0.07);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 64px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(235, 225, 203, 0.16);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-faint);
+}
+.foot nav {
+  display: flex;
+  gap: 22px;
+}
+.foot a {
+  color: var(--bone-dim);
+  transition: color 0.3s;
+}
+.foot a:hover {
+  color: var(--bone);
+}
+
+@media (max-width: 720px) {
+  .body section {
+    grid-template-columns: 1fr;
+  }
+  .body h2 {
+    grid-row: auto;
+  }
+  .body p,
+  .body ul {
+    grid-column: 1;
+  }
+}

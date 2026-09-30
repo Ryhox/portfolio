@@ -1,0 +1,30 @@
+.odo {
+  display: inline-flex;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: pre;
+}
+
+.cell {
+  position: relative;
+  display: inline-block;
+  width: 1ch;
+  height: 1.2em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 28%, #000 72%, transparent);
+}
+
+.drum {
+  display: flex;
+  flex-direction: column;
+  transform: translate3d(0, calc(var(--i, 0) * -1.2em), 0);
+  transition: transform var(--dur, 500ms) cubic-bezier(0.3, 1.35, 0.5, 1) var(--delay, 0ms);
+}
+
+.glyph {
+  display: block;
+  height: 1.2em;
+  line-height: 1.2em;
+  text-align: center;
+}

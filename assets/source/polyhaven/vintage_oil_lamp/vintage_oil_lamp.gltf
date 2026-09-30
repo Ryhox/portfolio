@@ -1,0 +1,410 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v3.5.30",
+    "version": "2.0"
+  },
+  "extensionsUsed": [
+    "KHR_materials_specular",
+    "KHR_materials_ior"
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "blend_export",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "vintage_oil_lamp_glass"
+    },
+    {
+      "mesh": 1,
+      "name": "vintage_oil_lamp"
+    },
+    {
+      "mesh": 2,
+      "name": "vintage_oil_lamp_flame"
+    }
+  ],
+  "materials": [
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "name": "vintage_oil_lamp_glass",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "vintage_oil_lamp",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 4
+        },
+        "metallicRoughnessTexture": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "emissiveFactor": [
+        1,
+        1,
+        1
+      ],
+      "emissiveTexture": {
+        "index": 6
+      },
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            0,
+            0,
+            0
+          ]
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "vintage_oil_lamp_flame",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 7
+        },
+        "metallicFactor": 0,
+        "roughnessFactor": 0
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Glass.001",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "TEXCOORD_0": 1,
+            "NORMAL": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "Circle.003",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 4,
+            "TEXCOORD_0": 5,
+            "NORMAL": 6
+          },
+          "indices": 7,
+          "material": 1
+        }
+      ]
+    },
+    {
+      "name": "Plane.003",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "TEXCOORD_0": 9,
+            "NORMAL": 10
+          },
+          "indices": 11,
+          "material": 2
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    },
+    {
+      "sampler": 0,
+      "source": 5
+    },
+    {
+      "sampler": 0,
+      "source": 6
+    },
+    {
+      "sampler": 0,
+      "source": 7
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_glass_nor_gl",
+      "uri": "textures/vintage_oil_lamp_glass_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_glass_diff-vintage_oil_lamp_glass_alpha",
+      "uri": "textures/vintage_oil_lamp_glass_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_glass_metal-vintage_oil_lamp_glass_rough",
+      "uri": "textures/vintage_oil_lamp_glass_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_nor_gl",
+      "uri": "textures/vintage_oil_lamp_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_diff",
+      "uri": "textures/vintage_oil_lamp_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_metal-vintage_oil_lamp_rough",
+      "uri": "textures/vintage_oil_lamp_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_flame_diff",
+      "uri": "textures/vintage_oil_lamp_flame_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "vintage_oil_lamp_flame_diff-vintage_oil_lamp_flame_alpha",
+      "uri": "textures/vintage_oil_lamp_flame_diff_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 891,
+      "max": [
+        0.02294541522860527,
+        0.8016371726989746,
+        0.022945357486605644
+      ],
+      "min": [
+        -0.022945230826735497,
+        0.42623430490493774,
+        -0.022945260629057884
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 891,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 891,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 4032,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 3557,
+      "max": [
+        0.10999996960163116,
+        0.471133291721344,
+        0.10999996960163116
+      ],
+      "min": [
+        -0.11000002920627594,
+        -1.822867901069003e-8,
+        -0.11000002175569534
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 3557,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 3557,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 17568,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 16,
+      "max": [
+        0.012247968465089798,
+        0.5270751714706421,
+        0.012247966602444649
+      ],
+      "min": [
+        -0.012247968465089798,
+        0.46773654222488403,
+        -0.012247967533767223
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 16,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 16,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5123,
+      "count": 24,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 10692,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7128,
+      "byteOffset": 10692,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10692,
+      "byteOffset": 17820,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 8064,
+      "byteOffset": 28512,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 42684,
+      "byteOffset": 36576,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 28456,
+      "byteOffset": 79260,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 42684,
+      "byteOffset": 107716,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 35136,
+      "byteOffset": 150400,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 192,
+      "byteOffset": 185536,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 128,
+      "byteOffset": 185728,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 192,
+      "byteOffset": 185856,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 48,
+      "byteOffset": 186048,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 186096,
+      "uri": "vintage_oil_lamp.bin"
+    }
+  ]
+}

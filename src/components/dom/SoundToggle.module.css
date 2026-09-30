@@ -1,0 +1,32 @@
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 112.5;
+}
+.scope {
+  width: 44px;
+  height: 14px;
+}
+.label {
+  display: inline-flex;
+  gap: 0.6em;
+}
+.state {
+  display: inline-block;
+  min-width: 3ch;
+  color: var(--bone-dim);
+}
+.toggle[aria-pressed='true'] .state {
+  color: var(--phosphor);
+}
+
+@media (max-width: 520px) {
+  .label {
+    display: none;
+  }
+}

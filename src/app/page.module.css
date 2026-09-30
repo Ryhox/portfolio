@@ -1,0 +1,588 @@
+/* ─────────────────────────────────────────────────────────────
+   The home page. Every pinned section is a grid: type in one cell,
+   an empty "stage" in the other that the 3D measures and fills
+   (see stageBox in lib/rig.ts). On wide screens they sit side by
+   side; on narrow ones the stage goes on top and the type below.
+   Nothing is placed by guesswork, so nothing overlaps at any size.
+   ───────────────────────────────────────────────────────────── */
+
+/* ── shared ───────────────────────────────────────────────── */
+
+.h2 {
+  font-size: clamp(52px, 7vw, 132px);
+  margin: 0;
+}
+.h2 em {
+  font-family: var(--font-inline);
+  font-style: normal;
+  font-weight: 700;
+  color: var(--brass-hi);
+}
+.h2Small {
+  font-size: clamp(44px, 5vw, 96px);
+}
+.flourish {
+  display: block;
+  width: clamp(150px, 14vw, 230px);
+  height: auto;
+  margin: clamp(12px, 1.8vh, 22px) 0 clamp(16px, 2.6vh, 30px);
+  color: var(--brass);
+  opacity: 0.85;
+}
+
+.sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100lvh;
+  overflow: clip;
+}
+
+/* ── hero ─────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  padding: calc(var(--nav-h) + 4vh) var(--gutter) calc(var(--safe) + 12px);
+  display: grid;
+  align-content: center;
+}
+.heroFx {
+  display: contents;
+}
+
+.heroCopy {
+  max-width: min(640px, 46vw);
+  position: relative;
+  top: 2vh;
+}
+/* with WebGL the words are drawn in the scene, hanging in front of the camera (bench/words.ts);
+   these stay for readers and search, laid out where the scene's copies take their places from */
+:global(html:not([data-nogl])) .heroFx > * {
+  opacity: 0;
+  pointer-events: none;
+}
+:global(html:not([data-nogl])) .heroFx * {
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+.heroTitle {
+  display: grid;
+  gap: 18px;
+  margin: 0 0 26px;
+  font-weight: 400;
+}
+.wordmark {
+  display: flex;
+  font-weight: 900;
+  font-size: clamp(88px, 13vw, 230px);
+  line-height: 0.8;
+  letter-spacing: 0.01em;
+  overflow: clip;
+  padding: 0.08em 0.04em 0.02em;
+  margin: -0.08em -0.04em -0.02em -0.05em;
+}
+/* each letter carries its own stamped-metal gradient, so it can move on its own */
+.letter {
+  display: block;
+  background: linear-gradient(180deg, #fff6e2 0%, var(--bone) 40%, #c9b999 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  transition:
+    transform 1.4s var(--ease-out) var(--d, 0s),
+    opacity 0.9s var(--ease-out) var(--d, 0s);
+}
+:global(html[data-stage]:not([data-stage='ready'])) .letter {
+  opacity: 0;
+  transform: translate3d(0, 100%, 0);
+}
+.reveal {
+  transition:
+    opacity 1.2s var(--ease-out) var(--d, 0s),
+    transform 1.5s var(--ease-out) var(--d, 0s);
+}
+:global(html[data-stage]:not([data-stage='ready'])) .reveal {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+}
+.heroRole {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: clamp(20px, 2.3vw, 38px);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--bone);
+}
+.amp {
+  color: var(--brass);
+  font-family: var(--font-inline);
+  margin: 0 0.12em;
+}
+
+
+.heroFoot {
+  position: absolute;
+  left: var(--gutter);
+  right: calc(var(--gutter) + var(--corner));
+  bottom: calc(var(--safe) + 8px);
+}
+.heroFootIn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+.cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--bone-dim);
+}
+.cueNeedle {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(235, 225, 203, 0.35);
+}
+.cueNeedle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 1px;
+  height: 9px;
+  background: var(--brass-hi);
+  transform-origin: 50% 100%;
+  animation: needle 2.8s var(--ease-in-out) infinite;
+}
+@keyframes needle {
+  0%,
+  100% {
+    transform: rotate(-50deg);
+  }
+  50% {
+    transform: rotate(130deg);
+  }
+}
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--bone);
+  border: 1px solid rgba(235, 225, 203, 0.35);
+  border-bottom-width: 3px;
+  border-radius: 3px;
+  animation: keypress 2.4s steps(1) infinite;
+}
+@keyframes keypress {
+  0%,
+  86% {
+    transform: none;
+    border-bottom-width: 3px;
+  }
+  87%,
+  94% {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+  }
+}
+
+.dive {
+  height: 135vh;
+}
+
+/* ── about ────────────────────────────────────────────────── */
+
+/* between the sections: a good breath of dark, so each one arrives on its own */
+.about {
+  position: relative;
+  /* the maker, the five trades, then the dive into the clock's hub */
+  height: 540vh;
+}
+/* the office: nothing on the page, the camera crossing the room */
+.office {
+  height: 200vh;
+}
+.about .sticky {
+  display: grid;
+  grid-template-columns: min(520px, 40vw) 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'text art';
+  column-gap: 6vw;
+  align-items: center;
+  padding: calc(var(--nav-h) + 3vh) var(--gutter) calc(4vh + var(--bar));
+}
+.aboutArt {
+  grid-area: art;
+  align-self: stretch;
+  position: relative;
+}
+/* the portrait fills the whole of it */
+.stageFill {
+  position: absolute;
+  inset: 0;
+}
+.aboutBio {
+  grid-area: text;
+  min-width: 0;
+  opacity: var(--bio, 1);
+  transform: translate3d(calc((1 - var(--bio, 1)) * -40px), 0, 0);
+  pointer-events: none;
+}
+:global([data-phase='bio']) .aboutBio {
+  pointer-events: auto;
+}
+.statement {
+  max-width: 30ch;
+  font-size: clamp(18px, 1.6vw, 26px);
+  line-height: 1.35;
+}
+.hint {
+  margin-top: clamp(18px, 3vh, 32px);
+  color: var(--bone-faint);
+}
+
+/* the trades: the clock in the middle of the frame, the title to its left, one trade to its right.
+   The layer spans the whole pinned frame; only its type fades, so the clock's box is measured true. */
+.trades {
+  grid-area: 1 / 1 / -1 / -1;
+  align-self: stretch;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) min(64vh, 40vw) minmax(0, 1fr);
+  grid-template-areas: 'head clock trade';
+  column-gap: 4vw;
+  align-items: center;
+  pointer-events: none;
+}
+.tradesHead,
+.trade {
+  min-width: 0;
+  opacity: var(--skills, 0);
+}
+.tradesHead {
+  grid-area: head;
+  transform: translate3d(calc((1 - var(--skills, 0)) * -40px), 0, 0);
+}
+.trade {
+  grid-area: trade;
+  transform: translate3d(calc((1 - var(--skills, 0)) * 40px), 0, 0);
+}
+:global([data-phase='skills']) .trade {
+  pointer-events: auto;
+}
+.clockStage {
+  grid-area: clock;
+  align-self: stretch;
+}
+
+/* one trade at a time, stacked in the same place: when the hands move on, the old one leaves in a
+   blink and the next is set line by line */
+.tradeList {
+  display: grid;
+}
+.tradeItem {
+  grid-area: 1 / 1;
+  display: grid;
+  align-content: center;
+  gap: clamp(10px, 1.6vh, 16px);
+  visibility: hidden;
+}
+.tradeItem[data-on='1'],
+.tradeItem[data-state='out'] {
+  visibility: visible;
+}
+.tradeItem > * {
+  transition:
+    transform 0.8s var(--ease-out),
+    opacity 0.6s var(--ease-out);
+}
+.tradeItem[data-on='1'] > :nth-child(2) {
+  transition-delay: 0.07s;
+}
+.tradeItem[data-on='1'] > :nth-child(3) {
+  transition-delay: 0.14s;
+}
+.tradeItem:not([data-on='1']) > * {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition-duration: 0.26s, 0.2s;
+}
+.tradeItem[data-dir='up']:not([data-on='1']) > * {
+  transform: translate3d(0, -22px, 0);
+}
+.tradeItem[data-state='out'] > * {
+  transform: translate3d(0, -12px, 0);
+}
+.tradeItem[data-dir='up'][data-state='out'] > * {
+  transform: translate3d(0, 12px, 0);
+}
+.tradeName {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(34px, 3.4vw, 62px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  color: var(--bone);
+}
+.tradeLine {
+  max-width: 28ch;
+  font-family: var(--font-text);
+  font-size: clamp(15px, 1.15vw, 18px);
+  line-height: 1.5;
+  color: var(--bone-dim);
+}
+.tradeTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  max-width: 36ch;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+/* five marks, like the minutes on a dial: where the hands are, and a way to send them elsewhere */
+.ticks {
+  display: flex;
+  gap: 4px;
+  margin: clamp(22px, 4vh, 40px) 0 0 -6px;
+}
+.tick {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 28px;
+}
+.tick i {
+  width: 22px;
+  height: 2px;
+  background: rgba(235, 225, 203, 0.2);
+  transition:
+    background 0.4s,
+    transform 0.5s var(--ease-out);
+}
+.tick:hover i {
+  background: rgba(235, 225, 203, 0.5);
+}
+.tick[data-on='1'] i {
+  background: var(--brass-hi);
+  transform: scaleY(1.6);
+}
+
+/* ── projects ─────────────────────────────────────────────── */
+
+.works {
+  position: relative;
+  /* one screen per plate; the last screen (Say Hi) lies under the film, so the snap opens straight onto it */
+  height: calc(var(--plates) * 86vh + 100vh);
+  margin-bottom: -100vh;
+  margin-bottom: -100lvh;
+}
+.works .sticky {
+  isolation: isolate;
+}
+/* the page over the loop of film (see ReelDeck) */
+.worksText {
+  position: absolute;
+  inset: 0;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* on the way in, the type waits for the film; the snap takes it with it */
+.worksText {
+  transition: opacity 0.35s;
+}
+:global(html[data-lens='pre']) .worksText {
+  opacity: 0;
+  visibility: hidden;
+  transition-duration: 0.2s;
+}
+:global(html[data-lens='out']) .worksText {
+  opacity: 0;
+  visibility: hidden;
+  transition: none;
+}
+/* the last screen waits behind the film until the shutter snaps onto it */
+:global(html[data-lens='full']) .finale {
+  visibility: hidden;
+}
+
+/* ── contact ──────────────────────────────────────────────── */
+
+/* the last screen, as in v1: SAY HI, big and centred, and the three ways to do it under it;
+   the page ends here, with only the footer's one line beneath */
+.finale {
+  position: relative;
+  min-height: calc(100svh - var(--footer-h));
+  padding: calc(var(--nav-h) + 10vh) var(--gutter) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.sayhi {
+  justify-content: center;
+  margin: 0 0 2.4vh;
+}
+.finaleLede {
+  color: var(--bone-dim);
+  font-size: 13px;
+  line-height: 1.75;
+  max-width: 46ch;
+  margin-bottom: clamp(24px, 4.5vh, 44px);
+}
+.local {
+  margin-top: clamp(22px, 4vh, 40px);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone-faint);
+}
+/* the shelf the cogs land on: an engraved brass rail across the bottom of the room */
+.floor {
+  position: relative;
+  margin-top: auto !important;
+  align-self: stretch;
+  width: calc(100% + var(--gutter) * 2);
+  margin: 0 calc(var(--gutter) * -1);
+  height: clamp(40px, 9vh, 110px);
+}
+.floor::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background:
+    linear-gradient(rgba(255, 236, 205, 0.28), rgba(255, 236, 205, 0) 40%),
+    linear-gradient(#6b4a22, #2e1f10);
+  box-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 8px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* ── narrow: the stage on top, the type below ─────────────── */
+
+@media (max-aspect-ratio: 21/20), (max-width: 559px) {
+  .h2 {
+    font-size: clamp(38px, 9.4vw, 72px);
+  }
+  .h2Small {
+    font-size: clamp(34px, 8.4vw, 64px);
+  }
+  .heroCopy {
+    max-width: none;
+    align-self: end;
+    top: 0;
+  }
+  .hero {
+    align-content: end;
+    padding-bottom: calc(var(--safe) + 70px);
+  }
+  .cueRight {
+    display: none;
+  }
+
+  .about .sticky {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 34fr) minmax(0, 66fr);
+    grid-template-areas: 'art' 'text';
+    row-gap: 2vh;
+    align-items: start;
+    padding-top: calc(var(--nav-h) + 1vh);
+  }
+  .statement {
+    font-size: clamp(16px, 4.3vw, 21px);
+  }
+  .hint {
+    display: none;
+  }
+  .trades {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'head' 'clock' 'trade';
+    row-gap: 2.4vh;
+    justify-items: center;
+    text-align: center;
+  }
+  .tradesHead .flourish,
+  .tradeLine,
+  .tradeTools {
+    margin-inline: auto;
+  }
+  .clockStage {
+    justify-self: stretch;
+  }
+  .tradeName {
+    font-size: clamp(28px, 7.4vw, 44px);
+  }
+  .tradeTools,
+  .ticks {
+    justify-content: center;
+  }
+  .ticks {
+    margin: 12px 0 0;
+  }
+
+}
+
+/* short landscape screens (phones on their side): everything a size down */
+@media (max-height: 560px) and (min-aspect-ratio: 21/20) {
+  .h2,
+  .h2Small {
+    font-size: clamp(30px, 9vh, 56px);
+  }
+  .flourish {
+    margin: 8px 0 10px;
+  }
+  .statement {
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+  .hint {
+    display: none;
+  }
+  .tradeName {
+    font-size: 26px;
+  }
+  .tradeLine {
+    font-size: 13px;
+  }
+  .ticks {
+    margin-top: 10px;
+  }
+  .wordmark {
+    font-size: clamp(64px, 22vh, 140px);
+  }
+}
+
+/* phones that are short as well as narrow: the portrait's details give way to the words */
+@media (max-aspect-ratio: 21/20) and (max-height: 720px) {
+  .statement {
+    font-size: 15px;
+    margin-bottom: 0;
+  }
+  .flourish {
+    margin: 8px 0 12px;
+  }
+}

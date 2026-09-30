@@ -1,0 +1,264 @@
+/* ── the room beside the page: the records on the left, the cabinet (3D) on the right ── */
+
+.room {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  display: grid;
+  grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: 3vw;
+  padding: calc(var(--nav-h) + 2vh) var(--gutter) calc(var(--safe) + 64px + var(--bar));
+  transform: translate3d(100%, 0, 0);
+  will-change: transform;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(20px, 4vh, 44px);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 2vh 4px 2vh 0;
+}
+.side::-webkit-scrollbar {
+  display: none;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(40px, 4.4vw, 88px);
+}
+.title em {
+  font-family: var(--font-inline);
+  font-style: normal;
+  font-weight: 700;
+  color: var(--brass-hi);
+}
+.flourish {
+  display: block;
+  width: clamp(130px, 12vw, 200px);
+  height: auto;
+  margin: clamp(10px, 1.6vh, 18px) 0 clamp(10px, 1.8vh, 20px);
+  color: var(--brass);
+  opacity: 0.85;
+}
+.lede {
+  max-width: 40ch;
+  color: var(--bone-dim);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* four sleeves to a row, so every record is in sight at once */
+.crate {
+  --cols: 4;
+}
+
+.cabinet {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* the way back, in the room's bottom-left corner (the record in the corner does the same) */
+.back {
+  position: absolute;
+  left: var(--gutter);
+  bottom: calc(var(--safe) + 18px + var(--bar));
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+  transition: color 0.3s;
+}
+.back svg {
+  width: 40px;
+  height: 12px;
+  transition: transform 0.6s var(--ease-out);
+}
+.back:hover {
+  color: var(--bone);
+}
+.back:hover svg {
+  transform: translateX(-8px);
+}
+.back:focus-visible {
+  outline: 1px solid var(--brass-hi);
+  outline-offset: 6px;
+}
+
+/* ── the record in the corner ── */
+
+.vinyl {
+  position: fixed;
+  right: var(--gutter);
+  bottom: calc(var(--safe) * 0.8 + var(--bar));
+  z-index: 55;
+  width: clamp(52px, 4.4vw, 68px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.8s var(--ease-out),
+    scale 0.4s var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.vinyl[data-shown='1'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.vinyl:hover {
+  scale: 1.07;
+}
+.vinyl:active {
+  scale: 0.95;
+}
+.vinyl:focus-visible {
+  outline: 1px solid var(--brass-hi);
+  outline-offset: 5px;
+}
+
+.disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 20deg,
+      rgba(255, 236, 205, 0) 0 8%,
+      rgba(255, 236, 205, 0.14) 12%,
+      rgba(255, 236, 205, 0) 18% 58%,
+      rgba(255, 236, 205, 0.1) 62%,
+      rgba(255, 236, 205, 0) 68%
+    ),
+    repeating-radial-gradient(circle at 50% 50%, #241a12 0 1px, #0b0806 1px 3px);
+  box-shadow:
+    0 0 0 1px rgba(201, 154, 88, 0.55),
+    0 8px 22px rgba(0, 0, 0, 0.6);
+  animation: turn 9s linear infinite;
+}
+/* at 33 rpm while it plays */
+.vinyl[data-playing='1'] .disc {
+  animation-duration: 1.8s;
+}
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* the label: every record's in turn, one fading into the next */
+.disc i {
+  position: absolute;
+  inset: 29%;
+  border-radius: 50%;
+  background: #3b1f12 center / cover no-repeat;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.disc i[data-on='1'] {
+  opacity: 1;
+}
+/* the spindle hole */
+.disc::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7%;
+  height: 7%;
+  border-radius: 50%;
+  background: #050403;
+  transform: translate(-50%, -50%);
+}
+
+/* what it does, said beside it while the pointer is on it */
+.hint {
+  position: absolute;
+  right: calc(100% + 14px);
+  top: 50%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate3d(6px, -50%, 0);
+  transition:
+    opacity 0.3s,
+    transform 0.4s var(--ease-out);
+  pointer-events: none;
+}
+.vinyl:hover .hint,
+.vinyl:focus-visible .hint {
+  opacity: 1;
+  transform: translate3d(0, -50%, 0);
+}
+
+/* narrow screens: the cabinet on top, the records under it (scrolling, if they must) */
+@media (max-aspect-ratio: 21/20), (max-width: 759px) {
+  .room {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 36fr) minmax(0, 64fr);
+    row-gap: 2vh;
+    padding-top: calc(var(--nav-h) + 1vh);
+  }
+  .cabinet {
+    grid-row: 1;
+  }
+  .side {
+    grid-row: 2;
+    justify-content: flex-start;
+    padding-bottom: var(--corner);
+  }
+  .lede {
+    display: none;
+  }
+  .crate {
+    --cols: 3;
+  }
+}
+@media (max-width: 479px) {
+  .crate {
+    --cols: 2;
+  }
+  .title {
+    font-size: clamp(32px, 9vw, 44px);
+  }
+}
+
+/* short landscape screens: the words give way to the records */
+@media (max-height: 560px) and (min-aspect-ratio: 21/20) {
+  .title {
+    font-size: clamp(28px, 8vh, 48px);
+  }
+  .lede {
+    display: none;
+  }
+  .flourish {
+    margin: 6px 0 8px;
+  }
+  .side {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disc {
+    animation: none;
+  }
+}

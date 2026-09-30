@@ -1,0 +1,33 @@
+.footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 28px;
+  min-height: var(--footer-h);
+  padding: 16px calc(var(--gutter) + var(--corner)) calc(var(--safe) * 0.5 + 12px) var(--gutter);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-faint);
+}
+.links {
+  display: flex;
+  gap: 28px;
+}
+.links a {
+  color: var(--bone-dim);
+  transition: color 0.3s;
+}
+.links a:hover {
+  color: var(--bone);
+}
+
+@media (max-width: 520px) {
+  .footer {
+    justify-content: center;
+    text-align: center;
+  }
+}

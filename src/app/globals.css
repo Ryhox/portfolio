@@ -1,0 +1,257 @@
+/* ─────────────────────────────────────────────────────────────
+   RYHOX WORKS · base layer
+   Palette: soot, bone, brass, copper, a little patina.
+   Nothing glows unless it is a tube, a filament, or phosphor.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  --ink: #0d0a07;
+  --ink-2: #15100b;
+  --ink-3: #221a12;
+  --bone: #ebe1cb;
+  --bone-dim: #b3a488;
+  --bone-faint: #6f6350;
+  --brass: #c99a58;
+  --brass-hi: #ecc98a;
+  --copper: #bb6c3d;
+  --patina: #7fa596;
+  --phosphor: #ffb54c;
+  --signal: #d4492e;
+
+  --font-display: var(--font-shoulders), 'Arial Narrow', Impact, sans-serif;
+  --font-inline: var(--font-inline), var(--font-shoulders), 'Arial Narrow', sans-serif;
+  --font-text: var(--font-gothic), 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-martian), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-crt: var(--font-vt), ui-monospace, monospace;
+
+  --gutter: clamp(20px, 4.2vw, 72px);
+  --safe: clamp(18px, 2.6vw, 40px);
+  --nav-h: 76px;
+  --footer-h: 58px;
+  --tube-radius: clamp(20px, 2.4vw, 38px);
+  /* the bottom-right corner belongs to the radio's record: what sits along the bottom keeps clear of it */
+  --corner: calc(clamp(52px, 4.4vw, 68px) + 20px);
+  /* how much of the screen a phone's toolbar takes right now (0 on desktop): keeps things off it */
+  --bar: calc(100lvh - 100svh);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--ink);
+  /* the scrollbar's room is kept even while the page is held still (a menu, the radio), so the
+     page never changes width under you */
+  scrollbar-gutter: stable;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.65;
+  font-variation-settings: 'wdth' 100;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--brass);
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+dl,
+dd,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 1px solid var(--brass-hi);
+  outline-offset: 6px;
+  border-radius: 1px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  left: var(--safe);
+  top: var(--safe);
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--bone);
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: translateY(-200%);
+  transition: transform 0.4s var(--ease-out);
+}
+.skip-link:focus {
+  transform: none;
+}
+
+/* ── Typography primitives ─────────────────────────────────── */
+
+.t-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-variation-settings: 'wdth' 112.5;
+  font-weight: 400;
+}
+
+.t-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+  line-height: 0.84;
+}
+
+.t-text {
+  font-family: var(--font-text);
+  letter-spacing: -0.005em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Channel change: the picture collapses to a line, then a dot ─── */
+html.crt-off [data-screen-layer],
+html.crt-off #main {
+  animation: crt-off 560ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+html.crt-on [data-screen-layer],
+html.crt-on #main {
+  animation: crt-on 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* between the two, while the route changes: off, but at full size, so the new page measures true */
+html.crt-dark [data-screen-layer],
+html.crt-dark #main {
+  visibility: hidden;
+}
+@keyframes crt-off {
+  0% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1, 0.006);
+  }
+  100% {
+    transform: scale(0, 0.006);
+  }
+}
+@keyframes crt-on {
+  0% {
+    transform: scale(0, 0.006);
+  }
+  35% {
+    transform: scale(1, 0.006);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+#main {
+  position: relative;
+  z-index: 2;
+}
+
+/* the WebGL layer: as tall as the large viewport, so a phone's toolbar only covers it, never resizes it */
+.gl-stage {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  pointer-events: none;
+  background: #050403;
+}

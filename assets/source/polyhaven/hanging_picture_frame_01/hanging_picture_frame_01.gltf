@@ -1,0 +1,339 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v1.6.16",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "hanging_picture_frame_01"
+    }
+  ],
+  "materials": [
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "name": "hanging_picture_frame_01_glass",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "hanging_picture_frame_01_artwork",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 3
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 4
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "hanging_picture_frame_01",
+      "normalTexture": {
+        "index": 5
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 6
+        },
+        "metallicRoughnessTexture": {
+          "index": 7
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cube.003",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        },
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 3,
+          "material": 1
+        },
+        {
+          "attributes": {
+            "POSITION": 7,
+            "NORMAL": 8,
+            "TEXCOORD_0": 9
+          },
+          "indices": 10,
+          "material": 2
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    },
+    {
+      "sampler": 0,
+      "source": 5
+    },
+    {
+      "sampler": 0,
+      "source": 6
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_artwork_nor_gl",
+      "uri": "textures/hanging_picture_frame_01_artwork_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_diff-hanging_picture_frame_01_opacity",
+      "uri": "textures/hanging_picture_frame_01_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_metallic-hanging_picture_frame_01_roughness",
+      "uri": "textures/hanging_picture_frame_01_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_artwork_diff",
+      "uri": "textures/hanging_picture_frame_01_artwork_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_artwork_roughness",
+      "uri": "textures/hanging_picture_frame_01_artwork_roughness_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_nor_gl",
+      "uri": "textures/hanging_picture_frame_01_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "hanging_picture_frame_01_diff",
+      "uri": "textures/hanging_picture_frame_01_diff_1k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        0.28592872619628906,
+        0.4094582498073578,
+        0.009911571629345417
+      ],
+      "min": [
+        -0.28592872619628906,
+        -0.4094582498073578,
+        0.009911516681313515
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 4,
+      "max": [
+        0.25658878684043884,
+        0.3807816803455353,
+        0.007744472939521074
+      ],
+      "min": [
+        -0.25658878684043884,
+        -0.3807816803455353,
+        0.007744423113763332
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 2209,
+      "max": [
+        0.296999990940094,
+        0.4204999804496765,
+        0.015854623168706894
+      ],
+      "min": [
+        -0.296999990940094,
+        -0.4204999804496765,
+        0.00010530756117077544
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 2209,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 2209,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5123,
+      "count": 7746,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 48,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 48,
+      "byteOffset": 48
+    },
+    {
+      "buffer": 0,
+      "byteLength": 32,
+      "byteOffset": 96
+    },
+    {
+      "buffer": 0,
+      "byteLength": 12,
+      "byteOffset": 128
+    },
+    {
+      "buffer": 0,
+      "byteLength": 48,
+      "byteOffset": 140
+    },
+    {
+      "buffer": 0,
+      "byteLength": 48,
+      "byteOffset": 188
+    },
+    {
+      "buffer": 0,
+      "byteLength": 32,
+      "byteOffset": 236
+    },
+    {
+      "buffer": 0,
+      "byteLength": 26508,
+      "byteOffset": 268
+    },
+    {
+      "buffer": 0,
+      "byteLength": 26508,
+      "byteOffset": 26776
+    },
+    {
+      "buffer": 0,
+      "byteLength": 17672,
+      "byteOffset": 53284
+    },
+    {
+      "buffer": 0,
+      "byteLength": 15492,
+      "byteOffset": 70956
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 86448,
+      "uri": "hanging_picture_frame_01.bin"
+    }
+  ]
+}

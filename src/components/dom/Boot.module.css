@@ -1,0 +1,63 @@
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: #0d0a07;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--gutter) 2.6vh;
+  pointer-events: none;
+  overflow: hidden;
+  user-select: none;
+  transition: opacity 0.7s var(--ease-in-out);
+}
+.boot[data-out='1'] {
+  opacity: 0;
+}
+
+/* Stamped brass numerals on counter drums. */
+.count {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(8rem, 25vw, 23rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  will-change: transform, opacity, filter;
+}
+
+.window {
+  position: relative;
+  display: block;
+  height: 1em;
+  width: 0.56em;
+  overflow: hidden;
+  /* the drum curves away at the top and bottom */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+
+.drum {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+.drum > span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  text-align: center;
+  background: linear-gradient(180deg, #fff3d6 0%, #e9c88e 26%, #c69a5a 52%, #8a6230 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pct {
+  margin: 0.1em 0 0 0.06em;
+  font-size: 0.3em;
+  line-height: 1;
+  color: #c69a5a;
+}

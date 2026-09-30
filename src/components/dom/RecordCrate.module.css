@@ -1,0 +1,186 @@
+/* The records: two to a row, each a big sleeve with its disc showing at the edge, the name beneath. */
+
+.crate {
+  min-width: 0;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+  gap: clamp(30px, 5vh, 52px) clamp(18px, 2vw, 32px);
+}
+
+.pick {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+}
+
+/* ── the sleeve and its disc ── */
+
+.slot {
+  position: relative;
+  width: 70%;
+  aspect-ratio: 1;
+}
+.sleeve {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 3px;
+  background: #2b2118 center / cover no-repeat;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 236, 205, 0.1),
+    8px 6px 22px rgba(0, 0, 0, 0.6);
+  transition: transform 0.6s var(--ease-out);
+}
+.disc {
+  position: absolute;
+  inset: 1.5%;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 20deg,
+      rgba(255, 236, 205, 0) 0 8%,
+      rgba(255, 236, 205, 0.12) 12%,
+      rgba(255, 236, 205, 0) 18% 58%,
+      rgba(255, 236, 205, 0.08) 62%,
+      rgba(255, 236, 205, 0) 68%
+    ),
+    repeating-radial-gradient(circle at 50% 50%, #221912 0 1px, #0b0806 1px 3px);
+  box-shadow:
+    0 0 0 1px rgba(201, 154, 88, 0.45),
+    4px 4px 16px rgba(0, 0, 0, 0.6);
+  transform: translateX(26%);
+  transition:
+    transform 0.8s var(--ease-out),
+    opacity 0s;
+}
+/* the label, the same size as on the 3D disc, with its spindle hole */
+.disc i {
+  position: absolute;
+  inset: 28%;
+  border-radius: 50%;
+  background: #3b1f12 center / cover no-repeat;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 0 5px rgba(0, 0, 0, 0.25);
+}
+.disc i::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9%;
+  height: 9%;
+  margin: -4.5% 0 0 -4.5%;
+  border-radius: 50%;
+  background: #0a0705;
+}
+.pick:hover .disc,
+.pick:focus-visible .disc {
+  transform: translateX(38%) rotate(70deg);
+}
+.pick:hover .sleeve,
+.pick:focus-visible .sleeve {
+  transform: translateY(-3px);
+}
+/* chosen: drawn out of the sleeve, upright, where the 3D record takes over */
+.row[data-disc='pulled'] .disc,
+.row[data-disc='away'] .disc,
+.out {
+  transform: translateX(40%);
+}
+.row[data-disc='away'] .disc {
+  opacity: 0;
+}
+.out {
+  position: absolute;
+  inset: 1.5%;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── the words ── */
+
+.text {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-right: 4px;
+}
+.title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(17px, 1.45vw, 23px);
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  color: var(--bone-dim);
+  overflow-wrap: anywhere;
+  transition: color 0.3s;
+}
+.pick:hover .title,
+.pick:focus-visible .title {
+  color: var(--bone);
+}
+.row[data-cur='1'] .title {
+  color: var(--brass-hi);
+}
+.artist {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-faint);
+}
+
+.state {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--brass);
+}
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+}
+.eq i {
+  width: 2px;
+  height: 4px;
+  background: var(--brass-hi);
+  animation: eq 0.8s ease-in-out infinite alternate;
+}
+.eq i:nth-child(2) {
+  animation-delay: -0.35s;
+}
+.eq i:nth-child(3) {
+  animation-delay: -0.6s;
+}
+@keyframes eq {
+  to {
+    height: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eq i {
+    animation: none;
+    height: 8px;
+  }
+}
+
+/* narrow: the full width of the phone, still two to a row */
+@media (max-aspect-ratio: 21/20), (max-width: 559px) {
+  .list {
+    gap: 28px 16px;
+  }
+  .title {
+    font-size: clamp(15px, 4.2vw, 20px);
+  }
+}

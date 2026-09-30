@@ -1,0 +1,60 @@
+#        ___
+#     __/   \__        RYHOX WORKS · things the machine keeps to itself
+#    /  \___/  \
+#    \__/   \__/       Everything below is made, fetched or dropped here by
+#       \___/          accident. None of it belongs in the history.
+#
+
+# ── the engine room ─────────────────────────────── (npm fills it back up)
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── what Next.js builds on its own ─────────────── (sawdust off the lathe)
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+
+# ── secrets ────────────────────────────────────── (the kettle stays in the kitchen)
+.env*.local
+.env
+
+# ── raw materials ──────────────────────────────── (huge, and only mine to hand out)
+# the Sketchfab originals stay local; the squeezed copies in public/models are committed
+assets/source/*.glb
+assets/source/*.zip
+
+# ── screenshots ────────────────────────────────── (every "does this look right?")
+# the headless QA runs and the ones taken by hand, in every language the OS speaks
+qa-shots/
+screenshots/
+Screenshot*.png
+Screen Shot*.png
+Schermata*.png
+Bildschirmfoto*.png
+Capture d’écran*.png
+*.screenshot.png
+
+# ── benchmarks and traces ──────────────────────── (how fast the cogs turned, last Tuesday)
+bench-results/
+*.cpuprofile
+*.heapsnapshot
+trace-*.json
+
+# ── the machine's own crumbs ───────────────────── (it sheds, like any workshop)
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+#    that's everything. the cogs are tidy. ⚙

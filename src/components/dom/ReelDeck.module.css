@@ -1,0 +1,408 @@
+/* over the loop of film: the title at the top, the loop in the middle (3D), the knobs at the foot */
+.root {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: calc(var(--nav-h) + 1.2vh) var(--gutter) calc(2.6vh + var(--bar) + var(--safe) * 0.4);
+  pointer-events: none;
+}
+
+.plates {
+  display: grid;
+  justify-items: center;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  text-align: center;
+}
+
+/* one plate at a time: the rest wait, hidden, in the document (all in the same cell, so the
+   row is as tall as the tallest) */
+.plate {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+.plate[data-state='in'],
+.plate[data-state='out'] {
+  visibility: visible;
+}
+.plate[data-state='in'] .article > * {
+  pointer-events: auto;
+}
+
+.article {
+  display: grid;
+  justify-items: center;
+  gap: clamp(8px, 1.4vh, 14px);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(40px, min(6.4vw, 10.5vh), 118px);
+  line-height: 0.88;
+  letter-spacing: 0.005em;
+  text-shadow: 0 2px 24px rgba(5, 3, 2, 0.8);
+}
+.title a {
+  transition: color 0.4s var(--ease-out);
+}
+.title a:hover {
+  color: var(--brass-hi);
+}
+
+/* each word slides through its own slot, the way the film runs: in from one side, out the other */
+.mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding: 0.06em 0.02em 0.1em;
+  margin: -0.06em -0.02em -0.1em;
+}
+.word {
+  display: inline-block;
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.8s var(--ease-out);
+  transition-delay: calc(0.08s + var(--w, 0) * 0.07s);
+}
+.plate:not([data-state='in']) .word {
+  transform: translate3d(104%, 0, 0);
+  transition-duration: 0.3s;
+  transition-delay: 0s;
+}
+.plate[data-dir='prev']:not([data-state='in']) .word {
+  transform: translate3d(-104%, 0, 0);
+}
+.plate[data-state='out'] .word {
+  transform: translate3d(-104%, 0, 0);
+  transition-delay: calc(var(--w, 0) * 0.025s);
+}
+.plate[data-dir='prev'][data-state='out'] .word {
+  transform: translate3d(104%, 0, 0);
+}
+
+.part {
+  transition:
+    transform 0.8s var(--ease-out),
+    opacity 0.6s var(--ease-out);
+  transition-delay: calc(0.2s + var(--k, 0) * 0.06s);
+}
+.plate:not([data-state='in']) .part {
+  opacity: 0;
+  transform: translate3d(22px, 0, 0);
+  transition-duration: 0.24s, 0.18s;
+  transition-delay: 0s;
+}
+.plate[data-dir='prev']:not([data-state='in']) .part,
+.plate[data-state='out'] .part {
+  transform: translate3d(-22px, 0, 0);
+}
+.plate[data-dir='prev'][data-state='out'] .part {
+  transform: translate3d(22px, 0, 0);
+}
+
+/* what it is, and the way to its case file */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 16px;
+  font-family: var(--font-text);
+  font-size: clamp(15px, 1.35vw, 20px);
+  line-height: 1.3;
+  color: var(--bone);
+  text-shadow: 0 1px 14px rgba(5, 3, 2, 0.9);
+}
+.dotSep {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brass);
+}
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass-hi);
+}
+.open svg {
+  width: 34px;
+  height: 12px;
+  transition: transform 0.6s var(--ease-out);
+}
+.open:hover svg {
+  transform: translateX(7px);
+}
+.open span {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0% 1px no-repeat;
+  transition: background-size 0.6s var(--ease-out);
+  padding-bottom: 3px;
+}
+.open:hover span {
+  background-size: 100% 1px;
+}
+
+/* where a project without a demo runs instead: a plain line under the first */
+.where {
+  font-family: var(--font-text);
+  font-size: clamp(13px, 1.05vw, 16px);
+  color: var(--bone-dim);
+  text-shadow: 0 1px 14px rgba(5, 3, 2, 0.9);
+}
+.where a {
+  color: var(--bone);
+  text-decoration: underline;
+  text-decoration-color: rgba(201, 154, 88, 0.6);
+  text-underline-offset: 0.25em;
+}
+.where a:hover {
+  text-decoration-color: var(--brass-hi);
+}
+
+/* the buttons sit in the bottom-right corner of the picture at the gate (the 3D says where it is);
+   when the picture is too narrow for them, they go under the film, centred */
+.actions {
+  position: absolute;
+  left: 0;
+  top: 0;
+  justify-content: flex-end;
+  text-align: right;
+  max-width: calc(100vw - 2 * var(--gutter));
+  /* sheared to the picture's sloping bottom edge, as if printed on the film */
+  transform-origin: 100% 100%;
+  transform: translate3d(calc(var(--gate-brx, 70vw) - 100% - clamp(12px, 1.3vw, 20px)), calc(var(--gate-bry, 70vh) - 100% - clamp(12px, 1.3vw, 20px)), 0)
+    skewY(var(--gate-skb, 0deg));
+  transition:
+    opacity 0.45s var(--ease-out) 0.15s,
+    translate 0.6s var(--ease-out) 0.15s;
+}
+.root[data-fit='small'] .actions {
+  scale: 0.72;
+}
+.root[data-fit='under'] .actions {
+  justify-content: center;
+  text-align: center;
+  transform-origin: 50% 0;
+  transform: translate3d(calc((var(--gate-l, 0px) + var(--gate-r, 100vw)) / 2 - 50%), calc(var(--gate-b, 70vh) + 12px), 0) skewY(var(--gate-skb, 0deg));
+}
+.plate:not([data-state='in']) .actions,
+.root[data-rest='0'] .actions,
+.root[data-gate='0'] .actions {
+  opacity: 0;
+  translate: 0 8px;
+  pointer-events: none !important;
+  transition-duration: 0.18s;
+  transition-delay: 0s;
+}
+
+.stage {
+  min-height: 0;
+}
+
+/* no live demo: the picture is left undeveloped and stamped, in the red of a rubber stamp */
+.stamp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.5em 0.8em 0.55em;
+  border: 4px double #c9432b;
+  color: #d9553a;
+  background: rgba(236, 225, 203, 0.08);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(28px, 3.4vw, 54px);
+  line-height: 0.9;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  transform: translate3d(calc(var(--gate-cx, 50vw) - 50%), calc(var(--gate-cy, 50vh) - 50%), 0) rotate(-9deg) scale(1.6);
+  transition:
+    opacity 0.12s ease,
+    transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.stamp small {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.24em;
+  letter-spacing: 0.16em;
+}
+.stamp[data-on='1'] {
+  opacity: 1;
+  transform: translate3d(calc(var(--gate-cx, 50vw) - 50%), calc(var(--gate-cy, 50vh) - 50%), 0) rotate(-9deg) scale(1);
+}
+
+/* the foot: a knob to either side, the sprocket holes between (clear of the radio's record) */
+.foot {
+  margin-right: var(--corner);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.knob {
+  position: relative;
+  width: clamp(48px, 4.2vw, 62px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: auto;
+  color: #1a120a;
+  -webkit-tap-highlight-color: transparent;
+}
+/* the knurled rim turns; the face with its arrow stays put */
+.knurl {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 0 58%, rgba(0, 0, 0, 0.45) 60%, transparent 64%),
+    repeating-conic-gradient(from 0deg, #e2bd80 0deg 4deg, #6e4a22 4deg 9deg);
+  box-shadow:
+    0 0 0 1px rgba(20, 12, 6, 0.9),
+    0 6px 18px rgba(0, 0, 0, 0.55);
+  transform: rotate(var(--turn, 0deg));
+  transition:
+    transform 0.7s var(--ease-spring),
+    rotate 0.5s var(--ease-out);
+}
+.knob::after {
+  content: '';
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #f6dca6 0%, #c99a58 45%, #7d5629 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 225, 0.6),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.35);
+}
+.knobArrow {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: 38%;
+  height: 38%;
+  transform: translate(-50%, -50%);
+  transition: transform 0.4s var(--ease-out);
+}
+.knob:hover .knurl {
+  rotate: 14deg;
+}
+.knob[data-dir='prev']:hover .knurl {
+  rotate: -14deg;
+}
+.knob[data-dir='next']:hover .knobArrow {
+  transform: translate(-40%, -50%);
+}
+.knob[data-dir='prev']:hover .knobArrow {
+  transform: translate(-60%, -50%);
+}
+.knob:active .knurl {
+  scale: 0.95;
+}
+.knob:focus-visible {
+  outline: 1px solid var(--brass-hi);
+  outline-offset: 5px;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+/* each one a perforation in the film: the plate at the gate is lit through */
+.dot {
+  position: relative;
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(235, 225, 203, 0.35);
+  transition:
+    width 0.45s var(--ease-out),
+    background-color 0.3s,
+    box-shadow 0.3s;
+}
+.dot::before {
+  content: '';
+  position: absolute;
+  inset: -10px -4px;
+}
+.dot:hover {
+  box-shadow: inset 0 0 0 1px var(--brass-hi);
+}
+.dot[aria-current='true'] {
+  width: 26px;
+  background: var(--brass);
+  box-shadow: inset 0 0 0 1px var(--brass-hi), 0 0 12px rgba(236, 201, 138, 0.35);
+}
+.dot:focus-visible {
+  outline: 1px solid var(--brass-hi);
+  outline-offset: 4px;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* a phone: a smaller title; the buttons centred under the picture */
+@media (max-aspect-ratio: 21/20), (max-width: 559px) {
+  .title {
+    font-size: clamp(32px, min(9.6vw, 6.4vh), 64px);
+  }
+  .line {
+    font-size: 15px;
+  }
+  .dots {
+    gap: 8px;
+  }
+  .dot {
+    width: 13px;
+    height: 10px;
+  }
+  .dot[aria-current='true'] {
+    width: 20px;
+  }
+}
+
+/* short screens: the case-file link steps aside */
+@media (max-height: 560px) {
+  .article {
+    gap: 6px;
+  }
+  .title {
+    font-size: clamp(28px, 9vh, 56px);
+  }
+  .knob {
+    width: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .part,
+  .word,
+  .actions,
+  .knurl {
+    transition-duration: 0.01s !important;
+  }
+}

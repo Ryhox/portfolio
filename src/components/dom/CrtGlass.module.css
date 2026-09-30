@@ -1,0 +1,99 @@
+.glass {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* film grain over the type as well as the picture: a tile of noise, twice the screen, jumped about
+   a few times a second (a transform only, so the compositor does it and nothing repaints) */
+.grain {
+  position: absolute;
+  inset: -50%;
+  background-size: 180px 180px;
+  opacity: 0.055;
+  animation: grain 0.5s steps(1) infinite;
+  will-change: transform;
+}
+@keyframes grain {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  17% {
+    transform: translate3d(-11%, 7%, 0);
+  }
+  33% {
+    transform: translate3d(6%, -13%, 0);
+  }
+  50% {
+    transform: translate3d(-17%, -4%, 0);
+  }
+  67% {
+    transform: translate3d(13%, 11%, 0);
+  }
+  83% {
+    transform: translate3d(-5%, 16%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grain {
+    animation: none;
+  }
+}
+
+/* a faint reflection of a window on the glass (no dark rim: the picture runs to the edges) */
+.sheen {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 40% at 22% 12%, rgba(255, 236, 205, 0.045), transparent 70%);
+}
+
+/* the electron beam, seen only while the channel changes */
+.beam {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(50% 50% at 50% 50%, #fff9ee 0%, #ffd7a0 45%, rgba(255, 160, 70, 0) 100%);
+}
+:global(html.crt-off) .beam {
+  animation: beam-off 560ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+:global(html.crt-on) .beam {
+  animation: beam-on 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes beam-off {
+  0% {
+    opacity: 0;
+    transform: scale(1, 1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1, 0.006);
+  }
+  88% {
+    opacity: 1;
+    transform: scale(0.004, 0.006);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.002, 0.004);
+  }
+}
+@keyframes beam-on {
+  0% {
+    opacity: 1;
+    transform: scale(0.004, 0.006);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1, 0.006);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1, 1);
+  }
+}

@@ -1,0 +1,79 @@
+.page {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: calc(var(--nav-h) + 4vh) var(--gutter) 8vh;
+  text-align: center;
+}
+.code {
+  display: flex;
+  align-items: center;
+  gap: 0.06em;
+  margin: 0;
+  font-size: clamp(120px, 26vw, 360px);
+  line-height: 0.8;
+}
+.code span {
+  background: linear-gradient(180deg, #fff6e2 0%, var(--bone) 42%, #c2a979 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.face {
+  width: 0.78em;
+  height: 0.78em;
+  color: var(--brass);
+  animation: shudder 4s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+/* now and then it tries to go on, and can't */
+@keyframes shudder {
+  0%,
+  88%,
+  100% {
+    transform: rotate(0deg);
+  }
+  90% {
+    transform: rotate(2.5deg);
+  }
+  92% {
+    transform: rotate(-1deg);
+  }
+  94% {
+    transform: rotate(0.6deg);
+  }
+}
+.flourish {
+  width: 220px;
+  height: auto;
+  margin: 28px 0 20px;
+  color: var(--brass);
+}
+.lead {
+  max-width: 38ch;
+  font-family: var(--font-text);
+  font-size: clamp(17px, 1.5vw, 21px);
+  line-height: 1.45;
+  color: var(--bone-dim);
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px 28px;
+  margin-top: 36px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+}
+.links a:hover {
+  color: var(--bone);
+}
+.home {
+  color: var(--brass-hi);
+}
