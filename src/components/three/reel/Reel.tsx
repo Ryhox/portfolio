@@ -2,7 +2,7 @@
 
 import { useTexture } from '@react-three/drei';
 import { type ThreeEvent, useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { projects } from '@/content/projects';
 import { clamp, damp, lerp, smoothstep } from '@/lib/math';
@@ -212,8 +212,11 @@ export default function Reel() {
     return { pivot, loop, drum, frames, shared, glyphs, card, bar, backdrop, dust };
   }, [posters]);
 
-  // the recordings: made when first needed, one running at a time
+  // the recordings: made when first needed, one running at a time. Their files are fetched ahead
+  // (that is only the network); the player itself is made later, at a moment the film stands still
   const films = useMemo(() => new Map<number, Film>(), []);
+  const clips = useMemo(() => new Map<number, { url: string | null; failed: boolean }>(), []);
+  const made = useRef(-10);
   const fx = useMemo(() => ({ code: 0, live: 0, none: 0, plate: -1 }), []);
   // the browser's bar: the address it shows, since when, how far it has dropped, what was drawn
   const bar = useMemo(() => ({ want: '', text: '', since: 0, drop: 0, drawn: '' }), []);
@@ -239,21 +242,47 @@ export default function Reel() {
         f.tex.dispose();
       });
       films.clear();
+      clips.forEach((c) => c.url && URL.revokeObjectURL(c.url));
+      clips.clear();
       built.glyphs.dispose();
       built.card.dispose();
       built.bar.texture.dispose();
     };
-  }, [films, built]);
+  }, [films, clips, built]);
 
+  /** Fetch a recording's file ahead of its player (kept as a blob, so the player starts at once). */
+  const fetchClip = (i: number) => {
+    if (i < 0 || i >= projects.length || clips.has(i)) return;
+    const clip = { url: null as string | null, failed: false };
+    clips.set(i, clip);
+    fetch(projects[i].video)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((b) => {
+        // (gone in the meantime: nothing to keep)
+        if (clips.get(i) === clip) clip.url = URL.createObjectURL(b);
+      })
+      .catch(() => (clip.failed = true));
+  };
+
+  /**
+   * Make a recording's player, once its file is here. A player's decoder starting up holds the
+   * GPU for a few hundredths of a second, whatever else is being drawn: so they are made one at a
+   * time, well apart, and (see below) only while the film stands still, where nobody sees it.
+   */
   const load = (i: number) => {
     if (i < 0 || i >= projects.length || films.has(i)) return;
+    fetchClip(i);
+    const clip = clips.get(i);
+    if (!clip || (!clip.url && !clip.failed) || rig.time - made.current < 0.5) return;
+    made.current = rig.time;
     const video = document.createElement('video');
     video.muted = true;
     video.loop = true;
     video.playsInline = true;
     video.preload = 'auto';
     video.disablePictureInPicture = true;
-    video.src = projects[i].video;
+    // (if the fetch failed, the player loads the file itself)
+    video.src = clip.url ?? projects[i].video;
     const tex = new THREE.VideoTexture(video);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.generateMipmaps = false;
@@ -412,19 +441,28 @@ export default function Reel() {
     // picture but what is really behind it, and the dust after the film)
     built.dust.renderOrder = out > 0 ? 100 : 0;
 
-    // the recordings: the one at the gate starts loading while the camera is still crossing the office
+    // the recordings: the one at the gate and its neighbours are fetched while the camera is still
+    // crossing the office; their players are made, the gate's first, only once the film is up and
+    // stands still at a frame (its still is on the film until then)
     const plate = reel.plate;
+    const here = Math.min(plate, projects.length - 1);
     if (office.path > 0.35 || on) {
-      load(Math.min(plate, projects.length - 1));
+      fetchClip(here);
+      fetchClip(plate + 1);
+      fetchClip(plate - 1);
+    }
+    if (on && reel.resting && office.view >= 1) {
+      load(here);
       load(plate + 1);
-      if (plate > 0) load(plate - 1);
+      load(plate - 1);
     }
     // the last plate (the title card) keeps the last recording turning behind it
-    const running = Math.min(plate, projects.length - 1);
+    const running = here;
     films.forEach((f, i) => {
       if (i === running && on) f.offAt = time + 0.6;
       const play = on && f.ready && time < f.offAt;
-      if (play && !f.rolling) {
+      // (it starts running once the film has come to rest: starting is a moment's work for the GPU too)
+      if (play && !f.rolling && reel.resting) {
         f.rolling = true;
         f.video.play()?.catch(() => (f.rolling = false));
       } else if (!play && f.rolling) {

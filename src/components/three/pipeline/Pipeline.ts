@@ -150,6 +150,8 @@ export type BeamParams = {
   density: number;
   steps: number;
   time: number;
+  /** the opening the office is seen through, while it is one (see renderOffice) */
+  portal?: [number, number, number] | null;
 };
 
 export type FinalParams = {
@@ -315,6 +317,20 @@ export class Pipeline {
     return this.crt.texture;
   }
 
+  /**
+   * The one pass that is not drawn from the first frame on (the office's beams of light) has its
+   * program compiled ahead, in the background: built on first use it is a wait of its own, in
+   * the very frame the office opens.
+   */
+  warm() {
+    const prev = this.gl.getRenderTarget();
+    this.fs.mesh.material = this.beamMat;
+    this.gl.setRenderTarget(this.beams);
+    const job = this.gl.compileAsync(this.fs.scene, this.fs.camera);
+    this.gl.setRenderTarget(prev);
+    return job.catch(() => {});
+  }
+
   /** `over`: drawn on top of what the target already holds (only its depth is cleared). */
   renderWorks(scene: THREE.Scene, camera: THREE.Camera, over = false) {
     this.gl.setRenderTarget(this.works);
@@ -330,7 +346,29 @@ export class Pipeline {
     this.gl.autoClear = auto;
   }
 
-  renderOffice(scene: THREE.Scene, camera: THREE.Camera) {
+  /**
+   * While the office is only seen through the clock's hub (`portal`: a round opening in scene uv,
+   * centre x, y and radius as a fraction of the height), only the part of it the opening can show
+   * is drawn, and lit by the beams: the rest of the frame would be thrown away, and until the
+   * opening has grown that is nearly all of it.
+   */
+  private window(target: THREE.WebGLRenderTarget, portal: [number, number, number] | null) {
+    const full = !portal || portal[2] > 1.2;
+    target.scissorTest = !full;
+    if (full) return;
+    const w = target.width;
+    const h = target.height;
+    // (a little over: the glass's colour fringes and the beams' blur reach past the edge)
+    const r = Math.max(0, portal[2]) * h + (12 * w) / Math.max(1, this.width / this.dpr);
+    const x0 = Math.max(0, Math.floor(portal[0] * w - r));
+    const y0 = Math.max(0, Math.floor(portal[1] * h - r));
+    const x1 = Math.min(w, Math.ceil(portal[0] * w + r));
+    const y1 = Math.min(h, Math.ceil(portal[1] * h + r));
+    target.scissor.set(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+  }
+
+  renderOffice(scene: THREE.Scene, camera: THREE.Camera, portal: [number, number, number] | null = null) {
+    this.window(this.office, portal);
     this.gl.setRenderTarget(this.office);
     this.gl.clear();
     this.gl.render(scene, camera);
@@ -354,6 +392,7 @@ export class Pipeline {
     u.uTime.value = p.time;
     u.uDensity.value = p.density;
     u.uSteps.value = p.steps;
+    this.window(this.beams, p.portal ?? null);
     this.fs.render(this.gl, this.beamMat, this.beams);
     return true;
   }

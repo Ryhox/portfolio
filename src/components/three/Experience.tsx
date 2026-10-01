@@ -52,6 +52,9 @@ export default function Experience() {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.05;
           gl.setClearColor('#050403', 1);
+          // asking the driver whether each program linked is a wait on the GPU the first time it is
+          // used: that is for development
+          gl.debug.checkShaderErrors = process.env.NODE_ENV !== 'production';
         }}
       >
         <Director setDpr={setDpr} />

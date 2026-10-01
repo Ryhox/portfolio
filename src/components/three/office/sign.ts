@@ -17,7 +17,7 @@ export const SIGN = {
   bevel: 0.03,
 };
 
-export function buildSign() {
+export async function buildSign(rest: () => Promise<void>) {
   const data = typeface as unknown as FontData & { capHeight: number; glyphs: Record<string, { ha: number; x_min: number; x_max: number }> };
   const font = new Font(data);
   // the font's size is its em; the cap height is a fraction of it
@@ -29,7 +29,7 @@ export function buildSign() {
   let x = 0;
   let gap = 0;
   const chars = Array.from(SIGN.text);
-  chars.forEach((ch, i) => {
+  const letter = (ch: string, i: number) => {
     const g = data.glyphs[ch];
     const geo = new THREE.ExtrudeGeometry(font.generateShapes(ch, em), {
       depth: SIGN.depth,
@@ -50,7 +50,12 @@ export function buildSign() {
     if (i === SIGN.gapAfter) gap = x + g.x_max * unit;
     if (i === SIGN.gapAfter + 1) gap = (gap + x + g.x_min * unit) / 2;
     x += g.ha * unit + SIGN.track;
-  });
+  };
+  // (a letter at a time: each is a few milliseconds of bevelled extrusion)
+  for (let i = 0; i < chars.length; i++) {
+    letter(chars[i], i);
+    await rest();
+  }
   // the gap the view flies through is the sign's origin
   group.children.forEach((m) => (m.position.x -= gap));
   const width = x - SIGN.track;

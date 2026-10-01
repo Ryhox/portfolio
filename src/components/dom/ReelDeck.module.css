@@ -168,7 +168,8 @@
 }
 
 /* the buttons sit in the bottom-right corner of the picture at the gate (the 3D says where it is);
-   when the picture is too narrow for them, they go under the film, centred */
+   when the picture is too narrow for them, they go under the film, centred. Their place (and the
+   shear to the picture's sloping bottom edge) is written onto them, see ReelDeck */
 .actions {
   position: absolute;
   left: 0;
@@ -178,8 +179,7 @@
   max-width: calc(100vw - 2 * var(--gutter));
   /* sheared to the picture's sloping bottom edge, as if printed on the film */
   transform-origin: 100% 100%;
-  transform: translate3d(calc(var(--gate-brx, 70vw) - 100% - clamp(12px, 1.3vw, 20px)), calc(var(--gate-bry, 70vh) - 100% - clamp(12px, 1.3vw, 20px)), 0)
-    skewY(var(--gate-skb, 0deg));
+  transform: translate3d(70vw, 70vh, 0) translate(-100%, -100%);
   transition:
     opacity 0.45s var(--ease-out) 0.15s,
     translate 0.6s var(--ease-out) 0.15s;
@@ -191,7 +191,6 @@
   justify-content: center;
   text-align: center;
   transform-origin: 50% 0;
-  transform: translate3d(calc((var(--gate-l, 0px) + var(--gate-r, 100vw)) / 2 - 50%), calc(var(--gate-b, 70vh) + 12px), 0) skewY(var(--gate-skb, 0deg));
 }
 .plate:not([data-state='in']) .actions,
 .root[data-rest='0'] .actions,

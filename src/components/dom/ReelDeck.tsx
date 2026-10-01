@@ -6,6 +6,7 @@ import Link from '@/components/dom/TransitionLink';
 import { hostOf, type Project } from '@/content/projects';
 import { site } from '@/content/site';
 import { onFrame } from '@/lib/loop';
+import { office } from '@/lib/office';
 import { PLATES, goTo, reel, wind, type Fx } from '@/lib/reel';
 import { rig } from '@/lib/rig';
 import ProjectActions from './ProjectActions';
@@ -87,6 +88,7 @@ export default function ReelDeck({ projects }: { projects: Project[] }) {
     let at = 0;
     const last = { gate: '', rest: '', fx: '', fit: '' };
     const px = (v: number) => `${v.toFixed(1)}px`;
+    const actions = Array.from(root.current?.querySelectorAll<HTMLElement>(`.${s.actions}`) ?? []);
     // what a button does to the picture: a browser's bar drops over the top of it with the address
     // the button goes to (the film draws it); a plate without a demo gets stamped
     const say = (fx: Fx, plate: number) => {
@@ -106,30 +108,32 @@ export default function ReelDeck({ projects }: { projects: Project[] }) {
       const el = list.current;
       const r = root.current;
       if (rig.route !== 'home' || !el || !r) return;
-      // the buttons sit on the gate's picture, wherever the glass shows it
+      // the buttons sit on the gate's picture, wherever the glass shows it (which only matters
+      // once the film is up, or about to be). Their place is written straight onto them and the
+      // stamp, not handed down from the deck's root as custom properties: those are inherited by
+      // everything in the deck (a thousand elements: every letter of every button is several spans),
+      // and the picture's place changes every frame the pointer moves, so every such frame
+      // restyled all of them, wherever on the page the visitor was
       const g = reel.gate;
-      const key = g.ok ? [g.left, g.right, g.bottom, g.film, ...g.tl, ...g.tr, ...g.bl, ...g.br].map((v) => v.toFixed(1)).join(',') : '';
+      const near = reel.on || office.path > 0.6;
+      const key = !near ? last.gate : g.ok ? [g.left, g.right, g.bottom, g.film, ...g.tl, ...g.tr, ...g.bl, ...g.br].map((v) => v.toFixed(1)).join(',') : '';
       if (key !== last.gate) {
         last.gate = key;
-        const st = r.style;
-        st.setProperty('--gate-l', px(g.left));
-        st.setProperty('--gate-r', px(g.right));
-        st.setProperty('--gate-b', px(g.bottom + g.film));
-        st.setProperty('--gate-cx', px((g.tl[0] + g.br[0]) / 2));
-        st.setProperty('--gate-cy', px((g.tl[1] + g.br[1]) / 2));
-        st.setProperty('--gate-tlx', px(g.tl[0]));
-        st.setProperty('--gate-tly', px(g.tl[1]));
-        st.setProperty('--gate-w', px(g.tr[0] - g.tl[0]));
-        st.setProperty('--gate-brx', px(g.br[0]));
-        st.setProperty('--gate-bry', px(g.br[1]));
-        // the slopes of the picture's bottom and top edges: what sits on them is sheared to match
-        const deg = (a: number[], b: number[]) => `${((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI).toFixed(2)}deg`;
-        st.setProperty('--gate-skb', deg(g.bl, g.br));
-        st.setProperty('--gate-skt', deg(g.tl, g.tr));
-        r.dataset.gate = g.ok ? '1' : '0';
         // the buttons go inside the picture's corner when it is wide enough for them, else under the
         // film; a short screen has no room under it, so there they sit inside, a size smaller
         const fit = g.right - g.left > 430 ? 'in' : rig.vh < 620 ? 'small' : 'under';
+        // the slope of the picture's bottom edge: what sits on it is sheared to match
+        const skew = `${((Math.atan2(g.br[1] - g.bl[1], g.br[0] - g.bl[0]) * 180) / Math.PI).toFixed(2)}deg`;
+        const pad = Math.min(20, Math.max(12, rig.vw * 0.013));
+        const place =
+          fit === 'under'
+            ? `translate3d(${px((g.left + g.right) / 2)}, ${px(g.bottom + g.film + 12)}, 0) translateX(-50%) skewY(${skew})`
+            : `translate3d(${px(g.br[0] - pad)}, ${px(g.br[1] - pad)}, 0) translate(-100%, -100%) skewY(${skew})`;
+        for (const a of actions) a.style.transform = place;
+        stamp.current?.style.setProperty('--gate-cx', px((g.tl[0] + g.br[0]) / 2));
+        stamp.current?.style.setProperty('--gate-cy', px((g.tl[1] + g.br[1]) / 2));
+        const shown = g.ok ? '1' : '0';
+        if (r.dataset.gate !== shown) r.dataset.gate = shown;
         if (fit !== last.fit) {
           last.fit = fit;
           r.dataset.fit = fit;
@@ -188,7 +192,7 @@ export default function ReelDeck({ projects }: { projects: Project[] }) {
   const github = site.socials[0].href;
 
   return (
-    <div ref={root} className={s.root} data-rest="1" data-gate="0" data-fit="in">
+    <div ref={root} className={s.root} data-rest="1" data-gate="0" data-fit="in" data-prepaint>
       <ol ref={list} className={s.plates}>
         {projects.map((p, i) => (
           <li key={p.slug} className={s.plate} data-plate={i} data-state={i === 0 ? 'in' : 'off'} data-dir="next">

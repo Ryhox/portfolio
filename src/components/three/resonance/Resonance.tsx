@@ -12,6 +12,7 @@ import { MODELS, useModel } from '@/lib/models';
 import { radio } from '@/lib/radio';
 import { rig, roomBox } from '@/lib/rig';
 import { useApp } from '@/lib/store';
+import { setCursor } from '../works/util';
 import { RadioDisplay, type Hit } from './display';
 import { coverTexture, vinylLabel } from './sleeves';
 
@@ -266,7 +267,7 @@ export default function Resonance() {
 
   useEffect(
     () => () => {
-      document.documentElement.style.cursor = '';
+      setCursor('');
       audio.mechanical = false;
       crateFx.disc.length = 0;
     },
@@ -514,7 +515,7 @@ export default function Resonance() {
   });
 
   // ── pointer ─────────────────────────────────────────────
-  const cursor = (c: string) => (document.documentElement.style.cursor = c);
+  const cursor = (c: string) => setCursor(c);
 
   const press = (k: Key) => {
     st.current.keys[k] = 1;

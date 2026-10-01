@@ -3,17 +3,25 @@
 import { useEffect, useRef } from 'react';
 import { about, tradeAngle, TRADES } from '@/lib/about';
 import { ZOOM_FROM } from '@/lib/office';
-import { onFrame } from '@/lib/loop';
+import { getLenis, onFrame } from '@/lib/loop';
 import { clamp, smoothstep } from '@/lib/math';
-import { pinProgress, rig } from '@/lib/rig';
+import { anchor, pinProgress, rig } from '@/lib/rig';
+import { useApp } from '@/lib/store';
 import { sfx } from '@/audio/sfx';
+
+/** where in the pinned scroll the trades' stretch starts, and how much of it they take between them */
+const TRADES_FROM = 0.28;
+const TRADES_SPAN = 0.4;
+/** how long the page holds still when a trade comes in (seconds) */
+const HOLD = 0.7;
 
 /**
  * Drives the pinned About section: the maker's half gives way to the trades' half as you scroll,
  * then the scroll steps the clock's hand through the five trades. They are set out round the
  * clock: each comes in when the hand first comes round to it and stays, so by the end all five
  * (and their tools) are there to be read; the one the hand points at is lit. A trade's name points
- * the hand at it.
+ * the hand at it. When a trade comes in the page holds still for a moment, right where its stretch
+ * begins: however hard the wheel is flung, each one is seen arrive, one at a time.
  */
 export default function AboutFx({ className, children }: { className?: string; children: React.ReactNode }) {
   const el = useRef<HTMLDivElement>(null);
@@ -82,13 +90,37 @@ export default function AboutFx({ className, children }: { className?: string; c
     let lastPhase = -1;
     let lastActive = -1;
     let lastSeen = -1;
+    // the page is held still for a trade coming in (since when; -1 = not)
+    let held = -1;
+    const release = () => {
+      if (held < 0) return;
+      held = -1;
+      // (unless something else is holding the page: a menu, the radio, a channel change)
+      const st = useApp.getState();
+      if (st.stage === 'ready' && !st.menuOpen && !st.switching && !st.radio) getLenis()?.start();
+    };
     const off = onFrame(() => {
-      if (rig.route !== 'home') return;
+      if (rig.route !== 'home') {
+        release();
+        return;
+      }
+      if (held >= 0 && rig.time - held > HOLD) release();
       const p = pinProgress('maker');
       const phase = smoothstep(0.18, 0.26, p);
       about.phase = phase;
       // the scroll walks the hand round the dial, unless a trade was picked a moment ago
-      const fromScroll = Math.min(TRADES - 1, Math.max(0, Math.floor(((p - 0.28) / 0.4) * TRADES)));
+      let fromScroll = Math.min(TRADES - 1, Math.max(0, Math.floor(((p - TRADES_FROM) / TRADES_SPAN) * TRADES)));
+      // a trade further on than the last one in: the page stops at the start of the next one's
+      // stretch (not wherever the wheel had got to: that may be two trades on) and holds there
+      // while it comes in. Not when the page is only passing through, or was put here
+      const lenis = getLenis();
+      if (lenis && held < 0 && lastSeen >= 0 && fromScroll > lastSeen && !rig.dark && !rig.reducedMotion && rig.time >= rig.jump.until && phase >= 1) {
+        fromScroll = lastSeen + 1;
+        const a = anchor('maker');
+        lenis.scrollTo(a.top + (a.height - rig.vh) * (TRADES_FROM + (TRADES_SPAN * fromScroll) / TRADES + 0.004), { immediate: true, force: true });
+        lenis.stop();
+        held = rig.time;
+      }
       // then the type steps aside, and the camera dives into the clock
       const out = smoothstep(ZOOM_FROM, ZOOM_FROM + 0.05, p);
       const pickedLive = about.picked >= 0 && rig.time - about.pickedAt < 6 && Math.abs(rig.velocity) < 400;
@@ -121,6 +153,7 @@ export default function AboutFx({ className, children }: { className?: string; c
 
     return () => {
       off();
+      release();
       ro.disconnect();
       cancelAnimationFrame(queued);
       buttons.forEach((b) => b.removeEventListener('click', onClick));

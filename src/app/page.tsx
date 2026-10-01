@@ -3,6 +3,7 @@ import AboutFx from '@/components/dom/AboutFx';
 import ContactPlates from '@/components/dom/ContactPlates';
 import Flourish from '@/components/dom/Flourish';
 import Footer from '@/components/dom/Footer';
+import Prepaint from '@/components/dom/Prepaint';
 import LocalTime from '@/components/dom/LocalTime';
 import ReelDeck from '@/components/dom/ReelDeck';
 import SayHi from '@/components/dom/SayHi';
@@ -83,7 +84,7 @@ export default function Home() {
           {/* the trades: the clock in the middle and the five set out round it, each with its tools
               on plates, at the place on the dial the hand points to. Each comes in as the hand
               comes round to it, and stays; the one it is on is lit */}
-          <div className={s.trades} data-about="skills">
+          <div className={s.trades} data-about="skills" data-prepaint>
             <header className={s.tradesHead}>
               <h2 className={`t-display ${s.h2} ${s.tradesTitle}`}>
                 Five trades, <em>one clock</em>
@@ -152,7 +153,7 @@ export default function Home() {
       {/* (the radio is not on the page: it stands beside it, see components/dom/Radio) */}
 
       {/* the last screen: it stands behind the film, and is seen through the last frame on the way out */}
-      <div className={s.last} data-last>
+      <div className={s.last} data-last data-prepaint>
         {/* Contact: say hi */}
         <section id="contact" data-anchor="contact" className={s.finale} aria-labelledby="contact-title">
           <SayHi className={s.sayhi} id="contact-title" />
@@ -164,6 +165,9 @@ export default function Home() {
 
         <Footer />
       </div>
+
+      {/* the type that lies over the 3D, painted once under the loader (see the component) */}
+      <Prepaint />
     </>
   );
 }

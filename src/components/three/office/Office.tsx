@@ -2,18 +2,28 @@
 
 import { Environment, Lightformer, useTexture } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { smootherstep, smoothstep } from '@/lib/math';
 import { MODELS, preloadModel, useModel } from '@/lib/models';
 import { APPROACH, office } from '@/lib/office';
 import { rig } from '@/lib/rig';
 import { applyPose, makePose } from '../bench/tube';
+import { mergeStatic } from './merge';
 import { damaskWallpaper, persianRug } from './patterns';
 import { buildSign } from './sign';
 import { ROOM, WINDOW, buildRoom } from './room';
 
 export const OFFICE_FOV = 36;
+/**
+ * A narrow screen gets a wider lens: the view is never less than this far across (degrees), so a
+ * phone still sees a room's width, and the word across it, not a slice through a long lens.
+ */
+const MIN_ACROSS = 30;
+const viewFov = (aspect: number) =>
+  Math.max(OFFICE_FOV, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(MIN_ACROSS) / 2) / aspect)));
+/** how far across the view is where the word was sized for it (the lens above, on a 1.75 screen), as a tangent */
+const SIGN_ACROSS = Math.tan(THREE.MathUtils.degToRad(OFFICE_FOV) / 2) * 1.75;
 /** the desk: its middle, and the height of its top */
 const DESK = { x: 0.1, z: -1.2, top: 0.78 };
 /** the old camera on the desk: how tall it stands (metres), and how far it is turned toward the door */
@@ -162,6 +172,167 @@ function makeSky() {
   return sky;
 }
 
+type World = { group: THREE.Group; box: THREE.Box3; dust: THREE.Points; mixer: THREE.AnimationMixer; lens: typeof office.lens; sign: THREE.Group };
+type Model = { scene: THREE.Object3D; animations: THREE.AnimationClip[] };
+type Drawable = CanvasImageSource & { width: number; height: number };
+
+/** A photo, decoded off the main thread before it is drawn (drawn undecoded, it is decoded there and then). */
+const decoded = (img: unknown) => (typeof HTMLImageElement !== 'undefined' && img instanceof HTMLImageElement ? img.decode().catch(() => {}) : Promise.resolve());
+
+/**
+ * The room arrives while the page is already up, and may be scrolling: it is built in small steps,
+ * and between them the frame goes back to the browser whenever a few milliseconds of work have
+ * gone, so building it never holds a frame up.
+ */
+function pacer(budget = 4) {
+  let since = performance.now();
+  return async () => {
+    if (performance.now() - since < budget) return;
+    await new Promise<void>((r) => setTimeout(r, 0));
+    since = performance.now();
+  };
+}
+
+/** Build the room: once per set of models (the models themselves are moved into it). */
+async function buildOffice(textures: THREE.Texture[], models: Model[]): Promise<World> {
+  const [paperD, paperN, paperA, panelD, panelN, panelA, floorD, floorN, floorA, ceilD, ceilN, carpetD, carpetN, carpetA] = textures;
+  const [desk, win, clock, shelf, books, lamp, lens, chairA, chairB, broken, cam] = models;
+  const rest = pacer();
+  for (const t of [paperD, panelD, floorD, ceilD, carpetD]) t.colorSpace = THREE.SRGBColorSpace;
+  for (const t of [paperN, paperA, panelN, panelA, floorN, floorA, ceilN, carpetN, carpetA]) t.colorSpace = THREE.NoColorSpace;
+  // (the two photos the patterns are drawn over, decoded off the main thread first)
+  await Promise.all([decoded(paperD.image), decoded(carpetD.image)]);
+  const wallpaper = await damaskWallpaper(paperD.image as Drawable, rest);
+  const rug = await persianRug(carpetD.image as Drawable, rest);
+  const room = buildRoom({
+    paper: { map: wallpaper, normal: paperN, arm: paperA },
+    panel: { map: panelD, normal: panelN, arm: panelA },
+    floor: { map: floorD, normal: floorN, arm: floorA },
+    ceiling: { map: ceilD, normal: ceilN },
+    rug: { map: rug, normal: carpetN, arm: carpetA },
+  });
+  const g = room.group;
+  await rest();
+
+  // the desk, its drawers toward the room; the camera lies on it
+  const d = stand(desk.scene, { height: DESK.top });
+  d.rotation.y = -Math.PI / 2;
+  d.position.set(DESK.x, 0, DESK.z);
+  g.add(d);
+  await rest();
+
+  // the window, in its opening; its glass takes no part in the shadows, its blinds do
+  const w = stand(win.scene, { scale: 1.02 });
+  w.rotation.y = Math.PI / 2;
+  w.position.set(ROOM.x0 + 0.02, WINDOW.y0 - 0.02, WINDOW.z);
+  w.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && /Glass/.test((m.material as THREE.Material).name)) {
+      m.castShadow = false;
+      (m.material as THREE.MeshStandardMaterial).opacity = 0.12;
+    }
+  });
+  g.add(w);
+  await rest();
+
+  // the grandfather clock and the bookshelf against the back wall
+  const c = stand(clock.scene, { height: 2.15 });
+  c.position.set(2.05, 0, ROOM.z0 + 0.3);
+  c.rotation.y = -0.12;
+  g.add(c);
+  const s = stand(shelf.scene, { height: 2.05 });
+  s.position.set(-1.75, 0, ROOM.z0 + 0.24);
+  // its paint is washed out: stain it to go with the desk
+  s.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh) {
+      const mat = (m.material as THREE.MeshStandardMaterial).clone();
+      mat.color.set('#94684a');
+      m.material = mat;
+    }
+  });
+  g.add(s);
+  await rest();
+  // fill its shelves with the encyclopaedia, a row or two to a shelf, some leaning
+  const sw = s.userData.size as THREE.Vector3;
+  const levels = [0.07, 0.245, 0.42, 0.595, 0.77];
+  for (let i = 0; i < levels.length; i++) {
+    const f = levels[i];
+    const rows = i === 2 ? 1 : 2;
+    for (let r = 0; r < rows; r++) {
+      const b = stand(books.scene, { clone: true, height: 0.24 + (i % 2) * 0.03 });
+      const bw = (b.userData.size as THREE.Vector3).x;
+      b.position.set(s.position.x - sw.x * 0.45 + bw / 2 + r * (bw + 0.03) + (i % 3) * 0.03, sw.y * f + 0.02, s.position.z + 0.02);
+      if (r === 1 && i === 3) b.rotation.z = -0.12;
+      if (b.position.x + bw / 2 < s.position.x + sw.x * 0.46) g.add(b);
+      await rest();
+    }
+  }
+
+  // the chair, pushed back and turned aside as if someone just got up (and out of the camera's
+  // way as it goes for the lens); a carved one waits by the wall
+  const a = stand(chairA.scene, { height: 1.05 });
+  a.position.set(DESK.x + 0.95, 0, DESK.z + 1.05);
+  a.rotation.y = Math.PI - 0.75;
+  g.add(a);
+  const bch = stand(chairB.scene, { height: 1.12 });
+  bch.position.set(2.55, 0, 0.35);
+  bch.rotation.y = -Math.PI / 2 - 0.35;
+  g.add(bch);
+  await rest();
+
+  // on the desk: the oil lamp, the magnifying glass, a few volumes
+  const l = stand(lamp.scene, { height: 0.56 });
+  l.position.set(DESK.x - 0.62, DESK.top, DESK.z - 0.12);
+  g.add(l);
+  const m = stand(lens.scene, { height: 0.26 });
+  m.rotation.set(-Math.PI / 2, 0, 0.6);
+  m.position.set(DESK.x + 0.55, DESK.top + 0.02, DESK.z + 0.12);
+  g.add(m);
+  const deskBooks = stand(books.scene, { clone: true, height: 0.2 });
+  deskBooks.scale.x *= 0.35;
+  deskBooks.position.set(DESK.x + 0.6, DESK.top, DESK.z - 0.22);
+  deskBooks.rotation.y = -0.25;
+  g.add(deskBooks);
+  await rest();
+
+  // and the old camera, in the middle of the desk, its lens turned a little toward the door
+  const cm = stand(cam.scene, { height: CAMERA.height });
+  cm.rotation.y = CAMERA.yaw;
+  cm.position.set(DESK.x - 0.05, DESK.top, DESK.z + 0.05);
+  g.add(cm);
+  g.updateMatrixWorld(true);
+  const body = cm.userData.size as THREE.Vector3;
+  const glass = {
+    center: cam.scene.localToWorld(new THREE.Vector3(LENS.x, LENS.y, LENS.z)),
+    normal: new THREE.Vector3(0, 0, 1).transformDirection(cam.scene.matrixWorld),
+    radius: LENS.r * cam.scene.getWorldScale(new THREE.Vector3()).x,
+    body: new THREE.Vector2(body.x, body.y),
+    ready: true,
+  };
+
+  // over the desk, the broken clock from the way in: a copy of it, its wheels still turning
+  const bc = broken.scene.clone(true);
+  const p = stand(bc, { height: 0.95 });
+  p.position.set(DESK.x - 0.05, 1.28, ROOM.z0 + 0.1);
+  g.add(p);
+  const mixer = new THREE.AnimationMixer(bc);
+  broken.animations.forEach((a) => mixer.clipAction(a).play());
+
+  await rest();
+  const sky = makeSky();
+  g.add(sky);
+  const dust = makeDust(420);
+  g.add(dust);
+  // the word the view flies through on its way across (placed on the flight, see below)
+  const sign = (await buildSign(rest)).group;
+  g.add(sign);
+  // nothing else in here moves: every mesh that shares a material becomes one (the hundreds of
+  // books, the mouldings, the furniture's parts), leaving the clock's turning wheels and the word
+  await mergeStatic(g, [p, sign, sky], rest);
+  return { group: g, box: room.box, dust, mixer, lens: glass, sign };
+}
+
 /**
  * The office behind the clock: a detective's room in the late afternoon. The sun comes in low
  * through the broken blinds, laying stripes over the rug and the desk and hanging in the dusty air;
@@ -191,131 +362,22 @@ export default function Office() {
   const broken = useModel(MODELS.brokenClock);
   const cam = useModel(MODELS.camera);
 
-  const world = useMemo(() => {
-    // built once per set of models: the models themselves are moved into the room, so a second
-    // build (React may run this twice) must hand back the first rather than steal them from it
-    type World = { group: THREE.Group; box: THREE.Box3; dust: THREE.Points; mixer: THREE.AnimationMixer; lens: typeof office.lens; sign: THREE.Group };
-    const cached = desk.scene.userData.office as World | undefined;
-    if (cached) return cached;
-    for (const t of [paperD, panelD, floorD, ceilD, carpetD]) t.colorSpace = THREE.SRGBColorSpace;
-    for (const t of [paperN, paperA, panelN, panelA, floorN, floorA, ceilN, carpetN, carpetA]) t.colorSpace = THREE.NoColorSpace;
-    const room = buildRoom({
-      paper: { map: damaskWallpaper(paperD.image as CanvasImageSource & { width: number; height: number }), normal: paperN, arm: paperA },
-      panel: { map: panelD, normal: panelN, arm: panelA },
-      floor: { map: floorD, normal: floorN, arm: floorA },
-      ceiling: { map: ceilD, normal: ceilN },
-      rug: { map: persianRug(carpetD.image as CanvasImageSource & { width: number; height: number }), normal: carpetN, arm: carpetA },
-    });
-    const g = room.group;
-
-    // the desk, its drawers toward the room; the camera lies on it
-    const d = stand(desk.scene, { height: DESK.top });
-    d.rotation.y = -Math.PI / 2;
-    d.position.set(DESK.x, 0, DESK.z);
-    g.add(d);
-
-    // the window, in its opening; its glass takes no part in the shadows, its blinds do
-    const w = stand(win.scene, { scale: 1.02 });
-    w.rotation.y = Math.PI / 2;
-    w.position.set(ROOM.x0 + 0.02, WINDOW.y0 - 0.02, WINDOW.z);
-    w.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh && /Glass/.test((m.material as THREE.Material).name)) {
-        m.castShadow = false;
-        (m.material as THREE.MeshStandardMaterial).opacity = 0.12;
-      }
-    });
-    g.add(w);
-
-    // the grandfather clock and the bookshelf against the back wall
-    const c = stand(clock.scene, { height: 2.15 });
-    c.position.set(2.05, 0, ROOM.z0 + 0.3);
-    c.rotation.y = -0.12;
-    g.add(c);
-    const s = stand(shelf.scene, { height: 2.05 });
-    s.position.set(-1.75, 0, ROOM.z0 + 0.24);
-    // its paint is washed out: stain it to go with the desk
-    s.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        const mat = (m.material as THREE.MeshStandardMaterial).clone();
-        mat.color.set('#94684a');
-        m.material = mat;
-      }
-    });
-    g.add(s);
-    // fill its shelves with the encyclopaedia, a row or two to a shelf, some leaning
-    const sw = s.userData.size as THREE.Vector3;
-    const levels = [0.07, 0.245, 0.42, 0.595, 0.77];
-    levels.forEach((f, i) => {
-      const rows = i === 2 ? 1 : 2;
-      for (let r = 0; r < rows; r++) {
-        const b = stand(books.scene, { clone: true, height: 0.24 + (i % 2) * 0.03 });
-        const bw = (b.userData.size as THREE.Vector3).x;
-        b.position.set(s.position.x - sw.x * 0.45 + bw / 2 + r * (bw + 0.03) + (i % 3) * 0.03, sw.y * f + 0.02, s.position.z + 0.02);
-        if (r === 1 && i === 3) b.rotation.z = -0.12;
-        if (b.position.x + bw / 2 < s.position.x + sw.x * 0.46) g.add(b);
-      }
-    });
-
-    // the chair, pushed back and turned aside as if someone just got up (and out of the camera's
-    // way as it goes for the lens); a carved one waits by the wall
-    const a = stand(chairA.scene, { height: 1.05 });
-    a.position.set(DESK.x + 0.95, 0, DESK.z + 1.05);
-    a.rotation.y = Math.PI - 0.75;
-    g.add(a);
-    const bch = stand(chairB.scene, { height: 1.12 });
-    bch.position.set(2.55, 0, 0.35);
-    bch.rotation.y = -Math.PI / 2 - 0.35;
-    g.add(bch);
-
-    // on the desk: the oil lamp, the magnifying glass, a few volumes
-    const l = stand(lamp.scene, { height: 0.56 });
-    l.position.set(DESK.x - 0.62, DESK.top, DESK.z - 0.12);
-    g.add(l);
-    const m = stand(lens.scene, { height: 0.26 });
-    m.rotation.set(-Math.PI / 2, 0, 0.6);
-    m.position.set(DESK.x + 0.55, DESK.top + 0.02, DESK.z + 0.12);
-    g.add(m);
-    const deskBooks = stand(books.scene, { clone: true, height: 0.2 });
-    deskBooks.scale.x *= 0.35;
-    deskBooks.position.set(DESK.x + 0.6, DESK.top, DESK.z - 0.22);
-    deskBooks.rotation.y = -0.25;
-    g.add(deskBooks);
-
-    // and the old camera, in the middle of the desk, its lens turned a little toward the door
-    const cm = stand(cam.scene, { height: CAMERA.height });
-    cm.rotation.y = CAMERA.yaw;
-    cm.position.set(DESK.x - 0.05, DESK.top, DESK.z + 0.05);
-    g.add(cm);
-    g.updateMatrixWorld(true);
-    const body = cm.userData.size as THREE.Vector3;
-    const glass = {
-      center: cam.scene.localToWorld(new THREE.Vector3(LENS.x, LENS.y, LENS.z)),
-      normal: new THREE.Vector3(0, 0, 1).transformDirection(cam.scene.matrixWorld),
-      radius: LENS.r * cam.scene.getWorldScale(new THREE.Vector3()).x,
-      body: new THREE.Vector2(body.x, body.y),
-      ready: true,
+  // the room is built once per set of models, and in small steps between frames (see buildOffice):
+  // until it is there, there is simply no office yet
+  const [world, setWorld] = useState<World | null>(() => (desk.scene.userData.office as World | undefined) ?? null);
+  useEffect(() => {
+    if (world) return;
+    let live = true;
+    const data = desk.scene.userData as { office?: World; officeJob?: Promise<World> };
+    data.officeJob ??= buildOffice(
+      [paperD, paperN, paperA, panelD, panelN, panelA, floorD, floorN, floorA, ceilD, ceilN, carpetD, carpetN, carpetA],
+      [desk, win, clock, shelf, books, lamp, lens, chairA, chairB, broken, cam],
+    ).then((w) => (data.office = w));
+    data.officeJob.then((w) => live && setWorld(w));
+    return () => {
+      live = false;
     };
-
-    // over the desk, the broken clock from the way in: a copy of it, its wheels still turning
-    const bc = broken.scene.clone(true);
-    const p = stand(bc, { height: 0.95 });
-    p.position.set(DESK.x - 0.05, 1.28, ROOM.z0 + 0.1);
-    g.add(p);
-    const mixer = new THREE.AnimationMixer(bc);
-    broken.animations.forEach((a) => mixer.clipAction(a).play());
-
-    g.add(makeSky());
-    const dust = makeDust(420);
-    g.add(dust);
-    // the word the view flies through on its way across (placed on the flight, see below)
-    const sign = buildSign().group;
-    g.add(sign);
-    const built = { group: g, box: room.box, dust, mixer, lens: glass, sign };
-    desk.scene.userData.office = built;
-    return built;
-  }, [paperD, paperN, paperA, panelD, panelN, panelA, floorD, floorN, floorA, ceilD, ceilN, carpetD, carpetN, carpetA, desk, win, clock, shelf, books, lamp, lens, chairA, chairB, broken, cam]);
+  }, [world, paperD, paperN, paperA, panelD, panelN, panelA, floorD, floorN, floorA, ceilD, ceilN, carpetD, carpetN, carpetA, desk, win, clock, shelf, books, lamp, lens, chairA, chairB, broken, cam]);
 
   // the sun, and a few small lights of the room's own
   const sun = useMemo(() => {
@@ -339,6 +401,7 @@ export default function Office() {
   const lampLight = useRef<THREE.PointLight>(null);
 
   useEffect(() => {
+    if (!world) return;
     gl.shadowMap.enabled = true;
     gl.shadowMap.type = THREE.PCFShadowMap;
     // nothing in the room moves: the shadow map is drawn when asked, not every frame
@@ -393,10 +456,11 @@ export default function Office() {
       applyPose(camera, pose, rig.vw, rig.vh);
       return;
     }
-    if (rig.route !== 'home' || office.mix <= 0 || !office.lens.ready) return;
+    if (!world || rig.route !== 'home' || office.mix <= 0 || !office.lens.ready) return;
     const g = office.lens;
-    const tanHalf = Math.tan(THREE.MathUtils.degToRad(OFFICE_FOV) / 2);
     const aspect = rig.vw / rig.vh;
+    const fov = viewFov(aspect);
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
     // square in front of the lens with the whole camera in view (on a narrow screen, its width
     // decides); then into the glass, until its black is more than the view
     const front = Math.max(g.body.y / (0.62 * 2 * tanHalf), g.body.x / (0.8 * 2 * tanHalf * aspect));
@@ -412,7 +476,7 @@ export default function Office() {
     path.pos.getPoint(CROSS, path.sp);
     path.look.getPoint(CROSS, path.st);
     const yaw = Math.atan2(path.sp.x - path.st.x, path.sp.z - path.st.z);
-    const size = SIGN_CAP * Math.min(1, Math.max(0.3, aspect / 1.75));
+    const size = SIGN_CAP * Math.min(1, (tanHalf * aspect) / SIGN_ACROSS);
     const key = `${path.sp.x.toFixed(4)},${path.sp.z.toFixed(4)},${size.toFixed(4)}`;
     if (key !== path.signKey) {
       path.signKey = key;
@@ -443,13 +507,13 @@ export default function Office() {
     path.m.lookAt(path.p, path.t, THREE.Object3D.DEFAULT_UP);
     pose.quaternion.setFromRotationMatrix(path.m);
     pose.offX = pose.offY = 0;
-    pose.fov = OFFICE_FOV;
+    pose.fov = fov;
     applyPose(camera, pose, rig.vw, rig.vh);
   }, -1);
 
   // the room's own life: the lamp's flame, the clock's wheels, the dust
   useFrame((_, dt) => {
-    if (office.mix <= 0) return;
+    if (!world || office.mix <= 0) return;
     world.mixer.update(dt * 0.55);
     const f = 1 + Math.sin(rig.time * 9.3) * 0.04 + Math.sin(rig.time * 23.1) * 0.03;
     if (lampLight.current) lampLight.current.intensity = 1.6 * f;
@@ -469,7 +533,7 @@ export default function Office() {
         <Lightformer form="rect" intensity={0.5} color="#8a7a70" position={[6, 1, 2]} rotation-y={-Math.PI / 2} scale={[6, 3, 1]} />
         <Lightformer form="rect" intensity={0.5} color="#8a6a50" position={[0, 1.5, 6]} rotation-y={Math.PI} scale={[8, 3, 1]} />
       </Environment>
-      <primitive object={world.group} />
+      {world && <primitive object={world.group} />}
       <primitive object={sun} />
       <primitive object={sun.target} />
       {/* the room lit by the afternoon it lets in: a warm fill from above, and the glow the sun

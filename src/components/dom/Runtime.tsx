@@ -83,6 +83,7 @@ function measureAll() {
   // where the landing's words end, at rest (the shift they take as the camera dives, taken back out)
   const title = document.getElementById('hero-title');
   rig.copyRight = 0;
+  rig.copyTop = 0;
   if (title?.parentElement) {
     // the words themselves, not their boxes (the wordmark's box runs the full width)
     const range = document.createRange();
@@ -94,8 +95,12 @@ function measureAll() {
       right = Math.max(right, range.getBoundingClientRect().right);
     }
     const t = getComputedStyle(title.parentElement).transform;
-    const shift = t && t !== 'none' ? new DOMMatrixReadOnly(t).m41 : 0;
-    if (right > 0) rig.copyRight = right - shift;
+    const m = t && t !== 'none' ? new DOMMatrixReadOnly(t) : null;
+    if (right > 0) rig.copyRight = right - (m?.m41 ?? 0);
+    // and where they start, down the page (the wordmark's cap line, not the top of its line box)
+    const mark = title.querySelector<HTMLElement>('[data-clip]') ?? title;
+    const r = mark.getBoundingClientRect();
+    if (r.height > 0) rig.copyTop = r.top + y - (m?.m42 ?? 0);
   }
 }
 

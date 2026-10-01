@@ -79,6 +79,7 @@ function heroFraming(aspect: number) {
     // portrait: the machine sits in the upper half, the copy below; the narrower the screen, the
     // further back the camera stands, so the whole case and its mouse always fit across
     // (the case is turned to the left, so the camera stands a little left of it to centre it)
+    // (this is where the camera stands; the case itself is then fitted to its room, see fitAbove)
     const back = Math.pow(0.8 / Math.max(aspect, 0.34), 1.05);
     return { n: 11.6 * back, r: -0.55, u: 1.9 + (back - 1) * 1.2, tr: -0.35, tu: -0.2, offX: 0, offY: 0.14 };
   }
@@ -105,32 +106,58 @@ const _fit = { offX: 0, offY: 0, fov: BENCH_FOV };
  * from `position` looking at `target`. It only ever zooms out, never in.
  */
 function fitHero(position: THREE.Vector3, target: THREE.Vector3, aspect: number) {
-  _probe.fov = BENCH_FOV;
-  _probe.aspect = aspect;
-  _probe.position.copy(position);
-  _probe.lookAt(target);
-  _probe.updateProjectionMatrix();
-  _probe.updateMatrixWorld();
-  let xl = Infinity;
-  let xr = -Infinity;
-  let yb = Infinity;
-  let yt = -Infinity;
-  for (const c of tube.box) {
-    _pc.copy(c).project(_probe);
-    xl = Math.min(xl, _pc.x);
-    xr = Math.max(xr, _pc.x);
-    yb = Math.min(yb, _pc.y);
-    yt = Math.max(yt, _pc.y);
-  }
+  const b = caseBounds(position, target, aspect);
   // the room: from a little past the words (or, unmeasured, the widest they can be) to near the edge
   const W = rig.vw;
   const copy = rig.copyRight > 0 ? rig.copyRight : clamp(0.042 * W, 20, 72) + Math.min(640, 0.46 * W);
   const l = ((copy + 0.04 * W) / W) * 2 - 1;
   const r = 0.9;
   // at most three quarters of the height
-  const s = Math.min(1, (r - l) / (xr - xl), 1.5 / (yt - yb));
-  _fit.offX = ((s * (xl + xr)) / 2 - (l + r) / 2) / 2;
-  _fit.offY = -(s * (yb + yt)) / 4;
+  const s = Math.min(1, (r - l) / (b.xr - b.xl), 1.5 / (b.yt - b.yb));
+  _fit.offX = ((s * (b.xl + b.xr)) / 2 - (l + r) / 2) / 2;
+  _fit.offY = -(s * (b.yb + b.yt)) / 4;
+  _fit.fov = 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(BENCH_FOV) / 2) / s));
+  return _fit;
+}
+
+const _bounds = { xl: 0, xr: 0, yb: 0, yt: 0 };
+
+/** Where the open case shows (feet to handle, the trackball aside), seen from `position` looking at `target`. */
+function caseBounds(position: THREE.Vector3, target: THREE.Vector3, aspect: number) {
+  _probe.fov = BENCH_FOV;
+  _probe.aspect = aspect;
+  _probe.position.copy(position);
+  _probe.lookAt(target);
+  _probe.updateProjectionMatrix();
+  _probe.updateMatrixWorld();
+  const b = _bounds;
+  b.xl = b.yb = Infinity;
+  b.xr = b.yt = -Infinity;
+  for (const c of tube.box) {
+    _pc.copy(c).project(_probe);
+    b.xl = Math.min(b.xl, _pc.x);
+    b.xr = Math.max(b.xr, _pc.x);
+    b.yb = Math.min(b.yb, _pc.y);
+    b.yt = Math.max(b.yt, _pc.y);
+  }
+  return b;
+}
+
+/**
+ * Over the words (a phone, a tablet held upright): the open case is fitted into the room between
+ * the site's bar and the landing's type, as big as fits there (nearly the full width, its
+ * trackball left to run off the side), in the middle of it. Here the lens zooms in as well as out.
+ */
+function fitAbove(position: THREE.Vector3, target: THREE.Vector3, aspect: number) {
+  const b = caseBounds(position, target, aspect);
+  const H = rig.vh;
+  // (unmeasured, the words start a little under two thirds of the way down)
+  const words = rig.copyTop > 0 ? rig.copyTop : 0.64 * H;
+  const top = 1 - (2 * 84) / H;
+  const bottom = 1 - (2 * Math.max(84 + 0.2 * H, words - 0.035 * H)) / H;
+  const s = clamp(Math.min(1.84 / (b.xr - b.xl), (top - bottom) / (b.yt - b.yb)), 0.5, 2.4);
+  _fit.offX = (s * (b.xl + b.xr)) / 4;
+  _fit.offY = -((s * (b.yb + b.yt)) / 2 - (top + bottom) / 2) / 2;
   _fit.fov = 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(BENCH_FOV) / 2) / s));
   return _fit;
 }
@@ -147,8 +174,9 @@ export function heroPose(aspect: number, px: number, py: number, time: number, l
   _t0.copy(focus).addScaledVector(X, f.tr).addScaledVector(Y, f.tu);
   // beside the words the case is fitted to the room they leave, measured from where the camera
   // rests (so the parallax still moves it); where the words sit under it, it keeps its framing
-  if (aspect > 21 / 20 && tube.ready && rig.vw > 100) {
-    const fit = fitHero(_ps.copy(C).addScaledVector(Z, f.n).addScaledVector(X, f.r).addScaledVector(Y, f.u), _t0, aspect);
+  if ((aspect > 21 / 20 || aspect < 0.8) && tube.ready && rig.vw > 100) {
+    _ps.copy(C).addScaledVector(Z, f.n).addScaledVector(X, f.r).addScaledVector(Y, f.u);
+    const fit = aspect < 0.8 ? fitAbove(_ps, _t0, aspect) : fitHero(_ps, _t0, aspect);
     return { position: _p0, target: _t0, offX: fit.offX, offY: fit.offY, fov: fit.fov };
   }
   return { position: _p0, target: _t0, offX: f.offX, offY: f.offY, fov: BENCH_FOV };

@@ -10,7 +10,7 @@ import { MODELS, useModel } from '@/lib/models';
 import { office } from '@/lib/office';
 import { rig, sectionVisible, stageBox } from '@/lib/rig';
 import { buildFrameKit } from '../works/frameKit';
-import { normalize } from '../works/util';
+import { normalize, setCursor } from '../works/util';
 import { portraitMaterial } from './portrait';
 
 /** Sizes of the two pieces at scale 1, filled in when they load. */
@@ -82,11 +82,11 @@ function Portrait({ into }: { into: React.RefObject<THREE.Group | null> }) {
         onPointerOver={(e) => {
           move(e);
           lens.current.hover = true;
-          document.documentElement.style.cursor = 'zoom-in';
+          setCursor('zoom-in');
         }}
         onPointerOut={() => {
           lens.current.hover = false;
-          document.documentElement.style.cursor = '';
+          setCursor('');
         }}
       />
     </group>

@@ -7,6 +7,9 @@
 //   --cpu 4      slow the CPU down four times (Chrome's throttling), like a cheap laptop or phone
 //   --hold       keep the quality fixed (no adaptive resolution), to measure one setting honestly
 //   --gputime    also time the GPU (costs a little CPU itself, so off by default)
+//   --delta 110 --every 45   the wheel: px a notch, ms between notches (400/16 = flung, 30/45 = slow)
+//   --wait 2500  how long after the page is up the scroll starts (ms)
+//   --trace      also record a Chrome trace, and say what the browser was doing in every long task
 //
 // Needs the site running (dev or `next start`). Prints a table and writes the raw frames as JSON.
 import fs from 'node:fs/promises';
@@ -47,7 +50,7 @@ const t0 = Date.now();
 await page.goto(url, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction("window.__app && window.__app.getState().stage === 'ready'", { timeout: 240000, polling: 250 });
 const loadMs = Date.now() - t0;
-await new Promise((r) => setTimeout(r, 2500));
+await new Promise((r) => setTimeout(r, Number(args.wait ?? 2500)));
 if (args.hold) await page.evaluate(() => (window.__perf.locked = true));
 
 // scroll down the page with the wheel, as a person would: a notch every 45 ms
@@ -56,10 +59,19 @@ await page.evaluate((gpu) => {
   window.__perf.record = [];
   window.__perf.gpuTiming = gpu;
 }, !!args.gputime);
+const traceFile = args.trace ? path.join(out, `trace-${Date.now()}.json`) : null;
+if (traceFile) {
+  await fs.mkdir(out, { recursive: true });
+  await page.tracing.start({ path: traceFile, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'cc', 'gpu', 'gpu.angle', 'disabled-by-default-gpu.decoder', 'disabled-by-default-gpu.service', 'media', 'v8.execute'] });
+}
+const delta = Number(args.delta ?? 110);
+const every = Number(args.every ?? 45);
 const started = Date.now();
-for (let i = 0; i < 2000; i++) {
-  await page.mouse.wheel({ deltaY: 110 });
-  await new Promise((r) => setTimeout(r, 45));
+for (let i = 0; i < 6000; i++) {
+  await page.mouse.wheel({ deltaY: delta });
+  await new Promise((r) => setTimeout(r, every));
+  // (where the page is, written into the trace, to place its long tasks)
+  if (traceFile && i % 4 === 0) await page.evaluate(() => console.timeStamp(`at ${Math.round(window.__rig.scroll)}`));
   if (i % 20 === 0) {
     const done = await page.evaluate(() => window.__rig.scroll >= window.__rig.limit - 4);
     if (done) break;
@@ -67,6 +79,7 @@ for (let i = 0; i < 2000; i++) {
   if (Date.now() - started > 180000) break;
 }
 await new Promise((r) => setTimeout(r, 1500));
+if (traceFile) await page.tracing.stop();
 const { frames, tier, dpr, longTasks, gpuTimer } = await page.evaluate(() => ({
   frames: window.__perf.record,
   tier: window.__perf.tier,
@@ -118,3 +131,46 @@ await fs.mkdir(out, { recursive: true });
 const file = path.join(out, `bench-${soft ? 'soft' : 'hw'}${args.cpu ? `-cpu${args.cpu}` : ''}-${w}x${h}-${Date.now()}.json`);
 await fs.writeFile(file, JSON.stringify({ args, loadMs, rows, tier, dpr, frames }, null, 1));
 console.log('frames written to', file);
+
+// ── the trace: every long task on the page's main thread and in the GPU process, where the page
+//    was at the time, and what the browser was doing in it
+if (traceFile) {
+  const trace = JSON.parse(await fs.readFile(traceFile, 'utf8'));
+  const events = (trace.traceEvents ?? trace).filter((e) => e.ts);
+  const names = new Map();
+  for (const e of trace.traceEvents ?? trace) if (e.name === 'thread_name') names.set(`${e.pid}:${e.tid}`, e.args.name);
+  const thread = (e) => names.get(`${e.pid}:${e.tid}`) ?? '';
+  const marks = events.filter((e) => e.name === 'TimeStamp' && String(e.args?.data?.message ?? '').startsWith('at ')).sort((a, b) => a.ts - b.ts);
+  const where = (ts) => {
+    let at = '?';
+    for (const m of marks) {
+      if (m.ts > ts) break;
+      at = m.args.data.message.slice(3);
+    }
+    return at;
+  };
+  const main = marks.length ? `${marks[0].pid}:${marks[0].tid}` : '';
+  const xs = events.filter((e) => e.ph === 'X' && e.dur).sort((a, b) => a.ts - b.ts);
+  const top = /^(ThreadControllerImpl::RunTask|RunTask)$/;
+  const quiet = /^(ThreadControllerImpl|RunTask|TaskQueueManager|SequenceManager|ProcessTask|Scheduler|MessageLoop|SimpleWatcher|Mojo|HandlePostMessage|FrameBlameContext|PipelineReporter|BeginMainThreadFrame|ThreadProxy)/;
+  const min = Number(args.long ?? 28) * 1000;
+  const lines = [];
+  for (const kind of ['main', 'gpu']) {
+    const mine = xs.filter((e) => (kind === 'main' ? `${e.pid}:${e.tid}` === main : /CrGpuMain|VizCompositorThread/.test(thread(e))));
+    if (!marks.length) break;
+    for (const t of mine.filter((e) => top.test(e.name) && e.dur >= min && e.ts >= marks[0].ts)) {
+      const inside = new Map();
+      for (const e of mine) {
+        if (e.ts < t.ts || e.ts + e.dur > t.ts + t.dur || e === t || quiet.test(e.name)) continue;
+        const d = e.args?.data ?? {};
+        const what = e.name === 'FunctionCall' ? `FunctionCall ${d.functionName || ''} ${String(d.url ?? '').split('/').pop()}` : e.name;
+        inside.set(what, Math.max(inside.get(what) ?? 0, e.dur));
+      }
+      const parts = [...inside].sort((a, b) => b[1] - a[1]).slice(0, Number(args.depth ?? 5)).map(([k, v]) => `${k} ${(v / 1000).toFixed(0)}`);
+      lines.push(`${kind.padEnd(4)} ${(t.dur / 1000).toFixed(0).padStart(4)} ms @${where(t.ts).padStart(6)}px  ${parts.join(' · ')}`);
+    }
+  }
+  console.log(`\nlong tasks (≥ ${min / 1000} ms):`);
+  console.log(lines.join('\n') || '  none');
+  if (!args.keep) await fs.unlink(traceFile);
+}

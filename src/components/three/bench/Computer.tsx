@@ -11,6 +11,7 @@ import { sfx } from '@/audio/sfx';
 import { KEY_ALIASES, KEY_ROWS, charForCode } from './keymap';
 import type { LumenOS } from './LumenOS';
 import { tube } from './tube';
+import { setCursor } from '../works/util';
 
 preloadModel(MODELS.computer);
 
@@ -330,7 +331,7 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
       b.dragging = true;
       b.lx = e.clientX;
       b.ly = e.clientY;
-      document.documentElement.style.cursor = 'grabbing';
+      setCursor('grabbing');
       const move = (ev: PointerEvent) => {
         const dx = ev.clientX - b.lx;
         const dy = ev.clientY - b.ly;
@@ -342,7 +343,7 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
       };
       const up = () => {
         b.dragging = false;
-        document.documentElement.style.cursor = '';
+        setCursor('');
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
       };
@@ -356,16 +357,18 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
     const code = capFromEvent(e);
     let o: THREE.Object3D | null = e.object;
     while (o && o !== m.ball) o = o.parent;
-    if (code || o) document.documentElement.style.cursor = o ? 'grab' : 'pointer';
+    if (code || o) setCursor(o ? 'grab' : 'pointer');
   };
   const onPointerOut = () => {
-    if (!ballSpin.current.dragging) document.documentElement.style.cursor = '';
+    if (!ballSpin.current.dragging) setCursor('');
   };
 
   const _wp = useMemo(() => new THREE.Vector3(), []);
   useFrame((_, dt) => {
     const g = group.current;
     if (!g) return;
+    // (once its tube is found: inside the tube, and on the other pages, the machine is not drawn)
+    if (tube.ready && (rig.route !== 'home' || (rig.dive >= 0.9995 && rig.exit === 0))) return;
     const dive = Math.max(rig.dive, 1 - rig.intro, rig.exit > 0 ? 1 - rig.exit : 0);
 
     m.mixer.update(dt);

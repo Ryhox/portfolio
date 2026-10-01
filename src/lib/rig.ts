@@ -60,6 +60,8 @@ export const rig = {
   dark: false,
   /** Where the landing's words end (CSS px from the left, at rest), for the hero framing to keep clear of; 0 = unknown. */
   copyRight: 0,
+  /** Where the landing's words start (CSS px from the top, at rest), for the hero framing over them to keep clear of; 0 = unknown. */
+  copyTop: 0,
 
   anchors: new Map<string, Anchor>(),
   stages: new Map<string, Stage>(),

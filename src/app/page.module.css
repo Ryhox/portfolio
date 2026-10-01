@@ -234,7 +234,8 @@
 .aboutBio {
   grid-area: text;
   min-width: 0;
-  opacity: var(--bio, 1);
+  /* gone by half-way through the change to the trades, whose type only then comes in */
+  opacity: clamp(0, calc(var(--bio, 1) * 2 - 1), 1);
   transform: translate3d(calc((1 - var(--bio, 1)) * -40px), 0, 0);
   pointer-events: none;
 }
@@ -257,6 +258,9 @@
    The layer spans the whole pinned frame; only its type fades, so the clock's box is measured true. */
 .trades {
   --clock: min(64vh, 40vw);
+  /* the type comes in over the second half of the change from the maker's half, once the portrait
+     and its words are on their way out, so the two never sit on top of each other */
+  --in: clamp(0, calc(var(--skills, 0) * 2 - 1), 1);
   position: relative;
   grid-area: 1 / 1 / -1 / -1;
   align-self: stretch;
@@ -277,7 +281,7 @@
 .tradesHead,
 .tradeItem {
   min-width: 0;
-  opacity: var(--skills, 0);
+  opacity: var(--in);
   transform: translate3d(calc((1 - var(--skills, 0)) * var(--from, 40px)), 0, 0);
 }
 .tradesHead {
@@ -311,7 +315,7 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  opacity: var(--skills, 0);
+  opacity: var(--in);
 }
 .leads path {
   fill: none;
@@ -365,7 +369,7 @@
   text-align: left;
   /* not all at once: a trade comes in when the hand first comes round to it (the line from the
      dial goes out, then the trade is there), and it stays; winding back takes it away again */
-  opacity: calc(var(--skills, 0) * var(--seen, 0));
+  opacity: calc(var(--in) * var(--seen, 0));
   translate: calc((1 - var(--seen, 0)) * var(--from, 40px) * -0.35) 0;
   transition:
     --seen 0.3s ease-in,
@@ -676,9 +680,26 @@
     display: none;
   }
 
+  /* a thumb goes a screen at a time: every stretch of the journey is shorter here, so the way
+     down the page is about a quarter less to scroll */
+  .dive {
+    height: 105vh;
+  }
+  .about {
+    height: 430vh;
+  }
+  .office {
+    height: 150vh;
+  }
+  .works {
+    --leave: 95vh;
+    height: calc(var(--plates) * 62vh + var(--leave) + 100vh);
+  }
+
+  /* the portrait has the bigger half: it is the picture here, the words go under it */
   .about .sticky {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 34fr) minmax(0, 66fr);
+    grid-template-rows: minmax(0, 55fr) minmax(0, 45fr);
     grid-template-areas: 'art' 'text';
     row-gap: 2vh;
     align-items: start;

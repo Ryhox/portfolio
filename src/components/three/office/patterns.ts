@@ -4,9 +4,22 @@ import * as THREE from 'three';
  * The office's printed surfaces, drawn once on canvases: a Victorian damask for the walls and a
  * Persian rug for the floor. Each is laid over a photographed surface (the stained paper, the
  * carpet's weave) so it reads as a real, worn thing rather than a clean graphic.
+ *
+ * They are made while the page is already up and may be scrolling, so the pixel work (a million
+ * and more pixels each) is done a strip at a time, with a `rest` between strips that hands the
+ * frame back to the browser whenever a few milliseconds have gone.
  */
 
 type Drawable = CanvasImageSource & { width: number; height: number };
+type Rest = () => Promise<void>;
+
+/** A canvas whose pixels are read back: kept in memory, not on the GPU, so reading them is no wait. */
+const canvas = (w: number, h: number) => {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return [c, c.getContext('2d', { willReadFrequently: true })!] as const;
+};
 
 const texture = (c: HTMLCanvasElement, repeat = true) => {
   const t = new THREE.CanvasTexture(c);
@@ -19,26 +32,34 @@ const texture = (c: HTMLCanvasElement, repeat = true) => {
 };
 
 /** Multiply a canvas by the luminance of a photo (normalised round 1), for grime and weave. */
-function grain(g: CanvasRenderingContext2D, photo: Drawable, w: number, h: number, strength: number, tiles = 1) {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  const p = c.getContext('2d')!;
+async function grain(g: CanvasRenderingContext2D, photo: Drawable, w: number, h: number, strength: number, rest: Rest, tiles = 1) {
+  const [, p] = canvas(w, h);
   for (let y = 0; y < tiles; y++) for (let x = 0; x < tiles; x++) p.drawImage(photo, (x * w) / tiles, (y * h) / tiles, w / tiles, h / tiles);
+  await rest();
   const src = p.getImageData(0, 0, w, h).data;
+  await rest();
   const img = g.getImageData(0, 0, w, h);
   const d = img.data;
+  await rest();
   let mean = 0;
   for (let i = 0; i < src.length; i += 16) mean += src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11;
   mean /= src.length / 16;
-  for (let i = 0; i < d.length; i += 4) {
-    const l = (src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11) / mean;
-    const k = 1 + (l - 1) * strength;
-    d[i] = Math.min(255, d[i] * k);
-    d[i + 1] = Math.min(255, d[i + 1] * k);
-    d[i + 2] = Math.min(255, d[i + 2] * k);
+  await rest();
+  // a strip of rows at a time
+  const strip = w * 4 * 48;
+  for (let from = 0; from < d.length; from += strip) {
+    const to = Math.min(d.length, from + strip);
+    for (let i = from; i < to; i += 4) {
+      const l = (src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11) / mean;
+      const k = 1 + (l - 1) * strength;
+      d[i] = Math.min(255, d[i] * k);
+      d[i + 1] = Math.min(255, d[i + 1] * k);
+      d[i + 2] = Math.min(255, d[i + 2] * k);
+    }
+    await rest();
   }
   g.putImageData(img, 0, 0);
+  await rest();
 }
 
 /** One half of a damask ornament, drawn about x = 0 (it is mirrored for the other half). */
@@ -84,11 +105,9 @@ function damask(g: CanvasRenderingContext2D, x: number, y: number, s: number) {
  * The wallpaper: dark green damask, the motifs in a half-drop repeat, a faint gilt line between
  * the stripes, all under the water stains and wear of the photographed paper.
  */
-export function damaskWallpaper(stains: Drawable) {
+export async function damaskWallpaper(stains: Drawable, rest: Rest) {
   const N = 1024;
-  const c = document.createElement('canvas');
-  c.width = c.height = N;
-  const g = c.getContext('2d')!;
+  const [c, g] = canvas(N, N);
   g.fillStyle = '#304a3d';
   g.fillRect(0, 0, N, N);
   // four columns of motifs, every other one dropped by half
@@ -106,8 +125,9 @@ export function damaskWallpaper(stains: Drawable) {
     // a thin gilt rule between the columns
     g.fillStyle = 'rgba(150, 124, 70, 0.22)';
     g.fillRect(Math.round(cw * i) - 1, 0, 2, N);
+    await rest();
   }
-  grain(g, stains, N, N, 0.9);
+  await grain(g, stains, N, N, 0.9, rest);
   return texture(c);
 }
 
@@ -116,14 +136,11 @@ export function damaskWallpaper(stains: Drawable) {
  * between ivory guard stripes, and a short fringe at the ends (alpha, for alphaTest). The weave
  * comes from the photographed carpet.
  */
-export function persianRug(weave: Drawable) {
+export async function persianRug(weave: Drawable, rest: Rest) {
   const W = 1024;
   const H = 1536;
   const FR = 40; // fringe
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const g = c.getContext('2d')!;
+  const [c, g] = canvas(W, H);
   const ivory = '#d8c7a0';
   const navy = '#1b2440';
   const crimson = '#6e1a17';
@@ -181,6 +198,7 @@ export function persianRug(weave: Drawable) {
     rosette(band, y, 26, 8, rust, ivory);
     rosette(W - band, y, 26, 8, rust, ivory);
   }
+  await rest();
   // the field: a small lattice of flowers on crimson
   const fx0 = B + 14;
   const fy0 = top + B + 14;
@@ -201,6 +219,8 @@ export function persianRug(weave: Drawable) {
     g.stroke();
   }
   for (let y = fy0 + 32; y < fy0 + fh; y += 64) for (let x = fx0 + 32; x < fx0 + fw; x += 64) rosette(x, y, 9, 6, 'rgba(216, 199, 160, 0.55)', navy);
+  // (the clip is kept across the rest: the canvas is this function's own)
+  await rest();
   // corner pieces: quarter medallions
   const corner = (cx: number, cy: number) => {
     for (const [r, col] of [
@@ -264,7 +284,8 @@ export function persianRug(weave: Drawable) {
   g.fillStyle = wear;
   g.fillRect(0, top, W, h);
   g.restore();
-  grain(g, weave, W, H, 0.75, 3);
+  await rest();
+  await grain(g, weave, W, H, 0.75, rest, 3);
   const t = texture(c, false);
   return t;
 }

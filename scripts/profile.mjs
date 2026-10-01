@@ -3,6 +3,8 @@
 //   node scripts/profile.mjs --url http://localhost:3000/?qa --from maker:0.9 --to works:0.15 [--gpu soft] [--top 30]
 //
 // --from / --to: an anchor name and how far into it (0..1 of its height), or a pixel offset.
+// --wheel: come down the page from the top with the mouse wheel, as a visitor (and the benchmark)
+//          does, and profile only between --from and --to (so first-time costs there are caught).
 // Best run against the dev server: function names are intact there.
 import fs from 'node:fs/promises';
 import puppeteer from 'puppeteer-core';
@@ -35,15 +37,29 @@ const pos = (spec) =>
   }, String(spec));
 const from = await pos(args.from ?? 0);
 const to = await pos(args.to ?? 3000);
-await page.evaluate((y) => window.__lenis.scrollTo(y, { immediate: true, force: true }), from);
-await new Promise((r) => setTimeout(r, 1500));
-
 const cdp = await page.createCDPSession();
 await cdp.send('Profiler.enable');
 await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
-await cdp.send('Profiler.start');
-await page.evaluate((y) => window.__lenis.scrollTo(y, { duration: 3, force: true }), to);
-await new Promise((r) => setTimeout(r, Number(args.ms ?? 4500)));
+if (args.wheel) {
+  await page.mouse.move(430, 450);
+  let on = false;
+  for (let i = 0; i < 4000; i++) {
+    await page.mouse.wheel({ deltaY: Number(args.delta ?? 110) });
+    await new Promise((r) => setTimeout(r, Number(args.every ?? 45)));
+    const y = await page.evaluate(() => window.__rig.scroll);
+    if (!on && y >= from) {
+      on = true;
+      await cdp.send('Profiler.start');
+    }
+    if (on && y >= to) break;
+  }
+} else {
+  await page.evaluate((y) => window.__lenis.scrollTo(y, { immediate: true, force: true }), from);
+  await new Promise((r) => setTimeout(r, 1500));
+  await cdp.send('Profiler.start');
+  await page.evaluate((y) => window.__lenis.scrollTo(y, { duration: 3, force: true }), to);
+  await new Promise((r) => setTimeout(r, Number(args.ms ?? 4500)));
+}
 const { profile } = await cdp.send('Profiler.stop');
 await browser.close();
 

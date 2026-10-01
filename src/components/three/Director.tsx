@@ -6,7 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { clamp, invLerp, smootherstep, smoothstep, spring } from '@/lib/math';
 import { office } from '@/lib/office';
-import { rig } from '@/lib/rig';
+import { anchor, rig } from '@/lib/rig';
 import { useApp } from '@/lib/store';
 import { warmup } from '@/lib/warmup';
 import Bench from './bench/Bench';
@@ -98,7 +98,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       window.clearTimeout(id);
     };
   }, []);
-  const clock = useRef({ office: 'wait' as 'wait' | 'warming' | 'ready', officeCompiled: false, reel: 'wait' as 'wait' | 'warming' | 'ready', reelCompiled: false, compiled: false, worksCompiled: false, frames: 0, perfT: 0, perfN: 0, good: 0, primed: false, tiered: false, skip: false, checkT: 0, sig: '', stable: 0, dirty: true });
+  const clock = useRef({ office: 'wait' as 'wait' | 'warming' | 'ready', officeCompiled: false, officeDraw: null as null | (() => boolean), reel: 'wait' as 'wait' | 'warming' | 'ready', reelCompiled: false, reelDraw: null as null | (() => boolean), compiled: false, worksCompiled: false, frames: 0, perfT: 0, perfN: 0, good: 0, primed: false, tiered: false, skip: false, checkT: 0, sig: '', stable: 0, dirty: true, still: 0 });
 
   useEffect(() => () => pipeline.dispose(), [pipeline]);
 
@@ -150,11 +150,20 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
     fitContent(aspect);
 
     // ── warm-up under the loader: textures a couple per frame, programs compiled asynchronously
-    warmup.step(gl);
+    // what arrives after the page is up (the office, the film) still has work for the GPU: every
+    // texture handed over, and every program's first draw, holds it for up to a few hundredths of a
+    // second, whatever else is on screen. Under the loader that is free. After it, it waits for a
+    // moment nothing is moving: the landing played out and the page held still (then a held frame
+    // is not seen). Only if the visitor never stops on the way down is it done regardless, from
+    // the About on: the office is next, and there it would all land in one frame
+    c.still = Math.abs(rig.velocity) < 30 ? c.still + dt : 0;
+    const calm = st.stage === 'boot' || !home || (rig.intro >= 1 && (c.still > 0.15 || (rig.anchors.has('maker') && rig.scroll > anchor('maker').top)));
+    if (calm) warmup.step(gl, st.stage === 'boot');
     if (tube.ready && !c.compiled) {
       c.compiled = true;
       warmup.add(benchScene);
       warmup.compile(gl, benchScene, benchCam, pipeline.bench).then(() => useApp.getState().setBenchReady(true));
+      pipeline.warm();
     }
     // the loader's count, from the real work: downloads, then uploads and compiles, then settling
     if (st.stage === 'boot') {
@@ -207,26 +216,34 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       }
     }
 
-    // ── the office, arriving after the page is up: its textures uploaded a few a frame, its
-    //    programs compiled in the background, then one unseen draw at a moment the visitor is still
+    // ── the office, arriving after the page is up: its photos decoded off the main thread, its
+    //    textures uploaded a few a frame, its programs compiled in the background, and then its
+    //    first draw taken a few objects a frame, unseen, at moments the page is held still (or,
+    //    for someone scrolling straight down from the landing, from the About on: see above)
     if (office.loaded && c.office === 'wait' && !warmup.loading) {
       c.office = 'warming';
       warmup.add(officeScene);
       warmup.compile(gl, officeScene, officeCam, pipeline.office).then(() => (c.officeCompiled = true));
-    } else if (c.office === 'warming' && c.officeCompiled && warmup.idle() && Math.abs(rig.velocity) < 40) {
-      c.office = 'ready';
-      gl.shadowMap.needsUpdate = true;
-      warmup.prime(gl, officeScene, officeCam, pipeline.office);
-      office.shadowDirty = true;
+    } else if (c.office === 'warming' && c.officeCompiled && warmup.idle() && (calm || office.mix > 0)) {
+      c.officeDraw ??= warmup.slices(gl, officeScene, officeCam, pipeline.office, true);
+      // (already in the room: it is being drawn for real)
+      if (office.mix > 0 || c.officeDraw()) {
+        c.office = 'ready';
+        c.officeDraw = null;
+        office.shadowDirty = true;
+      }
     }
     // the loop of film inside the camera arrives with the office, and is warmed up the same way
     if (reel.loaded && c.reel === 'wait' && !warmup.loading) {
       c.reel = 'warming';
       warmup.add(reelScene);
       warmup.compile(gl, reelScene, reelCam, pipeline.works).then(() => (c.reelCompiled = true));
-    } else if (c.reel === 'warming' && c.reelCompiled && warmup.idle() && Math.abs(rig.velocity) < 40) {
-      c.reel = 'ready';
-      warmup.prime(gl, reelScene, reelCam, pipeline.works);
+    } else if (c.reel === 'warming' && c.reelCompiled && warmup.idle() && (calm || reel.on)) {
+      c.reelDraw ??= warmup.slices(gl, reelScene, reelCam, pipeline.works);
+      if (reel.on || c.reelDraw()) {
+        c.reel = 'ready';
+        c.reelDraw = null;
+      }
     }
 
     // ── the landing: the watch drops, the camera cranes after it, the lamp catches, the tube powers on
@@ -332,7 +349,9 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
           office.shadowDirty = false;
         }
         sway(officeCam, pan);
-        pipeline.renderOffice(officeScene, officeCam);
+        // (seen only through the clock's hub so far: only that much of it is drawn)
+        const through = inOffice && !office.full && pan <= 0.0005 ? office.portal : null;
+        pipeline.renderOffice(officeScene, officeCam, through);
         // the light through the window: fewer steps on slower machines, none on the slowest
         if (office.sun && perf.tier < 3) {
           const drawn = pipeline.renderBeams({
@@ -343,6 +362,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
             density: 0.085,
             steps: perf.tier >= 2 ? 10 : perf.tier === 1 ? 14 : 22,
             time: t,
+            portal: through,
           });
           if (drawn) beam = 1;
         }

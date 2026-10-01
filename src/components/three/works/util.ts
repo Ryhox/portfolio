@@ -29,6 +29,33 @@ export function findAncestor<T extends THREE.Object3D>(o: THREE.Object3D | null,
   return null;
 }
 
+let want = '';
+let under: HTMLElement | null = null;
+let on: HTMLElement | null = null;
+const apply = () => {
+  const el = want ? under : null;
+  if (on && on !== el) on.style.cursor = '';
+  on = el;
+  if (on && on.style.cursor !== want) on.style.cursor = want;
+};
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      under = e.target instanceof HTMLElement ? e.target : null;
+      if (want) apply();
+    },
+    { passive: true },
+  );
+}
+
+/**
+ * The pointer's shape over something in the 3D. The canvas takes no pointer itself (the page over
+ * it does), so the shape is put on whatever element of the page is under the pointer, and follows
+ * it. Put on the document's root instead it is inherited by everything, and every change of it
+ * restyles the whole page: most of a frame, each time the pointer crosses a key or a picture.
+ */
 export function setCursor(c: string) {
-  document.documentElement.style.cursor = c;
+  want = c;
+  apply();
 }

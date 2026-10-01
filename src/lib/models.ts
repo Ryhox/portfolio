@@ -27,7 +27,19 @@ function tune(scene: THREE.Object3D) {
   scene.traverse((o) => {
     const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
     if (!m) return;
-    for (const mat of Array.isArray(m) ? m : [m]) if (mat.transparent && mat.side === THREE.DoubleSide) mat.forceSinglePass = true;
+    for (const mat of Array.isArray(m) ? m : [m]) {
+      // glass that bends what is behind it makes three draw everything else in the scene a second
+      // time, every frame, to have a picture to bend: for a lens lying on a desk that doubled the
+      // office's whole cost. Here glass is plain, clear glass
+      const glass = mat as THREE.MeshPhysicalMaterial;
+      if (glass.transmission > 0) {
+        glass.transmission = 0;
+        glass.transparent = true;
+        glass.opacity = Math.min(glass.opacity, 0.28);
+        glass.depthWrite = false;
+      }
+      if (mat.transparent && mat.side === THREE.DoubleSide) mat.forceSinglePass = true;
+    }
   });
 }
 
