@@ -9,7 +9,7 @@ import { clamp, damp, lerp, smoothstep } from '@/lib/math';
 import { office } from '@/lib/office';
 import { PLATES, reel, wind } from '@/lib/reel';
 import { rig } from '@/lib/rig';
-import { toScreen } from '../pipeline/project';
+import { toScreen, toScreenFar } from '../pipeline/project';
 import { CURVE, bendPointer } from '../pipeline/shaders';
 import { setCursor } from '../works/util';
 import { ASPECT, PICTURE, RADIUS, browserBar, frameGeometry, heading, stripAt, frameMaterial, glyphAtlas, sharedUniforms, titleCard } from './film';
@@ -46,6 +46,29 @@ const POOL = 17;
 const DEG = Math.PI / 180;
 
 /**
+ * The way out (lib/reel's `leave`): the view goes into the picture at the gate, which clears as it
+ * comes, and on through the film, stopping THROUGH past it (in spiral radii). The last screen
+ * stands behind the film, as far back as makes it FAR of its size from where the view starts.
+ */
+const THROUGH = 0.25;
+const FAR = 0.5;
+const BACK = (FAR * DIST + THROUGH) / (1 - FAR);
+/** points to a side of the picture's outline (the opening the last screen is seen through) */
+const SIDE = 8;
+
+/** Whether an outline (x, y, x, y, … in px) is wider than the whole view: its four corners lie inside it. */
+function covers(pts: number[], w: number, h: number) {
+  for (const [x, y] of [[0, 0], [w, 0], [0, h], [w, h]]) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 2; i < pts.length; j = i, i += 2) {
+      if (pts[i + 1] > y !== pts[j + 1] > y && x < ((pts[j] - pts[i]) * (y - pts[i + 1])) / (pts[j + 1] - pts[i + 1]) + pts[i]) inside = !inside;
+    }
+    if (!inside) return false;
+  }
+  return true;
+}
+
+/**
  * How much of a frame shows: all of it, everywhere (the far side of the spiral is simply in shadow,
  * see the film's shader); only past a whole turn, well out of sight, is it let go.
  */
@@ -62,7 +85,7 @@ type Film = { video: HTMLVideoElement; tex: THREE.VideoTexture; ready: boolean; 
  */
 function makeBackdrop() {
   const m = new THREE.ShaderMaterial({
-    uniforms: { uAspect: { value: 1 } },
+    uniforms: { uAspect: { value: 1 }, uShow: { value: 1 } },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
       void main() {
@@ -74,6 +97,7 @@ function makeBackdrop() {
       precision highp float;
       varying vec2 vUv;
       uniform float uAspect;
+      uniform float uShow;
       void main() {
         // (linear light: these are the site's soot at the top and a lamp-lit umber at the foot)
         vec3 top = vec3(0.0026, 0.0019, 0.0014);
@@ -81,10 +105,12 @@ function makeBackdrop() {
         vec3 col = mix(low, top, smoothstep(0.0, 0.9, vUv.y));
         vec2 c = (vUv - vec2(0.5, 0.46)) * vec2(uAspect, 1.0);
         col += vec3(0.016, 0.009, 0.0045) * exp(-dot(c, c) * 2.2);
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, uShow);
       }
     `,
     depthWrite: false,
+    // (on the way out it gives way to the inner world, drawn under it)
+    transparent: true,
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m);
   mesh.frustumCulled = false;
@@ -121,7 +147,8 @@ function makeDust(count: number) {
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vA = (0.25 + 0.75 * seed) * (0.6 + 0.4 * sin(uTime * (0.6 + seed) + seed * 20.0));
         gl_Position = projectionMatrix * mv;
-        gl_PointSize = uPx * (0.8 + seed * 1.8) / -mv.z;
+        // (a speck the view flies close by stays a speck)
+        gl_PointSize = min(uPx * (0.8 + seed * 1.8) / -mv.z, uPx * 4.0);
       }
     `,
     fragmentShader: /* glsl */ `
@@ -254,31 +281,75 @@ export default function Reel() {
     const want = Math.min(box.w * lerp(0.8, 0.33, wide), Math.min(vh * 0.42, box.h * 0.72) * ASPECT);
     const chord = 2 * HALF;
     const fov = 2 * Math.atan((chord * vh) / (2 * DIST * RADIUS * want));
+    // the way out: straight at the picture at the gate, and through the film
+    const out = reel.leave;
+    const go = out * out * (3 - 2 * out);
     camera.fov = THREE.MathUtils.radToDeg(fov);
     camera.aspect = aspect;
     camera.near = 0.05;
     camera.far = 20;
-    camera.position.set(0, 0, DIST * RADIUS);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(0, 0, lerp(DIST, -THROUGH, go) * RADIUS);
+    camera.rotation.set(0, 0, 0);
     camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
     // the gate in the middle of its box: shift the picture (not the view), through the glass's curve
-    const cx = ((box.x + box.w / 2) / vw) * 2 - 1;
-    const cy = 1 - ((box.y + box.h * 0.5) / vh) * 2;
+    // (on the way out the view's own middle comes to the middle of the screen, where the last screen's is)
+    const cx = (((box.x + box.w / 2) / vw) * 2 - 1) * (1 - go);
+    const cy = (1 - ((box.y + box.h * 0.5) / vh) * 2) * (1 - go);
     const [sx, sy] = bendPointer(cx, cy, CURVE, aspect);
     const e = camera.projectionMatrix.elements;
     e[8] = -sx;
     e[9] = -sy;
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 
-    // the spiral leans a little toward the pointer, round the gate
+    // the spiral leans a little toward the pointer, round the gate (and squares up for the way out)
     const { pivot } = built;
-    pivot.rotation.set(damp(pivot.rotation.x, -rig.pointer.sy * 0.03, 3, rig.dt), damp(pivot.rotation.y, rig.pointer.sx * 0.06, 3, rig.dt), 0);
+    const lean = 1 - smoothstep(0, 0.25, out);
+    pivot.rotation.set(damp(pivot.rotation.x, -rig.pointer.sy * 0.03 * lean, 3, rig.dt), damp(pivot.rotation.y, rig.pointer.sx * 0.06 * lean, 3, rig.dt), 0);
     pivot.updateMatrixWorld(true);
     built.shared.uDrum.value.copy(built.drum.matrixWorld);
 
-    // where the gate's picture is on screen, for the buttons under it
+    // the way out, for the page: the picture at the gate clears into an opening, and the last
+    // screen stands behind the film, seen through it at the size its distance makes it
+    const hole = reel.hole;
+    const last = reel.last;
+    hole.pts.length = 0;
+    if (out > 0 && out < 1) {
+      last.scale = (BACK - THROUGH) / (camera.position.z / RADIUS + BACK);
+      last.x = (cx * vw) / 2;
+      last.y = (-cy * vh) / 2;
+      // (only once the film has come to rest on its last frame)
+      last.show = smoothstep(0.32, 0.56, out) * (1 - smoothstep(0.05, 0.6, Math.abs(reel.pos - reel.display)));
+      // the picture's outline, wherever the film has it, as the glass shows it
+      const off = Math.round(reel.display) - reel.display;
+      let seen = true;
+      const point = (a: number, y: number) => {
+        const p = stripAt(a + off);
+        tmp.v.set(p.x, y + p.y, p.z - RADIUS).applyMatrix4(pivot.matrixWorld);
+        if (seen && toScreenFar(tmp.v, camera, tmp.s)) hole.pts.push(tmp.s[0], tmp.s[1]);
+        else seen = false;
+      };
+      const { half, h } = PICTURE;
+      for (let i = 0; i < SIDE; i++) point(lerp(-half, half, i / SIDE), h);
+      for (let i = 0; i < SIDE; i++) point(half, lerp(h, -h, i / SIDE));
+      for (let i = 0; i < SIDE; i++) point(lerp(half, -half, i / SIDE), -h);
+      for (let i = 0; i < SIDE; i++) point(-half, lerp(-h, h, i / SIDE));
+      // wider than the whole view (or the view is at the film, or through it): no edge is left to see
+      hole.open = !seen || covers(hole.pts, vw, vh);
+      if (hole.open) hole.pts.length = 0;
+    } else {
+      last.scale = 1;
+      last.x = last.y = 0;
+      last.show = out >= 1 ? 1 : 0;
+      hole.open = out >= 1;
+    }
+
+    // where the gate's picture is on screen, for the buttons under it (they are gone on the way out)
     const g = reel.gate;
+    if (reel.leaving) {
+      g.ok = false;
+      return;
+    }
     let l = Infinity;
     let r = -Infinity;
     let t = Infinity;
@@ -326,10 +397,20 @@ export default function Reel() {
     const on = reel.on;
     const time = rig.time;
     built.shared.uTime.value = time;
-    (built.backdrop.material as THREE.ShaderMaterial).uniforms.uAspect.value = rig.vw / rig.vh;
+    const bm = built.backdrop.material as THREE.ShaderMaterial;
+    bm.uniforms.uAspect.value = rig.vw / rig.vh;
     const dm = built.dust.material as THREE.ShaderMaterial;
     dm.uniforms.uTime.value = time;
     dm.uniforms.uPx.value = rig.vh * 0.01 * rig.dpr;
+    // the way out: the dust settles before the picture has cleared, and once the view is through
+    // the film the dark in here gives way to the inner world (drawn under it, see the director)
+    const out = reel.leave;
+    const open = out > 0 && reel.hole.open;
+    dm.uniforms.uFade.value = 1 - smoothstep(0.3, 0.5, out);
+    bm.uniforms.uShow.value = 1 - reel.world;
+    // (while leaving the film is drawn from the gate outward, so nothing shows through the clearing
+    // picture but what is really behind it, and the dust after the film)
+    built.dust.renderOrder = out > 0 ? 100 : 0;
 
     // the recordings: the one at the gate starts loading while the camera is still crossing the office
     const plate = reel.plate;
@@ -400,7 +481,10 @@ export default function Reel() {
       const sAt = k - w;
       const a = heading(sAt);
       const vis = visibility(a);
-      fr.mesh.visible = vis > 0.004 && sAt + 0.5 > CUT;
+      const gate = Math.abs(sAt) < 0.5;
+      // (once the picture at the gate is wider than the view, the rest of the film is behind it)
+      fr.mesh.visible = vis > 0.004 && sAt + 0.5 > CUT && (gate || !open);
+      fr.mesh.renderOrder = out > 0 ? Math.abs(sAt) : 0;
       fr.mesh.rotation.y = a;
       fr.mesh.position.y = stripAt(sAt).y;
       fr.k = k;
@@ -428,19 +512,20 @@ export default function Reel() {
         const [fx0, fy0] = (focus ?? '50% 50%').split(' ').map((v) => parseFloat(v) / 100);
         u.uFocus.value.set(fx0, 1 - fy0);
       }
-      const gate = Math.abs(sAt) < 0.5;
       u.uCode.value = gate ? fx.code : 0;
       u.uLive.value = gate ? fx.live : 0;
       u.uNone.value = gate ? fx.none : 0;
       u.uBar.value = gate ? bar.drop : 0;
       u.uLoad.value = gate ? loaded : 0;
+      // its picture clears on the way out; an opening only once nothing else is left in view
+      u.uClear.value = !gate || out <= 0 ? 0 : open && reel.last.show >= 1 ? 1 : Math.min(reel.last.show, 0.999);
     }
   });
 
   // the page's own links and buttons lie over the loop: what they take is theirs
   const onPage = (e: ThreeEvent<MouseEvent>) => !!(e.nativeEvent.target as HTMLElement | null)?.closest?.('a, button');
   const click = (e: ThreeEvent<MouseEvent>) => {
-    if (!reel.on || onPage(e)) return;
+    if (!reel.on || reel.leaving || onPage(e)) return;
     e.stopPropagation();
     const plate = (e.object.userData.plate as number) ?? 0;
     const delta = ((e.object.userData.k as number) ?? 0) - Math.round(reel.display);
@@ -453,7 +538,7 @@ export default function Reel() {
     wind(delta);
   };
   const over = (e: ThreeEvent<PointerEvent>) => {
-    if (!reel.on || onPage(e)) return;
+    if (!reel.on || reel.leaving || onPage(e)) return;
     e.stopPropagation();
     setCursor('pointer');
   };

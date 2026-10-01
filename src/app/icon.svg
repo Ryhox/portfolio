@@ -5,7 +5,6 @@
       <stop offset="1" stop-color="#9c6a33"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#120d08"/>
   <g fill="url(#b)" transform="translate(32 32)">
     <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4"/>
     <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(36)"/>

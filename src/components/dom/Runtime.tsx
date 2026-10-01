@@ -7,6 +7,7 @@ import { chapters, type ChapterId } from '@/content/sections';
 import { onFrame, setLenis, startLoop, stopLoop, getLenis } from '@/lib/loop';
 import { office } from '@/lib/office';
 import { perf } from '@/lib/perf';
+import { reel } from '@/lib/reel';
 import { rig } from '@/lib/rig';
 import { audio } from '@/audio/engine';
 import { useApp } from '@/lib/store';
@@ -39,12 +40,14 @@ function measure() {
   // while the channel-change squeezes the picture, nothing measures true: it is measured once it ends
   const cl = document.documentElement.classList;
   if (cl.contains('crt-off') || cl.contains('crt-on')) return;
-  // the page is moved aside while the view swings to the radio: it is measured where it stands
-  const main = document.getElementById('main');
-  const moved = main?.style.transform ?? '';
-  if (main && moved) main.style.transform = '';
+  // the page is moved aside while the view swings to the radio, and the last screen is held behind
+  // the film on the way out of the projects: they are measured where they stand
+  const moved = [document.getElementById('main'), document.querySelector<HTMLElement>('[data-last]')]
+    .filter((el): el is HTMLElement => !!el?.style.transform)
+    .map((el) => [el, el.style.transform] as const);
+  for (const [el] of moved) el.style.transform = '';
   measureAll();
-  if (main && moved) main.style.transform = moved;
+  for (const [el, t] of moved) el.style.transform = t;
 }
 
 function measureAll() {
@@ -185,6 +188,8 @@ export default function Runtime() {
         // the last screen lies under the Works section's film: it is only reached once that lets go
         if (a && probe >= a.top + (c.id === 'contact' ? rig.vh * 0.5 : 0)) found = c.id;
       }
+      // (or once the view is through the last frame, on its way to it)
+      if (reel.world > 0.5 && rig.anchors.has('contact')) found = 'contact';
       if (rig.dive < 0.98 && found !== 'top' && rig.exit === 0) found = 'top';
       if (found !== current) {
         current = found;

@@ -251,146 +251,304 @@
   color: var(--bone-faint);
 }
 
-/* the trades: the clock in the middle of the frame, the title to its left, one trade to its right.
+/* the trades: the clock in the middle of the frame and all five trades set out round it, each at
+   the place on the dial the hand points to (three down its right, two up its left, the title at
+   the top left), so every one and its tools can be read at a glance; the hand's one is lit.
    The layer spans the whole pinned frame; only its type fades, so the clock's box is measured true. */
 .trades {
+  --clock: min(64vh, 40vw);
+  position: relative;
   grid-area: 1 / 1 / -1 / -1;
   align-self: stretch;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) min(64vh, 40vw) minmax(0, 1fr);
-  grid-template-areas: 'head clock trade';
+  grid-template-columns: minmax(0, 1fr) var(--clock) minmax(0, 1fr);
+  /* a row to each place on the dial, as far apart as the hand's stops are on the rim */
+  grid-template-rows: repeat(3, minmax(min-content, calc(var(--clock) * 0.36)));
+  grid-template-areas:
+    'head clock t0'
+    't4 clock t1'
+    't3 clock t2';
+  align-content: center;
   column-gap: 4vw;
   align-items: center;
   pointer-events: none;
 }
 .tradesHead,
-.trade {
+.tradeItem {
   min-width: 0;
   opacity: var(--skills, 0);
+  transform: translate3d(calc((1 - var(--skills, 0)) * var(--from, 40px)), 0, 0);
 }
 .tradesHead {
+  --from: -40px;
   grid-area: head;
-  transform: translate3d(calc((1 - var(--skills, 0)) * -40px), 0, 0);
+  justify-self: end;
+  text-align: right;
 }
-.trade {
-  grid-area: trade;
-  transform: translate3d(calc((1 - var(--skills, 0)) * 40px), 0, 0);
+.tradesHead .tradesTitle {
+  font-size: clamp(24px, min(4vw, 6.6vh), 76px);
 }
-:global([data-phase='skills']) .trade {
-  pointer-events: auto;
+.tradesTitle em {
+  display: block;
+}
+/* (its cog toward the clock) */
+.tradesHead .flourish {
+  margin-left: auto;
+  margin-bottom: 0;
+  transform: scaleX(-1);
 }
 .clockStage {
   grid-area: clock;
   align-self: stretch;
 }
 
-/* one trade at a time, stacked in the same place: when the hands move on, the old one leaves in a
-   blink and the next is set line by line */
+/* a line from each trade's place on the dial out to its name: faint, and drawn over in brass from
+   the clock outward when the hand comes round to it */
+.leads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: var(--skills, 0);
+}
+.leads path {
+  fill: none;
+  stroke: rgba(235, 225, 203, 0.2);
+  stroke-width: 1;
+}
+.leads path + path {
+  stroke: var(--brass-hi);
+  stroke-width: 1.25;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 0.25s ease-in;
+}
+.leads circle {
+  fill: rgba(235, 225, 203, 0.35);
+  transition: fill 0.3s;
+}
+/* (a trade's line is there once the hand has been round to it) */
+.leads g {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.leads g[data-seen='1'] {
+  opacity: 1;
+}
+.leads g[data-on='1'] path + path {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.7s var(--ease-out) 0.1s;
+}
+.leads g[data-on='1'] circle {
+  fill: var(--brass-hi);
+}
+
+@property --seen {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+/* each trade: its name, its tools on small plates, and (for the one the hand is on) what it is */
 .tradeList {
-  display: grid;
+  display: contents;
 }
 .tradeItem {
-  grid-area: 1 / 1;
+  position: relative;
   display: grid;
-  align-content: center;
-  gap: clamp(10px, 1.6vh, 16px);
+  gap: clamp(8px, 1.3vh, 13px);
+  max-width: min(100%, 380px);
+  justify-self: start;
+  justify-items: start;
+  text-align: left;
+  /* not all at once: a trade comes in when the hand first comes round to it (the line from the
+     dial goes out, then the trade is there), and it stays; winding back takes it away again */
+  opacity: calc(var(--skills, 0) * var(--seen, 0));
+  translate: calc((1 - var(--seen, 0)) * var(--from, 40px) * -0.35) 0;
+  transition:
+    --seen 0.3s ease-in,
+    visibility 0s 0.3s;
   visibility: hidden;
 }
-.tradeItem[data-on='1'],
-.tradeItem[data-state='out'] {
+.tradeItem[data-seen='1'] {
+  --seen: 1;
   visibility: visible;
-}
-.tradeItem > * {
   transition:
-    transform 0.8s var(--ease-out),
-    opacity 0.6s var(--ease-out);
+    --seen 0.7s var(--ease-out) 0.3s,
+    visibility 0s;
 }
-.tradeItem[data-on='1'] > :nth-child(2) {
-  transition-delay: 0.07s;
+.tradeItem:nth-child(1) {
+  grid-area: t0;
 }
-.tradeItem[data-on='1'] > :nth-child(3) {
-  transition-delay: 0.14s;
+.tradeItem:nth-child(2) {
+  grid-area: t1;
 }
-.tradeItem:not([data-on='1']) > * {
-  opacity: 0;
-  transform: translate3d(0, 22px, 0);
-  transition-duration: 0.26s, 0.2s;
+.tradeItem:nth-child(3) {
+  grid-area: t2;
 }
-.tradeItem[data-dir='up']:not([data-on='1']) > * {
-  transform: translate3d(0, -22px, 0);
+.tradeItem:nth-child(4) {
+  grid-area: t3;
 }
-.tradeItem[data-state='out'] > * {
-  transform: translate3d(0, -12px, 0);
+.tradeItem:nth-child(5) {
+  grid-area: t4;
 }
-.tradeItem[data-dir='up'][data-state='out'] > * {
-  transform: translate3d(0, 12px, 0);
+/* the two up the left of the clock are set toward it */
+.tradeItem:nth-child(n + 4) {
+  --from: -40px;
+  justify-self: end;
+  justify-items: end;
+  text-align: right;
+}
+:global([data-phase='skills']) .tradeItem[data-seen='1'] {
+  pointer-events: auto;
 }
 .tradeName {
   font-family: var(--font-display);
   font-weight: 800;
   text-transform: uppercase;
-  font-size: clamp(34px, 3.4vw, 62px);
+  font-size: clamp(22px, min(2.9vw, 4.8vh), 46px);
   line-height: 0.95;
   letter-spacing: 0.01em;
+  color: rgba(235, 225, 203, 0.6);
+  transition: color 0.45s;
+}
+/* the name points the hand at its trade; so does anywhere on the trade */
+.tradeName button {
+  text-transform: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: inherit;
+}
+.tradeName button::after {
+  content: '';
+  position: absolute;
+  inset: -10px -12px;
+}
+.tradeItem:hover .tradeName {
+  color: rgba(235, 225, 203, 0.85);
+}
+.tradeItem[data-on='1'] .tradeName {
   color: var(--bone);
 }
-.tradeLine {
-  max-width: 28ch;
-  font-family: var(--font-text);
-  font-size: clamp(15px, 1.15vw, 18px);
-  line-height: 1.5;
-  color: var(--bone-dim);
-}
+/* the tools: nameplates like the site's buttons, soot with a brass hairline; on the hand's trade
+   they turn to polished brass, one after another */
 .tradeTools {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
-  max-width: 36ch;
+  gap: 6px;
+}
+.tradeItem:nth-child(n + 4) .tradeTools {
+  justify-content: flex-end;
+}
+.tradeTools li {
+  --c: 4px;
+  position: relative;
+  isolation: isolate;
+  padding: 6px 10px 5px;
   font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--brass);
+  font-variation-settings: 'wdth' 112.5;
+  white-space: nowrap;
+  color: var(--bone-dim);
+  background: #120d09;
+  box-shadow: inset 0 0 0 1px rgba(201, 154, 88, 0.42);
+  clip-path: polygon(
+    var(--c) 0,
+    calc(100% - var(--c)) 0,
+    100% var(--c),
+    100% calc(100% - var(--c)),
+    calc(100% - var(--c)) 100%,
+    var(--c) 100%,
+    0 calc(100% - var(--c)),
+    0 var(--c)
+  );
+  transition: color 0.3s;
 }
-/* five marks, like the minutes on a dial: where the hands are, and a way to send them elsewhere */
-.ticks {
-  display: flex;
-  gap: 4px;
-  margin: clamp(22px, 4vh, 40px) 0 0 -6px;
+.tradeTools li::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, #ecc98a 0%, #c99a58 48%, #8e6634 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 225, 0.7),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.3s;
 }
-.tick {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 28px;
+.tradeItem[data-on='1'] .tradeTools li {
+  color: #1a120a;
+  transition-delay: calc(0.08s + var(--k, 0) * 0.06s);
 }
-.tick i {
-  width: 22px;
-  height: 2px;
-  background: rgba(235, 225, 203, 0.2);
+.tradeItem[data-on='1'] .tradeTools li::before {
+  opacity: 1;
+  transition-delay: calc(0.08s + var(--k, 0) * 0.06s);
+}
+.tradeLine {
+  max-width: 30ch;
+  font-family: var(--font-text);
+  font-size: clamp(14px, 1.05vw, 17px);
+  line-height: 1.45;
+  color: var(--bone-dim);
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
   transition:
-    background 0.4s,
-    transform 0.5s var(--ease-out);
+    opacity 0.25s,
+    transform 0.4s var(--ease-out);
 }
-.tick:hover i {
-  background: rgba(235, 225, 203, 0.5);
+.tradeItem[data-on='1'] .tradeLine {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.6s 0.25s,
+    transform 0.7s var(--ease-out) 0.25s;
 }
-.tick[data-on='1'] i {
-  background: var(--brass-hi);
-  transform: scaleY(1.6);
+/* where there is not the room for it, the trades and their tools go without the sentence */
+@media (max-height: 759px), (max-width: 1199px) {
+  .tradeLine {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* ── projects ─────────────────────────────────────────────── */
 
 .works {
   position: relative;
-  /* one screen per plate; the last screen (Say Hi) lies under the film, so the snap opens straight onto it */
-  height: calc(var(--plates) * 86vh + 100vh);
+  /* how much scroll the way out takes: into the last frame and through it (see lib/reel) */
+  --leave: 125vh;
+  /* one screen per plate, then the way out; the last screen (Say Hi) lies under the film, so the
+     view comes through the last frame straight onto it */
+  height: calc(var(--plates) * 86vh + var(--leave) + 100vh);
   margin-bottom: -100vh;
   margin-bottom: -100lvh;
 }
+/* without WebGL there is no film to go through: the last screen simply follows the last plate */
+:global(html[data-nogl]) .works {
+  --leave: 0px;
+}
 .works .sticky {
   isolation: isolate;
+}
+/* as long as the way out (only measured) */
+.leave {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: var(--leave);
+  visibility: hidden;
+  pointer-events: none;
 }
 /* the page over the loop of film (see ReelDeck) */
 .worksText {
@@ -407,7 +565,7 @@
   white-space: nowrap;
 }
 
-/* on the way in, the type waits for the film; the snap takes it with it */
+/* on the way in, the type waits for the film; on the way out it lets go of it */
 .worksText {
   transition: opacity 0.35s;
 }
@@ -416,14 +574,29 @@
   visibility: hidden;
   transition-duration: 0.2s;
 }
+:global(html[data-lens='zoom']) .worksText {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.25s,
+    visibility 0s 0.25s;
+}
 :global(html[data-lens='out']) .worksText {
   opacity: 0;
   visibility: hidden;
   transition: none;
 }
-/* the last screen waits behind the film until the shutter snaps onto it */
-:global(html[data-lens='full']) .finale {
+/* the last screen waits behind the film: not seen until the view goes into the last frame, then
+   through it (the lens view holds it there, see components/dom/LensView), then simply the page */
+.last {
+  position: relative;
+}
+:global(html[data-lens='full']) .last {
   visibility: hidden;
+}
+:global(html[data-lens='zoom']) .last {
+  pointer-events: none;
+  will-change: transform;
 }
 
 /* ── contact ──────────────────────────────────────────────── */
@@ -517,33 +690,80 @@
   .hint {
     display: none;
   }
+  /* the title, the clock, and under it the five trades in a column: each a name and its plates */
   .trades {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas: 'head' 'clock' 'trade';
-    row-gap: 2.4vh;
-    justify-items: center;
+    align-content: stretch;
+    row-gap: 1.8vh;
+  }
+  .tradesHead {
+    --from: 0px;
+    justify-self: center;
     text-align: center;
   }
-  .tradesHead .flourish,
-  .tradeLine,
-  .tradeTools {
+  .tradesHead .tradesTitle {
+    font-size: clamp(30px, 8.4vw, 64px);
+  }
+  .tradesHead .flourish {
     margin-inline: auto;
+    transform: none;
   }
   .clockStage {
     justify-self: stretch;
   }
+  .leads {
+    display: none;
+  }
+  .tradeList {
+    grid-area: trade;
+    display: grid;
+    gap: clamp(7px, 1.3vh, 14px);
+  }
+  .tradeList .tradeItem {
+    --from: 0px;
+    grid-area: auto;
+    grid-template-columns: 31% minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    max-width: none;
+    justify-self: stretch;
+    justify-items: start;
+    text-align: left;
+  }
+  .tradeList .tradeItem .tradeTools {
+    justify-content: flex-start;
+    gap: 4px;
+  }
+  /* (the last one's plates keep clear of the record in the corner) */
+  .tradeList .tradeItem:last-child .tradeTools {
+    padding-right: var(--corner);
+  }
+  .tradesTitle em {
+    display: inline;
+  }
+  .tradeList .tradeItem {
+    translate: 0 calc((1 - var(--seen, 0)) * 10px);
+  }
   .tradeName {
-    font-size: clamp(28px, 7.4vw, 44px);
+    font-size: clamp(15px, 4.5vw, 26px);
   }
-  .tradeTools,
-  .ticks {
-    justify-content: center;
+  .tradeTools li {
+    --c: 3px;
+    padding: 4px 7px 3px;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
   }
-  .ticks {
-    margin: 12px 0 0;
+  .tradeLine {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
-
 }
 
 /* short landscape screens (phones on their side): everything a size down */
@@ -562,14 +782,29 @@
   .hint {
     display: none;
   }
-  .tradeName {
-    font-size: 26px;
+  .tradeItem {
+    gap: 6px;
   }
-  .tradeLine {
-    font-size: 13px;
+  /* a smaller clock, set a little to the left: the three trades down its right get the room, and
+     the plates of the one at the bottom keep clear of the record in the corner */
+  .trades {
+    --clock: min(56vh, 36vw);
+    grid-template-columns: minmax(0, 0.8fr) var(--clock) minmax(0, 1.2fr);
+    column-gap: 3vw;
   }
-  .ticks {
-    margin-top: 10px;
+  .tradesHead .tradesTitle {
+    font-size: clamp(22px, 6vh, 40px);
+  }
+  .tradeItem:nth-child(3) .tradeTools {
+    padding-right: var(--corner);
+  }
+  .tradeTools {
+    gap: 4px;
+  }
+  .tradeTools li {
+    --c: 3px;
+    padding: 4px 8px 3px;
+    font-size: 10px;
   }
   .wordmark {
     font-size: clamp(64px, 22vh, 140px);

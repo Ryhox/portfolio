@@ -10,8 +10,8 @@ import { anchor, pinProgress, rig } from './rig';
  *   Office     ─► the camera crosses the room, through the word hanging in it, to the old camera
  *                 lying on the desk, then goes into its lens until the black glass is all there is
  *   Works      ─► inside the camera: the works on a loop of film (lib/reel), wound on by the scroll
- *   Say Hi     ─► lies under the film; as the Works section ends, the shutter snaps (dark, a
- *                 flash) with the film still up, and the last screen is there
+ *   Say Hi     ─► stands behind the film; past the last plate the view goes into the frame at the
+ *                 gate and through it (lib/reel's `leave`), and the last screen is there
  */
 export const office = {
   /** 0..1: the dive into the hub, over the last stretch of the About section */
@@ -20,8 +20,6 @@ export const office = {
   path: 0,
   /** 0..1: the end of the flight: into the black of the glass, then the first film fades up */
   view: 0,
-  /** past the Works section: the shutter snaps the films away (and back, scrolling up) */
-  out: false,
   /** 0..1: how much of the office shows (through the portal while it opens) */
   mix: 0,
   /** the portal in scene uv, written by the inner world's camera: centre x, y, radius (fraction of height) */
@@ -49,15 +47,6 @@ export const office = {
 export const ZOOM_FROM = 0.72;
 /** where in the office flight the camera stops crossing the room and goes into the screen */
 export const APPROACH = 0.68;
-/** how far past the Works section's end (in viewports) the shutter snaps, and how far back undoes it */
-const SNAP_AT = 0.005;
-const SNAP_BACK = 0.12;
-
-/** The scroll at which the last screen (Say Hi) shows: just past where the shutter snaps the films away. */
-export function lastScreenScroll() {
-  const w = anchor('works');
-  return w.top + w.height - rig.vh + Math.ceil(rig.vh * SNAP_AT * 2) + 1;
-}
 
 export function updateOffice() {
   if (rig.route !== 'home') {
@@ -65,7 +54,6 @@ export function updateOffice() {
     office.mix = 0;
     office.path = 0;
     office.view = 0;
-    office.out = false;
     return;
   }
   office.zoom = smoothstep(ZOOM_FROM, 1, pinProgress('maker'));
@@ -73,12 +61,6 @@ export function updateOffice() {
   const w = anchor('works');
   office.path = clamp(invLerp(o.top - rig.vh, w.top, rig.scroll));
   office.view = smoothstep(0.92, 1, office.path);
-  // the snap is a moment, not a scrub: it fires the moment the films' section lets go
-  if (rig.anchors.has('works')) {
-    const past = (rig.scroll - (w.top + w.height - rig.vh)) / rig.vh;
-    if (!office.out && past > SNAP_AT) office.out = true;
-    else if (office.out && past < -SNAP_BACK) office.out = false;
-  }
   // the office shows from the moment the hub starts to open until the films cover it
   office.mix = office.zoom > 0.001 && office.view < 1 ? 1 : 0;
 }

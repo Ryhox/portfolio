@@ -12,24 +12,3 @@
   pointer-events: none;
   visibility: hidden;
 }
-
-/* the snap: the shutter's dark, then the flash, over the type, under the site's bar */
-.shutter,
-.flash {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100vh;
-  height: 100lvh;
-  opacity: 0;
-  pointer-events: none;
-}
-.shutter {
-  z-index: 40;
-  background: #000;
-}
-.flash {
-  z-index: 41;
-  background: radial-gradient(circle at 50% 50%, #fffaf2 0%, #ffeed6 55%, #f6d3a4 100%);
-}

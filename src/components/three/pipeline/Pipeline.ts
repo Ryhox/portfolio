@@ -315,10 +315,19 @@ export class Pipeline {
     return this.crt.texture;
   }
 
-  renderWorks(scene: THREE.Scene, camera: THREE.Camera) {
+  /** `over`: drawn on top of what the target already holds (only its depth is cleared). */
+  renderWorks(scene: THREE.Scene, camera: THREE.Camera, over = false) {
     this.gl.setRenderTarget(this.works);
-    this.gl.clear();
+    if (!over) {
+      this.gl.clear();
+      this.gl.render(scene, camera);
+      return;
+    }
+    const auto = this.gl.autoClear;
+    this.gl.autoClear = false;
+    this.gl.clearDepth();
     this.gl.render(scene, camera);
+    this.gl.autoClear = auto;
   }
 
   renderOffice(scene: THREE.Scene, camera: THREE.Camera) {

@@ -156,6 +156,7 @@ const frag = /* glsl */ `
   uniform sampler2D tBar;
   uniform float uBar;
   uniform float uLoad;
+  uniform float uClear;
   uniform float uCut;
   varying float vU;
   varying vec2 vUv;
@@ -224,6 +225,9 @@ const frag = /* glsl */ `
     vec2 hi = vec2(1.0 - edge, 1.0 - marg - gap);
     vec2 iuv = (vUv - lo) / (hi - lo);
     bool inPic = all(greaterThanEqual(iuv, vec2(0.0))) && all(lessThanEqual(iuv, vec2(1.0)));
+    // on the way out the picture at the gate clears, like film with nothing on it, until it is
+    // an opening: what stands behind the film shows through it
+    if (inPic && uClear >= 1.0) discard;
     if (inPic) {
       float fa = (uSize.x * (hi.x - lo.x)) / (uSize.y * (hi.y - lo.y));
       vec3 img = picture(cover(iuv, fa));
@@ -289,7 +293,7 @@ const frag = /* glsl */ `
     vec3 L = normalize(vec3(-0.35, 0.8, 0.5));
     float spec = pow(max(dot(N, normalize(L + V)), 0.0), 40.0);
     col += vec3(1.0, 0.82, 0.58) * spec * (inPic ? 0.06 : 0.3) * (outside ? 1.0 : 0.25);
-    gl_FragColor = vec4(col * uFade, uVis);
+    gl_FragColor = vec4(col * uFade, uVis * (inPic ? 1.0 - uClear : 1.0));
   }
 `;
 
@@ -307,6 +311,7 @@ export type FrameUniforms = {
   uU: { value: number };
   uBar: { value: number };
   uLoad: { value: number };
+  uClear: { value: number };
 };
 
 /** What every frame shares (one object each, so a change reaches all of them). */
@@ -340,6 +345,7 @@ export function frameMaterial(shared: ReturnType<typeof sharedUniforms>, seed: n
     uU: { value: 0 },
     uBar: { value: 0 },
     uLoad: { value: 0 },
+    uClear: { value: 0 },
   };
   const m = new THREE.ShaderMaterial({
     vertexShader: vert,

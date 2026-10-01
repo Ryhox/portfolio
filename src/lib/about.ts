@@ -11,5 +11,10 @@ export const about = {
 
 export const TRADES = 5;
 
-/** Where each trade sits on the dial, clockwise from twelve (radians). */
-export const tradeAngle = (i: number) => (i / TRADES) * Math.PI * 2;
+/**
+ * Where each trade sits on the dial, clockwise from twelve (degrees): three down the right of the
+ * clock and two up its left, which is where the page sets them out round it (the title has the
+ * place at the top left). The hand points at the trade itself.
+ */
+const DIAL = [45, 90, 135, 225, 270];
+export const tradeAngle = (i: number) => (DIAL[Math.min(TRADES - 1, Math.max(0, i))] * Math.PI) / 180;

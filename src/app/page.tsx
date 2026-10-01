@@ -80,37 +80,46 @@ export default function Home() {
             <p className={`t-label ${s.hint}`}>Hover the portrait. A loupe finds what is under the paint.</p>
           </div>
 
-          {/* the trades: the clock in the middle, and only the trade its hands point at */}
+          {/* the trades: the clock in the middle and the five set out round it, each with its tools
+              on plates, at the place on the dial the hand points to. Each comes in as the hand
+              comes round to it, and stays; the one it is on is lit */}
           <div className={s.trades} data-about="skills">
             <header className={s.tradesHead}>
-              <h2 className={`t-display ${s.h2} ${s.h2Small}`}>
+              <h2 className={`t-display ${s.h2} ${s.tradesTitle}`}>
                 Five trades, <em>one clock</em>
               </h2>
               <Flourish className={s.flourish} />
             </header>
             <div className={s.clockStage} data-stage="about-clock" data-pin="maker" aria-hidden="true" />
-            <div className={s.trade}>
-              <ol className={s.tradeList}>
-                {capabilities.map((c, i) => (
-                  <li key={c.name} className={s.tradeItem} data-skill={i} data-on={i === 0 ? '1' : '0'}>
-                    <h3 className={s.tradeName}>{c.name}</h3>
-                    <p className={s.tradeLine}>{c.line}</p>
-                    <ul className={s.tradeTools} aria-label={`${c.name}: tools`}>
-                      {c.items.map((t) => (
-                        <li key={t}>{t}</li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
-              <div className={s.ticks} role="group" aria-label="Point the clock at a trade">
-                {capabilities.map((c, i) => (
-                  <button key={c.name} type="button" className={s.tick} data-skill-btn={i} aria-label={c.name}>
-                    <i />
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* a line from each trade's place on the dial out to its name (drawn by AboutFx) */}
+            <svg className={s.leads} data-leads aria-hidden="true">
+              {capabilities.map((c, i) => (
+                <g key={c.name} data-lead={i} data-on={i === 0 ? '1' : '0'}>
+                  <path />
+                  <path pathLength={1} />
+                  <circle r="2.5" />
+                </g>
+              ))}
+            </svg>
+            <ol className={s.tradeList} role="list">
+              {capabilities.map((c, i) => (
+                <li key={c.name} className={s.tradeItem} data-skill={i} data-on={i === 0 ? '1' : '0'}>
+                  <h3 className={s.tradeName}>
+                    <button type="button" data-skill-btn={i} aria-pressed={i === 0}>
+                      {c.name}
+                    </button>
+                  </h3>
+                  <ul className={s.tradeTools} aria-label={`${c.name}: tools`}>
+                    {c.items.map((t, k) => (
+                      <li key={t} style={{ '--k': k } as React.CSSProperties}>
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className={s.tradeLine}>{c.line}</p>
+                </li>
+              ))}
+            </ol>
           </div>
         </AboutFx>
       </section>
@@ -136,20 +145,25 @@ export default function Home() {
             <ReelDeck projects={projects} />
           </div>
         </div>
+        {/* the way out: past the last plate, the view goes into the frame at the gate and through it */}
+        <div data-anchor="leave" className={s.leave} aria-hidden="true" />
       </section>
 
       {/* (the radio is not on the page: it stands beside it, see components/dom/Radio) */}
 
-      {/* Contact: say hi */}
-      <section id="contact" data-anchor="contact" className={s.finale} aria-labelledby="contact-title">
-        <SayHi className={s.sayhi} id="contact-title" />
-        <p className={s.finaleLede}>Open for freelance, collabs and weird ideas.</p>
-        <ContactPlates />
-        <LocalTime className={s.local} />
-        <div className={s.floor} data-anchor="floor" aria-hidden="true" />
-      </section>
+      {/* the last screen: it stands behind the film, and is seen through the last frame on the way out */}
+      <div className={s.last} data-last>
+        {/* Contact: say hi */}
+        <section id="contact" data-anchor="contact" className={s.finale} aria-labelledby="contact-title">
+          <SayHi className={s.sayhi} id="contact-title" />
+          <p className={s.finaleLede}>Open for freelance, collabs and weird ideas.</p>
+          <ContactPlates />
+          <LocalTime className={s.local} />
+          <div className={s.floor} data-anchor="floor" aria-hidden="true" />
+        </section>
 
-      <Footer />
+        <Footer />
+      </div>
     </>
   );
 }

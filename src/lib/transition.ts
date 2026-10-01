@@ -1,6 +1,5 @@
 import { getLenis } from './loop';
-import { lastScreenScroll } from './office';
-import { plateScroll, reel, settleReel } from './reel';
+import { lastScreenScroll, plateScroll, reel, settleReel } from './reel';
 import { rig } from './rig';
 import { useApp } from './store';
 import { sfx } from '@/audio/sfx';
@@ -111,7 +110,7 @@ async function powerOn() {
 function placeOf(target: string) {
   const el = document.querySelector<HTMLElement>(target);
   const top = el ? el.getBoundingClientRect().top + window.scrollY : 0;
-  // Say Hi lies under the film: at its top the film is still up, so it is just past the snap
+  // Say Hi stands behind the film: it is where the way out through the last frame ends
   if (target === '#contact' && rig.anchors.has('works')) return Math.min(getLenis()?.limit ?? top, Math.max(top, lastScreenScroll()));
   return top;
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { onFrame } from '@/lib/loop';
 import { clamp } from '@/lib/math';
+import { reel } from '@/lib/reel';
 import { anchor, rig } from '@/lib/rig';
 import s from './SayHi.module.css';
 
@@ -22,7 +23,8 @@ export default function SayHi({ className, id }: { className?: string; id?: stri
       const a = anchor('contact');
       if (!a.height) return;
       // from the section's top at 85% of the viewport down to 15%
-      const p = clamp((rig.scroll + rig.vh * 0.85 - a.top) / (rig.vh * 0.7));
+      // (seen through the last frame of the film, on the way out of the projects, it stands ready)
+      const p = reel.leave > 0 ? 1 : clamp((rig.scroll + rig.vh * 0.85 - a.top) / (rig.vh * 0.7));
       if (Math.abs(p - last) < 0.0005) return;
       last = p;
       chars.forEach((c, i) => {

@@ -9,14 +9,21 @@ import { MODELS, useModel } from '@/lib/models';
 import { normalize } from './util';
 
 
+// built once per model: the model itself is moved into the wrapper, so a second build (React may
+// run this twice) must hand back the first rather than steal the clock from it
+// (not kept in the model's userData: the office clones this model, and a clone copies userData)
+const built = new WeakMap<THREE.Object3D, { root: THREE.Group; mixer: THREE.AnimationMixer }>();
+
 /**
- * The first thing inside the glass: a broken clock hanging in the dark, its wheels still turning.
- * On the 404 page the same clock is the whole scene.
+ * The 404 page's whole scene: a broken clock hanging in the dark, its wheels still turning.
+ * On the way in through the glass only its light is left, falling on the gears.
  */
 export default function Threshold() {
   const gltf = useModel(MODELS.brokenClock);
   const group = useRef<THREE.Group>(null);
   const { root, mixer } = useMemo(() => {
+    const cached = built.get(gltf.scene);
+    if (cached) return cached;
     const root = normalize(gltf.scene, 7.4, 'y');
     gltf.scene.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -28,7 +35,9 @@ export default function Threshold() {
     });
     const mixer = new THREE.AnimationMixer(gltf.scene);
     gltf.animations.forEach((c) => mixer.clipAction(c).play());
-    return { root, mixer };
+    const b = { root, mixer };
+    built.set(gltf.scene, b);
+    return b;
   }, [gltf]);
 
   const light = useRef<THREE.SpotLight>(null);
@@ -42,11 +51,11 @@ export default function Threshold() {
     const hold = rig.route === 'home' ? dive.top + dive.height - rig.vh : 0;
 
     // time runs a little faster while you scroll, as if the page were winding it
-    mixer.update(dt * (0.55 + Math.min(2.5, Math.abs(rig.velocity) / 900)));
+    if (lost) mixer.update(dt * (0.55 + Math.min(2.5, Math.abs(rig.velocity) / 900)));
 
     const y = lost ? -rig.scroll * rig.unitsPerPx : -hold * rig.unitsPerPx;
-    const visible = lost || rig.route === 'home';
-    g.visible = visible && Math.abs(g.position.y - -rig.scroll * rig.unitsPerPx) < 20;
+    // the clock itself is only seen on the 404 page; elsewhere it just marks where the light aims
+    g.visible = lost;
     g.position.set(lost ? 0 : 2.1, y + (lost ? 0.2 : 0.4), lost ? -1.5 : -5.5);
     // it hangs; it sways a little, and leans towards the pointer
     const sway = Math.sin(rig.time * 0.6) * 0.035;

@@ -124,14 +124,6 @@ export const sfx = {
     burst(300, 0.7, 0.25, 0.25, 'lowpass');
     tone(40, 0.5, 0.3, 'sine', 70);
   },
-  /** the camera's shutter: the blades snap shut, and spring open again a beat later */
-  shutter() {
-    burst(3400, 2.2, 0.03, 0.4);
-    tone(210, 0.05, 0.2, 'triangle', 110);
-    burst(2600, 2.6, 0.04, 0.32, 'bandpass', 0.13);
-    tone(160, 0.06, 0.16, 'triangle', 80, 0.13);
-    tone(5200, 0.12, 0.018, 'sine', 3100, 0.13);
-  },
   /** a gear tooth passing a pawl */
   ratchet() {
     burst(3000 + Math.random() * 1500, 4, 0.02, 0.18);

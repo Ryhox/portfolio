@@ -259,8 +259,15 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
     if (home && st.stage === 'ready' && reel.on) {
       // inside the old camera the loop of film is the whole view: nothing else in 3D can be seen,
       // so it is all that is drawn (through the same glass), and the recordings keep their colours
+      // (on the way out through the last frame, the dark in here gives way to the inner world the
+      // last screen lies on: that is drawn first, and the film's own dark fades over it)
+      const under = reel.world > 0;
+      if (under) {
+        sway(worksCam, pan);
+        pipeline.renderWorks(worksScene, worksCam);
+      }
       sway(reelCam, pan);
-      pipeline.renderWorks(reelScene, reelCam);
+      pipeline.renderWorks(reelScene, reelCam, under);
       pipeline.runCrt(null, {
         os: 0,
         hasScene: true,
@@ -281,7 +288,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
         bezel: 0,
         aspect,
       }, 1.05);
-      pipeline.present('crt', { bloom: 0, vignette: 0, exposure: 1, grain: 0.05, time: t, tone: 0, pan });
+      pipeline.present('crt', { bloom: 0, vignette: 0, exposure: 1, grain: 0.05, time: t, tone: reel.world, pan });
     } else {
       // ── where are we: 0 = at the bench, 1 = inside the tube
       let tPose = 0;

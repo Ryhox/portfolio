@@ -1,142 +1,107 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { sfx } from '@/audio/sfx';
-import { getLenis, onFrame } from '@/lib/loop';
+import { onFrame } from '@/lib/loop';
 import { smoothstep } from '@/lib/math';
 import { office } from '@/lib/office';
-import { reel } from '@/lib/reel';
+import { lastScreenScroll, reel } from '@/lib/reel';
 import { anchor, rig } from '@/lib/rig';
 import s from './LensView.module.css';
-
-/** The beats of a snap (seconds): the shutter falls, holds dark, then the flash fades onto what is next. */
-const SHUT = 0.07;
-const HOLD = 0.06;
-const FLASH = 0.55;
 
 /**
  * The way into the old camera and out of it. The office camera goes into the black of the lens,
  * the screen is black, and behind the black the view changes to the loop of film inside (the 3D
- * reel), which fades up. The moment the Works section ends, with the film still up, the shutter
- * snaps (dark, a flash) onto the last screen lying underneath; the page holds still while it does.
- * Scrolling back snaps back.
+ * reel), which fades up. Past the last plate the view goes out through the frame at the gate, as
+ * it came into the Lumen's tube at the start: the picture there clears, and the last screen stands
+ * behind the film, seen through it, until the view is through and it is the page. The 3D does the
+ * flying and says where the last screen shows (lib/reel); here the page's own last screen is put
+ * there: at the size its distance makes it, and only inside the picture's outline.
  */
 export default function LensView() {
   const black = useRef<HTMLDivElement>(null);
-  const shutter = useRef<HTMLDivElement>(null);
-  const flash = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const html = document.documentElement;
-    // the film is in (not snapped away); unknown until the first frame, which never snaps
-    let shown: boolean | null = null;
-    let snap: { t0: number; to: boolean; swapped: boolean } | null = null;
-    // the page is held still for a snap
-    let locked = false;
-    let shutA = 0;
-    let flashA = 0;
-    const release = () => {
-      if (!locked) return;
-      locked = false;
-      getLenis()?.start();
-    };
-    const last = { black: '', shut: '', flash: '', vis: false };
-    const set = (el: HTMLElement | null, key: 'black' | 'shut' | 'flash', v: string) => {
-      if (!el || last[key] === v) return;
-      last[key] = v;
-      el.style.opacity = v;
+    const last = { black: '', vis: false };
+    // the last screen, while it is held behind the film
+    let held: HTMLElement | null = null;
+    const letGo = () => {
+      if (!held) return;
+      const st = held.style;
+      st.transform = st.transformOrigin = st.clipPath = st.opacity = '';
+      held = null;
     };
 
     // what the view shows, decided before anything draws
     const offState = onFrame(() => {
-      const home = rig.route === 'home';
-      const now = rig.time;
-      const want = !office.out;
-      if (shown === null || !home) {
-        shown = want;
-        snap = null;
-        release();
-      }
-      if (!snap && shown !== want) {
-        // (with the picture off for a channel change, the other side is simply there)
-        if (rig.reducedMotion || rig.dark) shown = want;
-        else {
-          snap = { t0: now, to: want, swapped: false };
-          sfx.shutter();
-          // a snap is a moment: the page holds still for it (unless the page is only passing
-          // through, on its way somewhere further off, like a link to another section)
-          const l = getLenis();
-          const w = anchor('works');
-          const passing = rig.time < rig.jump.until && Math.abs(rig.jump.to - (w.top + w.height - rig.vh)) > rig.vh;
-          if (l && !passing) {
-            l.stop();
-            locked = true;
-          }
-        }
-      }
-
-      // the snap: the shutter falls, what is behind it changes, and the flash fades onto it
-      shutA = 0;
-      flashA = 0;
-      if (snap) {
-        const e = now - snap.t0;
-        const o = e - SHUT - HOLD;
-        if (!snap.swapped && e >= SHUT) {
-          shown = snap.to;
-          snap.swapped = true;
-          // behind the shutter, the last screen is set exactly in place
-          if (locked && !snap.to) {
-            const w = anchor('works');
-            getLenis()?.scrollTo(w.top + w.height - rig.vh + 1, { immediate: true, force: true });
-          }
-        }
-        shutA = o < 0 ? smoothstep(0, SHUT, e) : 0;
-        flashA = o < 0 ? 0 : 0.9 * (1 - smoothstep(0, FLASH, o));
-        if (o > FLASH) {
-          snap = null;
-          release();
-        }
-      }
-      // halfway into the glass the screen is black: from there on the view is the film
-      reel.on = home && !!shown && office.view >= 0.5;
+      // halfway into the glass the screen is black: from there on the view is the film, until the way out ends
+      reel.on = rig.route === 'home' && office.view >= 0.5 && reel.leave < 1;
     });
 
     // the page around it
     const offDom = onFrame(() => {
       const home = rig.route === 'home';
+      const out = home && reel.leave >= 1;
       const v = home ? office.view : 0;
       // the way in: the black of the glass becomes the whole screen, then the film fades up out of it
-      const b = !home || !shown ? 0 : v < 0.5 ? smoothstep(0, 0.45, v) : 1 - smoothstep(0.55, 1, v);
+      const b = !home || out ? 0 : v < 0.5 ? smoothstep(0, 0.45, v) : 1 - smoothstep(0.55, 1, v);
       const vis = b > 0.001;
       if (vis !== last.vis && black.current) {
         last.vis = vis;
         black.current.style.visibility = vis ? 'visible' : 'hidden';
       }
-      set(black.current, 'black', b.toFixed(3));
-      // the type waits for the film, and the last screen for the snap
-      const mode = !home || office.path <= 0 ? '' : !shown ? 'out' : v > 0.6 ? 'full' : 'pre';
+      const op = b.toFixed(3);
+      if (black.current && last.black !== op) {
+        last.black = op;
+        black.current.style.opacity = op;
+      }
+      // the type waits for the film, and lets go of it on the way out; the last screen waits behind it
+      const mode = !home || office.path <= 0 ? '' : out ? 'out' : reel.leaving ? 'zoom' : v > 0.6 ? 'full' : 'pre';
       if ((html.dataset.lens ?? '') !== mode) {
         if (mode) html.dataset.lens = mode;
         else delete html.dataset.lens;
       }
-      set(shutter.current, 'shut', shutA.toFixed(3));
-      set(flash.current, 'flash', flashA.toFixed(3));
+
+      if (mode !== 'zoom') {
+        letGo();
+        return;
+      }
+      if (!held?.isConnected) held = document.querySelector<HTMLElement>('[data-last]');
+      if (!held) return;
+      // the last screen where it will be at the end of the way out, seen from as far off as the
+      // view still is: scaled about the view's own middle (a flat thing square to the view, so
+      // this is exactly how the camera sees it)
+      const at = reel.last;
+      const a = anchor('contact');
+      const ox = rig.vw / 2 - a.left;
+      const oy = rig.vh / 2 - (a.top - lastScreenScroll());
+      const st = held.style;
+      st.transformOrigin = `${ox.toFixed(1)}px ${oy.toFixed(1)}px`;
+      st.transform = `translate3d(${at.x.toFixed(2)}px, ${(at.y + window.scrollY - lastScreenScroll()).toFixed(2)}px, 0) scale(${at.scale.toFixed(5)})`;
+      st.opacity = at.show.toFixed(3);
+      // and only what the picture at the gate leaves open of it (the outline, in the screen's own px)
+      const pts = reel.hole.pts;
+      if (reel.hole.open) st.clipPath = 'none';
+      else if (!pts.length) st.clipPath = 'inset(50%)';
+      else {
+        let poly = '';
+        for (let i = 0; i < pts.length; i += 2) {
+          const x = ox + (pts[i] - rig.vw / 2 - at.x) / at.scale;
+          const y = oy + (pts[i + 1] - rig.vh / 2 - at.y) / at.scale;
+          poly += `${i ? ',' : ''}${x.toFixed(1)}px ${y.toFixed(1)}px`;
+        }
+        st.clipPath = `polygon(${poly})`;
+      }
     }, 'after');
 
     return () => {
       offState();
       offDom();
-      release();
+      letGo();
       delete html.dataset.lens;
       reel.on = false;
     };
   }, []);
 
-  return (
-    <>
-      <div ref={black} className={s.black} aria-hidden="true" />
-      <div ref={shutter} className={s.shutter} aria-hidden="true" />
-      <div ref={flash} className={s.flash} aria-hidden="true" />
-    </>
-  );
+  return <div ref={black} className={s.black} aria-hidden="true" />;
 }
