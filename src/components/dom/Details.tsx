@@ -1,19 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
+import { GREET, IDLE, STILL, watch, type Step } from './tabIcons';
 
-/** While the tab is elsewhere: a pocket watch, still going, in place of the cog. */
-const AWAY_ICON = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1d196"/><stop offset="1" stop-color="#9c6a33"/></linearGradient></defs>
-  <rect width="64" height="64" rx="14" fill="#120d08"/>
-  <rect x="28" y="5" width="8" height="7" rx="2" fill="url(#b)"/>
-  <circle cx="32" cy="36" r="22" fill="url(#b)"/>
-  <circle cx="32" cy="36" r="17.5" fill="#ebe1cb"/>
-  <path d="M32 36V24M32 36l8 5" stroke="#120d08" stroke-width="3.2" stroke-linecap="round"/>
-  <circle cx="32" cy="36" r="2.6" fill="#120d08"/>
-</svg>`)}`;
-
-/** The small things: the tab calls after you when you leave; developers get a hello in the console. */
+/**
+ * The small things: the tab wears the automaton's face while you are here, and calls after you
+ * when you leave, a pocket watch keeping the time; developers get a hello in the console.
+ */
 export default function Details() {
   useEffect(() => {
     // ── a hello for whoever opens the console
@@ -23,29 +16,56 @@ export default function Details() {
       'font: 12px monospace; color: #b3a488',
     );
 
+    // ── the tab's icon (what it was is kept, to be put back)
+    const kept = new Map<HTMLLinkElement, string>();
+    const show = (href: string) => {
+      for (const l of document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]')) {
+        if (!kept.has(l)) kept.set(l, l.href);
+        if (l.href !== href) l.href = href;
+      }
+    };
+    let timer = 0;
+
+    // here: the face, a step at a time; whatever it was doing, it goes back to idling
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const play = (steps: Step[], i = 0) => {
+      if (still) return show(STILL);
+      if (i >= steps.length) return play(IDLE);
+      show(steps[i][0]);
+      timer = window.setTimeout(play, steps[i][1], steps, i + 1);
+    };
+
+    // elsewhere: the watch, set again as each minute turns
+    const tick = () => {
+      show(watch(new Date()));
+      timer = window.setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
+    };
+
     // ── the tab, while you are elsewhere: its words and its icon
     let title = document.title;
-    const icons = new Map<HTMLLinkElement, string>();
+    let away = false;
     const onVis = () => {
-      const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]'));
+      clearTimeout(timer);
       if (document.hidden) {
+        away = true;
         title = document.title;
         document.title = 'Come back, it’s still ticking';
-        for (const l of links) {
-          icons.set(l, l.href);
-          l.href = AWAY_ICON;
-        }
+        tick();
       } else {
+        away = false;
         document.title = title;
-        icons.forEach((href, l) => (l.href = href));
-        icons.clear();
+        play(GREET);
       }
     };
     document.addEventListener('visibilitychange', onVis);
+    if (document.hidden) onVis();
+    else play(IDLE);
 
     return () => {
       document.removeEventListener('visibilitychange', onVis);
-      icons.forEach((href, l) => (l.href = href));
+      clearTimeout(timer);
+      if (away) document.title = title;
+      kept.forEach((href, l) => (l.href = href));
     };
   }, []);
 

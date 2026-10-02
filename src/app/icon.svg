@@ -1,22 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f1d196"/>
-      <stop offset="1" stop-color="#9c6a33"/>
-    </linearGradient>
-  </defs>
-  <g fill="url(#b)" transform="translate(32 32)">
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(36)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(72)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(108)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(144)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(180)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(216)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(252)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(288)"/>
-    <rect x="-3.4" y="-26" width="6.8" height="9" rx="1.4" transform="rotate(324)"/>
-    <circle r="19.5"/>
-  </g>
-  <path d="M25.5 44V20h8.4a6.8 6.8 0 010 13.6h-8.4M32.8 33.6l6.8 10.4" fill="none" stroke="#120d08" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <path fill="#f1d688" d="M5 3h10v1h-10zM4 4h12v1h-12zM4 5h12v1h-12zM4 6h12v1h-12zM4 7h12v1h-12zM20 7h3v1h-3zM4 8h12v1h-12zM20 8h2v1h-2zM4 9h12v1h-12zM20 9h2v1h-2zM4 10h12v1h-12zM19 10h3v1h-3zM4 11h12v1h-12zM19 11h2v1h-2zM5 12h10v1h-10zM18 12h3v1h-3zM17 13h4v1h-4zM1 14h19v1h-19zM1 15h2v1h-2zM4 15h15v1h-15zM1 16h2v1h-2zM4 16h12v1h-12zM1 17h2v1h-2zM4 17h5v1h-5zM10 17h6v1h-6zM1 18h2v1h-2zM4 18h5v1h-5zM12 18h4v1h-4zM1 19h2v1h-2zM4 19h12v1h-12zM1 20h2v1h-2zM4 20h12v1h-12zM4 21h12v1h-12zM5 23h10v1h-10z"/>
+  <path fill="#c58e38" d="M9 2h2v1h-2zM7 13h6v1h-6zM5 22h10v1h-10z"/>
+  <path fill="#1e1005" d="M6 6h2v1h-2zM12 6h2v1h-2zM6 7h2v1h-2zM12 7h2v1h-2zM7 9h1v1h-1zM12 9h1v1h-1zM8 10h4v1h-4zM8 16h4v1h-4zM7 17h2v1h-2zM10 17h3v1h-3zM7 18h2v1h-2zM12 18h1v1h-1zM7 19h6v1h-6zM8 20h4v1h-4z"/>
+  <path fill="#ece5d4" d="M9 0h2v1h-2zM9 1h2v1h-2zM20 4h4v1h-4zM20 5h4v1h-4zM20 6h4v1h-4zM9 17h1v1h-1zM9 18h3v1h-3zM0 21h4v1h-4zM0 22h4v1h-4zM0 23h4v1h-4z"/>
 </svg>
