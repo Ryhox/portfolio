@@ -170,31 +170,6 @@
     transform: rotate(130deg);
   }
 }
-.kbd {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--bone);
-  border: 1px solid rgba(235, 225, 203, 0.35);
-  border-bottom-width: 3px;
-  border-radius: 3px;
-  animation: keypress 2.4s steps(1) infinite;
-}
-@keyframes keypress {
-  0%,
-  86% {
-    transform: none;
-    border-bottom-width: 3px;
-  }
-  87%,
-  94% {
-    transform: translateY(2px);
-    border-bottom-width: 1px;
-  }
-}
 
 .dive {
   height: 135vh;
@@ -675,9 +650,6 @@
   .hero {
     align-content: end;
     padding-bottom: calc(var(--safe) + 70px);
-  }
-  .cueRight {
-    display: none;
   }
 
   /* a thumb goes a screen at a time: every stretch of the journey is shorter here, so the way

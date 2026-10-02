@@ -4,6 +4,8 @@
   z-index: 60;
   overflow: hidden;
   pointer-events: none;
+  /* (seen from outside it is laid on the machine's screen: see the component) */
+  transform-origin: 0 0;
 }
 
 /* film grain over the type as well as the picture: a tile of noise, twice the screen, jumped about

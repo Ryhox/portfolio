@@ -72,7 +72,7 @@ export const bloomUpFrag = /* glsl */ `
 `;
 
 /**
- * The tube. Takes the inner world, the terminal canvas and bloom, and produces the image a
+ * The tube. Takes the inner world, the greeter's canvas and bloom, and produces the image a
  * warm cathode-ray tube would show: barrel curvature, convergence error at the edges,
  * a rounded phosphor field that falls off into the bezel, scanlines and a tuning glitch.
  * Output stays linear HDR so it can be displayed directly or mapped onto the 3D screen.

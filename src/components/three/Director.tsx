@@ -10,7 +10,7 @@ import { anchor, rig } from '@/lib/rig';
 import { useApp } from '@/lib/store';
 import { warmup } from '@/lib/warmup';
 import Bench from './bench/Bench';
-import { LumenOS } from './bench/LumenOS';
+import { Greeter } from './bench/Greeter';
 import { applyPose, benchPose, bump, fitContent, heroAnchor, makePose, openingPose, tube } from './bench/tube';
 import { HeroWords, WORDS_DEPTH } from './bench/words';
 import { Pipeline } from './pipeline/Pipeline';
@@ -26,6 +26,14 @@ const LANDING = 3.6; // seconds of the landing: lamp, lid, camera, tube
 
 const _swayQ = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 1, 0);
+const _corner = new THREE.Vector3();
+/** the corners of the tube's picture, as rig.glass keeps them: top-left, top-right, bottom-right, bottom-left */
+const CORNERS = [
+  [-1, 1],
+  [1, 1],
+  [1, -1],
+  [-1, -1],
+];
 /**
  * Swing a camera round where it stands, toward the radio on its right: by a whole view's width
  * when all the way across, so the world goes off to the left exactly as the page does.
@@ -72,7 +80,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
   const reelCam = useMemo(() => new THREE.PerspectiveCamera(30, 1, 0.05, 20), []);
   const radioCam = useMemo(() => new THREE.PerspectiveCamera(32, 1, 0.1, 400), []);
   const pipeline = useMemo(() => new Pipeline(gl, gl.capabilities.maxSamples >= 2 ? 2 : 0), [gl]);
-  const os = useMemo(() => new LumenOS(), []);
+  const greeter = useMemo(() => new Greeter(), []);
   // the landing's words, hanging in front of the camera (the camera flies past them into the tube)
   const words = useMemo(() => new HeroWords(), []);
   const wordsCam = useMemo(() => new THREE.PerspectiveCamera(30, 1, 0.05, 160), []);
@@ -104,8 +112,8 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production')
-      (window as unknown as Record<string, unknown>).__dir = { pipeline, benchScene, worksScene, officeScene, reelScene, radioScene, benchCam, worksCam, officeCam, reelCam, radioCam, os, gl };
-  }, [pipeline, benchScene, worksScene, officeScene, reelScene, radioScene, benchCam, worksCam, officeCam, reelCam, radioCam, os, gl]);
+      (window as unknown as Record<string, unknown>).__dir = { pipeline, benchScene, worksScene, officeScene, reelScene, radioScene, benchCam, worksCam, officeCam, reelCam, radioCam, greeter, gl };
+  }, [pipeline, benchScene, worksScene, officeScene, reelScene, radioScene, benchCam, worksCam, officeCam, reelCam, radioCam, greeter, gl]);
 
   // Pointer rays inside the tube must pass through the same curvature the image does.
   const worksEvents = useMemo(
@@ -145,8 +153,8 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
     const c = clock.current;
 
     pipeline.setSize(w, h, dpr);
-    // the terminal is drawn to the shape of the machine's glass, which it fills
-    os.setAspect(tube.hw / tube.hh);
+    // the greeter is drawn to the shape of the machine's glass, which it fills
+    greeter.setAspect(tube.hw / tube.hh);
     fitContent(aspect);
 
     // ── warm-up under the loader: textures a couple per frame, programs compiled asynchronously
@@ -273,6 +281,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
     //    world's own camera turns round where it stands, and the radio is laid over what it sees
     const pan = radio.pan;
     if (pan > 0.0005) pipeline.renderRadio(radioScene, radioCam);
+    rig.glass.on = false;
     if (home && st.stage === 'ready' && reel.on) {
       // inside the old camera the loop of film is the whole view: nothing else in 3D can be seen,
       // so it is all that is drawn (through the same glass), and the recordings keep their colours
@@ -313,23 +322,23 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       else tPose = 1;
       const benchVisible = home && tube.ready && tPose < 0.9995;
 
-      // ── what the tube shows: the terminal at the bench, the works once inside
+      // ── what the tube shows: the greeter at the bench, the works once inside
       let osMix = 0;
       let tune = rig.tune;
       if (home) {
         if (rig.exit > 0) {
           osMix = smoothstep(0.42, 0.55, rig.exit);
           tune += bump(rig.exit, 0.36, 0.6);
-          os.setMode('farewell');
+          greeter.setMode('farewell');
         } else {
           osMix = 1 - smoothstep(0.2, 0.3, rig.dive);
           tune += bump(rig.dive, 0.16, 0.33);
-          os.setMode('home');
+          greeter.setMode('home');
         }
-        os.setScripted(rig.exit > 0 ? 0 : invLerp(0.025, 0.15, rig.dive));
       }
-      if (osMix > 0) os.update(t);
-      // the terminal fills the whole glass; the works keep the viewport's shape, so the picture
+      // (with reduced motion it stands still, its arm up, until it is touched)
+      if (osMix > 0) greeter.update(t, rig.reducedMotion);
+      // the greeter fills the whole glass; the works keep the viewport's shape, so the picture
       // changes shape on the way in (and out), under the tuning static
       tube.fill = !home ? 0 : rig.exit > 0 ? smoothstep(0.38, 0.55, rig.exit) : 1 - smoothstep(0.14, 0.3, rig.dive);
       tune = Math.min(1, tune);
@@ -369,7 +378,10 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       }
       // in the sunlit office the glow is kept for what really shines (the window, the sun on brass)
       const officeView = inOffice && office.full;
-      pipeline.runCrt(os.texture, {
+      const radius = Math.min(38, Math.max(20, w * 0.024));
+      // the rim belongs to the machine's screen: it goes as the view goes in through the glass
+      const bezel = benchVisible ? 1 - smoothstep(0.86, 0.9995, tPose) : 0;
+      pipeline.runCrt(greeter.texture, {
         os: osMix,
         hasScene: osMix < 1,
         bloom: perf.tier > 0 ? 0 : officeView ? 0.22 : 0.55,
@@ -380,14 +392,13 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
         curve: CURVE,
         ca: 0.0035,
         scan: 0,
-        radius: Math.min(38, Math.max(20, w * 0.024)),
+        radius,
         flicker: rig.reducedMotion ? 0 : 1,
         dim: 1,
         office: inOffice ? office.mix : 0,
         portal: office.portal,
         beam,
-        // the rim belongs to the machine's screen: it goes as the view goes in through the glass
-        bezel: benchVisible ? 1 - smoothstep(0.86, 0.9995, tPose) : 0,
+        bezel,
         aspect: (tube.cw + (tube.hw - tube.cw) * tube.fill) / (tube.ch + (tube.hh - tube.ch) * tube.fill),
       }, officeView ? 2.2 : 1.1);
 
@@ -399,6 +410,17 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
         }
         applyPose(benchCam, pose, w, h);
         sway(benchCam, pan);
+        // where the picture on the machine's glass shows: the page's own glass (the grain over
+        // the inner world) lies on it there, so the world has its grain before the view is inside
+        const gw = tube.cw + (tube.hw - tube.cw) * tube.fill;
+        const gh = tube.ch + (tube.hh - tube.ch) * tube.fill;
+        CORNERS.forEach(([sx, sy], i) => {
+          _corner.copy(tube.C).addScaledVector(tube.R, sx * gw).addScaledVector(tube.U, sy * gh).project(benchCam);
+          rig.glass.pts[i * 2] = ((_corner.x + 1) / 2) * w;
+          rig.glass.pts[i * 2 + 1] = ((1 - _corner.y) / 2) * h;
+        });
+        rig.glass.round = radius * bezel;
+        rig.glass.on = true;
         pipeline.renderBench(benchScene, benchCam);
         const e = smoothstep(0.7, 1, tPose);
         pipeline.present('bench', { bloom: perf.tier > 0 ? 0 : 0.55 * (1 - e), vignette: 0.55 * (1 - e), exposure: 1, grain: 0.04, time: t, pan }, 2.2);
@@ -453,7 +475,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
 
   return (
     <>
-      {createPortal(<Bench os={os} crt={pipeline.crtTexture} />, benchScene, { camera: benchCam })}
+      {createPortal(<Bench greeter={greeter} crt={pipeline.crtTexture} />, benchScene, { camera: benchCam })}
       {createPortal(<Works camera={worksCam} />, worksScene, { camera: worksCam, events: worksEvents as never })}
       {officeOn &&
         createPortal(

@@ -28,7 +28,10 @@ export default function Prepaint() {
       host = document.createElement('div');
       host.setAttribute('aria-hidden', 'true');
       host.inert = true;
-      host.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100lvh;z-index:2147483000;opacity:0.01;pointer-events:none;overflow:hidden;contain:strict';
+      // (it lies over the loader, so it must not show there: the copies are painted as they are,
+      // then put on the screen in black, at the least opacity there is. On the dark of the loader
+      // that changes nothing; in their own bone colour the big letters of the last screen showed)
+      host.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100lvh;z-index:2147483000;opacity:0.004;filter:brightness(0);pointer-events:none;overflow:hidden;contain:strict';
       // each piece twice: once laid out at rest, and once playing its way in the way it will on
       // the page (what it is drawn with on the way, part faded and moving, is not what it is drawn
       // with at rest)

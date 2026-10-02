@@ -8,9 +8,10 @@ import { rig } from '@/lib/rig';
 import { useApp } from '@/lib/store';
 import { spring } from '@/lib/math';
 import { sfx } from '@/audio/sfx';
-import { KEY_ALIASES, KEY_ROWS, charForCode } from './keymap';
-import type { LumenOS } from './LumenOS';
+import type { Greeter } from './Greeter';
+import { KEY_ALIASES, KEY_ROWS } from './keymap';
 import { tube } from './tube';
+import { CURVE, bendPointer } from '../pipeline/shaders';
 import { setCursor } from '../works/util';
 
 preloadModel(MODELS.computer);
@@ -233,11 +234,12 @@ function assemble(scene: THREE.Group, animations: THREE.AnimationClip[], crt: TH
   };
 }
 
-export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture }) {
+export default function Computer({ greeter, crt }: { greeter: Greeter; crt: THREE.Texture }) {
   const gltf = useModel(MODELS.computer);
   const group = useRef<THREE.Group>(null);
   const m = useMemo(() => buildMachine(gltf.scene, gltf.animations, crt), [gltf, crt]);
   const lastTyped = useRef(-10);
+  const overGreeter = useRef(false);
   const ballSpin = useRef({ vx: 0, vy: 0, dragging: false, lx: 0, ly: 0 });
   const yaw = useRef({ x: 0, v: 0 });
 
@@ -245,38 +247,26 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
     if (process.env.NODE_ENV !== 'production') (window as unknown as { __computer: unknown }).__computer = { gltf, m };
   }, [gltf, m]);
 
-  // ── keyboard → keycaps + terminal
+  // ── keyboard → keycaps: the machine's keys go down with your own (the page keeps every key)
   useEffect(() => {
-    const press = (code: string, down: boolean) => {
-      const cap = m.caps.get(code) ?? m.caps.get(KEY_ALIASES[code] ?? '');
-      if (cap) cap.down = down;
-    };
+    const capFor = (code: string) => m.caps.get(code) ?? m.caps.get(KEY_ALIASES[code] ?? '');
     const canType = (e: KeyboardEvent) => {
-      if (e.metaKey || e.altKey) return false;
+      if (e.metaKey || e.altKey || e.ctrlKey) return false;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName))) return false;
       const st = useApp.getState();
       return rig.route === 'home' && st.stage === 'ready' && !st.menuOpen && rig.dive < 0.2 && rig.exit === 0;
     };
-    // keys the page (or the browser) also uses: the terminal only takes them while it is in use
-    const SHARED = new Set([' ', 'Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End']);
-    const OWN = new Set(['Backspace', 'Delete']);
     const onDown = (e: KeyboardEvent) => {
-      if (!canType(e)) return;
-      press(e.code, true);
-      const inUse = os.busy || os.input.length > 0 || rig.time - lastTyped.current < 8;
-      if ((SHARED.has(e.key) || e.ctrlKey) && !inUse) return;
-      if (e.key.length !== 1 && !SHARED.has(e.key) && !OWN.has(e.key)) return;
-      // copying a selection from the page stays copying
-      if (e.ctrlKey && e.key.toLowerCase() === 'c' && window.getSelection()?.toString()) return;
-      if (!os.key({ key: e.key, ctrl: e.ctrlKey, shift: e.shiftKey })) return;
-      e.preventDefault();
+      const cap = capFor(e.code);
+      if (!cap || !canType(e)) return;
+      cap.down = true;
       lastTyped.current = rig.time;
       if (!e.repeat) sfx.key(e.key === 'Enter');
     };
     const onUp = (e: KeyboardEvent) => {
-      press(e.code, false);
-      os.keyup({ key: e.key, ctrl: e.ctrlKey, shift: e.shiftKey });
+      const cap = capFor(e.code);
+      if (cap) cap.down = false;
     };
     const onBlur = () => m.caps.forEach((c) => (c.down = false));
     window.addEventListener('keydown', onDown);
@@ -288,7 +278,7 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
       window.removeEventListener('keyup', onUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [m, os]);
+  }, [m]);
 
   const capFromEvent = (e: ThreeEvent<PointerEvent>) => {
     let o: THREE.Object3D | null = e.object;
@@ -302,21 +292,34 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
 
   const interactive = () => rig.dive < 0.15 && useApp.getState().stage === 'ready';
 
+  /**
+   * Where on the greeter's picture the pointer is (0..1 across, 0..1 down), if it is on the tube:
+   * the glass bows the picture, so the point is taken through the same curve.
+   */
+  const onPicture = (e: ThreeEvent<PointerEvent>) => {
+    const uv = e.intersections.find((i) => i.object === m.screen)?.uv;
+    if (!uv || tube.fill < 1) return null;
+    const [x, y] = bendPointer(uv.x * 2 - 1, uv.y * 2 - 1, CURVE, tube.hw / tube.hh);
+    return [(x + 1) / 2, (1 - y) / 2] as const;
+  };
+
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (!interactive()) return;
+    // the little automaton on the tube answers a touch, each part of it in its own way
+    const at = onPicture(e);
+    if (at && greeter.poke(at[0], at[1])) {
+      e.stopPropagation();
+      sfx.click();
+      return;
+    }
     const code = capFromEvent(e);
     if (code) {
       e.stopPropagation();
       const cap = m.caps.get(code)!;
       cap.down = true;
-      // a cap pressed with the mouse (or a finger) types as its key would
-      const ch = charForCode(code);
-      const key = code === 'Enter' || code === 'Backspace' || code === 'Tab' ? code : ch ? ch.toLowerCase() : null;
-      if (key) os.key({ key, ctrl: false, shift: false });
       lastTyped.current = rig.time;
       sfx.key(code === 'Enter');
       const up = () => {
-        if (key) os.keyup({ key, ctrl: false, shift: false });
         cap.down = false;
         window.removeEventListener('pointerup', up);
       };
@@ -359,8 +362,22 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
     while (o && o !== m.ball) o = o.parent;
     if (code || o) setCursor(o ? 'grab' : 'pointer');
   };
-  const onPointerOut = () => {
-    if (!ballSpin.current.dragging) setCursor('');
+  const onGreeter = (e: ThreeEvent<PointerEvent>) => {
+    const at = interactive() ? onPicture(e) : null;
+    return !!at && !!greeter.zoneAt(at[0], at[1]);
+  };
+  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    const over = onGreeter(e);
+    if (over) setCursor('pointer');
+    else if (overGreeter.current) setCursor('');
+    overGreeter.current = over;
+  };
+  const onPointerOut = (e: ThreeEvent<PointerEvent>) => {
+    // (the pointer leaves one part of the machine for another all the time: over the automaton
+    // it keeps its shape)
+    if (ballSpin.current.dragging || onGreeter(e)) return;
+    overGreeter.current = false;
+    setCursor('');
   };
 
   const _wp = useMemo(() => new THREE.Vector3(), []);
@@ -442,7 +459,7 @@ export default function Computer({ os, crt }: { os: LumenOS; crt: THREE.Texture 
   });
 
   return (
-    <group ref={group} onPointerDown={onPointerDown} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
+    <group ref={group} onPointerDown={onPointerDown} onPointerOver={onPointerOver} onPointerMove={onPointerMove} onPointerOut={onPointerOut}>
       <primitive object={gltf.scene} position={m.offset} />
     </group>
   );

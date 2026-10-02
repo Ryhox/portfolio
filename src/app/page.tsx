@@ -25,8 +25,9 @@ export default function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(graph(profilePageJsonLd())) }} />
 
-      {/* Ignition: the Lumen 64 on the bench. With WebGL its words are drawn in the scene,
-          hanging in front of the camera, which flies past them on its way into the tube */}
+      {/* Ignition: the Lumen 64 on the bench, a little automaton waving from its tube. With WebGL
+          the words are drawn in the scene, hanging in front of the camera, which flies past them
+          on its way into the tube */}
       <section id="top" data-anchor="top" className={s.hero} aria-labelledby="hero-title">
         <div className={s.heroFx}>
           <div className={s.heroCopy} data-words>
@@ -48,12 +49,6 @@ export default function Home() {
               <p className={`t-label ${s.cue}`}>
                 <span className={s.cueNeedle} aria-hidden="true" data-deco="needle" />
                 Scroll to enter the machine
-              </p>
-              <p className={`t-label ${s.cue} ${s.cueRight}`}>
-                <kbd className={s.kbd} data-deco="key">
-                  A
-                </kbd>
-                Type something. It listens.
               </p>
             </div>
           </div>

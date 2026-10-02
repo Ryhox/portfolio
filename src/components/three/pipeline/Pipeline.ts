@@ -170,7 +170,7 @@ export type FinalParams = {
  * Three worlds, one tube.
  *   office ──────┐ (through the clock's hub)
  *   inner world ─┤
- *   terminal ────┴─► CRT pass ─► crtTarget ─┬─► present            (inside)
+ *   greeter ─────┴─► CRT pass ─► crtTarget ─┬─► present            (inside)
  *                                           └─► screen texture ──► bench ─► present  (outside)
  */
 export class Pipeline {

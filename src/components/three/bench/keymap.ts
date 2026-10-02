@@ -20,20 +20,3 @@ export const KEY_ALIASES: Record<string, string> = {
   ArrowUp: 'Semicolon',
   ArrowDown: 'Period',
 };
-
-/** What a cap types when clicked with the mouse. */
-export function charForCode(code: string): string | null {
-  if (code.startsWith('Key')) return code.slice(3);
-  if (code.startsWith('Digit')) return code.slice(5);
-  const map: Record<string, string> = {
-    Space: ' ',
-    Minus: '-',
-    Equal: '=',
-    BracketLeft: '[',
-    Semicolon: ';',
-    Comma: ',',
-    Period: '.',
-    Slash: '/',
-  };
-  return map[code] ?? null;
-}

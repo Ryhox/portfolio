@@ -19,7 +19,7 @@ export const tube = {
   cw: 1.2,
   ch: 0.675,
   /**
-   * 1 = the picture fills the machine's whole glass (the terminal, at the bench); 0 = it has the
+   * 1 = the picture fills the machine's whole glass (the greeter, at the bench); 0 = it has the
    * viewport's shape (the works, seen through the glass and then from inside it)
    */
   fill: 1,

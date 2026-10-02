@@ -18,7 +18,7 @@ export default function Details() {
   useEffect(() => {
     // ── a hello for whoever opens the console
     console.log(
-      '%c⚙ RYHOX WORKS%c\n\nHello, curious one. Everything here is hand-built: the tube, the lens, the cabinet.\nThe source lives at https://github.com/Ryhox. Try typing in the terminal on the landing page.',
+      '%c⚙ RYHOX WORKS%c\n\nHello, curious one. Everything here is hand-built: the tube, the lens, the cabinet.\nThe source lives at https://github.com/Ryhox.',
       'font: 800 22px sans-serif; color: #c99a58; letter-spacing: .08em',
       'font: 12px monospace; color: #b3a488',
     );

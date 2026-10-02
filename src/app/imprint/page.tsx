@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const CC_BY = 'https://creativecommons.org/licenses/by/4.0/';
 
 const models = [
-  { title: 'Lumen 64 Spark || Computer', author: 'dark_igorek', href: 'https://sketchfab.com/3d-models/lumen-64-spark-computer-b4c0d44924d3408593878bdc2ae353a2', changed: 'the pictured screen replaced by a working terminal, textures compressed' },
+  { title: 'Lumen 64 Spark || Computer', author: 'dark_igorek', href: 'https://sketchfab.com/3d-models/lumen-64-spark-computer-b4c0d44924d3408593878bdc2ae353a2', changed: 'the pictured screen replaced by a live one, textures compressed' },
   { title: 'Steampunk Camera', author: 'lumoize', href: 'https://sketchfab.com/3d-models/steampunk-camera-a2210a0ba6834141af3bf83ee1e03f07', changed: 'geometry simplified, textures compressed' },
   { title: 'Lumen Resonance || Audio System', author: 'dark_igorek', href: 'https://sketchfab.com/3d-models/lumen-resonance-audio-system-11b9575fd0fd4c01be2cd3d79421524d', changed: 'controls and display made to work, its vinyl copied into a crate, textures compressed' },
   { title: 'Broken Steampunk Clock', author: 'VassKacsoHunor', href: 'https://sketchfab.com/3d-models/broken-steampunk-clock-c440d78639b74e77ba6ae375f9cbf5b7', changed: 'a second one hung in the office, geometry simplified, textures compressed' },

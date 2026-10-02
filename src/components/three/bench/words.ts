@@ -3,7 +3,7 @@ import * as THREE from 'three';
 /**
  * The landing's words, in the scene: flat, hanging in the air between the camera and the machine,
  * so the camera flies past them on its way into the tube. They are the page's own words (the h1 and
- * the two cues), read letter by letter from where the browser lays them out and painted with the
+ * the cue), read letter by letter from where the browser lays them out and painted with the
  * same fonts and colours, so at rest they sit exactly where the page would have put them.
  */
 
@@ -42,7 +42,7 @@ type Block = {
   w: number;
   h: number;
   glyphs: Glyph[];
-  deco: 'needle' | 'key' | null;
+  deco: 'needle' | null;
   decoRect: Rect | null;
   decoRise: Rise | null;
   canvas: HTMLCanvasElement;
@@ -167,8 +167,6 @@ export class HeroWords {
       for (let n = walk.nextNode(); n; n = walk.nextNode()) {
         const el = n.parentElement;
         if (!el) continue;
-        // the key's letter belongs to the key, which is drawn on its own
-        if (!deco && el.closest('[data-deco]')) continue;
         const cs = getComputedStyle(el);
         const font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
         const wdth = parseFloat(/wdth['"]?\s+([\d.]+)/.exec(cs.fontVariationSettings)?.[1] ?? '100');
@@ -237,7 +235,7 @@ export class HeroWords {
     };
 
     document.querySelectorAll<HTMLElement>('[data-words]').forEach((root) => make(root, 24, null));
-    document.querySelectorAll<HTMLElement>('[data-words] [data-deco]').forEach((el) => make(el, 4, el.dataset.deco === 'needle' ? 'needle' : 'key'));
+    document.querySelectorAll<HTMLElement>('[data-words] [data-deco]').forEach((el) => make(el, 4, 'needle'));
   }
 
   /** Paint a block's canvas, if what it shows has changed. */
@@ -254,39 +252,26 @@ export class HeroWords {
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
 
-    // the key goes down for a moment every 2.4 s (as the CSS keypress animation)
-    const pressed = b.deco === 'key' && t >= 0 && ((time % 2.4) / 2.4 >= 0.87 && (time % 2.4) / 2.4 < 0.95);
     if (b.deco && b.decoRect) {
       const [op, dy] = rising(b.decoRise, t);
       const r = b.decoRect;
       ctx.globalAlpha = op;
-      if (b.deco === 'needle') {
-        const cx = r.x + r.w / 2;
-        const cy = r.y + r.h / 2 + dy;
-        ctx.strokeStyle = BORDER;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r.w / 2 - 0.5, 0, Math.PI * 2);
-        ctx.stroke();
-        // it swings from -50° to 130° and back every 2.8 s
-        const k = (time % 2.8) / 1.4;
-        const deg = k < 1 ? -50 + 180 * easeInOut(k) : 130 - 180 * easeInOut(k - 1);
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate((deg * Math.PI) / 180);
-        ctx.fillStyle = NEEDLE;
-        ctx.fillRect(-0.5, -9, 1, 9);
-        ctx.restore();
-      } else {
-        const top = r.y + dy + (pressed ? 2 : 0);
-        const bottom = pressed ? 1 : 3;
-        const h = r.h - (pressed ? 2 : 0);
-        ctx.fillStyle = BORDER;
-        ctx.beginPath();
-        ctx.roundRect(r.x, top, r.w, h, 3);
-        ctx.roundRect(r.x + 1, top + 1, r.w - 2, h - 1 - bottom, 2);
-        ctx.fill('evenodd');
-      }
+      const cx = r.x + r.w / 2;
+      const cy = r.y + r.h / 2 + dy;
+      ctx.strokeStyle = BORDER;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r.w / 2 - 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      // it swings from -50° to 130° and back every 2.8 s
+      const k = (time % 2.8) / 1.4;
+      const deg = k < 1 ? -50 + 180 * easeInOut(k) : 130 - 180 * easeInOut(k - 1);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate((deg * Math.PI) / 180);
+      ctx.fillStyle = NEEDLE;
+      ctx.fillRect(-0.5, -9, 1, 9);
+      ctx.restore();
       ctx.globalAlpha = 1;
     }
 
@@ -302,16 +287,15 @@ export class HeroWords {
       ctx.globalAlpha = op;
       ctx.font = g.font;
       ctx.fontStretch = g.stretch as CanvasFontStretch;
-      const drop = dy + (pressed ? 2 : 0);
       if (g.grad) {
         // the letters' stamped-metal gradient, carried with them as they rise
-        const grad = ctx.createLinearGradient(0, g.grad[0] + drop, 0, g.grad[1] + drop);
+        const grad = ctx.createLinearGradient(0, g.grad[0] + dy, 0, g.grad[1] + dy);
         grad.addColorStop(0, '#fff6e2');
         grad.addColorStop(0.4, '#ebe1cb');
         grad.addColorStop(1, '#c9b999');
         ctx.fillStyle = grad;
       } else ctx.fillStyle = g.color;
-      ctx.fillText(g.ch, g.x, g.base + drop);
+      ctx.fillText(g.ch, g.x, g.base + dy);
       ctx.restore();
     }
     b.tex.needsUpdate = true;

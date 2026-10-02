@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { rig } from '@/lib/rig';
 import Computer from './Computer';
-import type { LumenOS } from './LumenOS';
+import type { Greeter } from './Greeter';
 import { tube } from './tube';
 
 RectAreaLightUniformsLib.init();
@@ -35,7 +35,7 @@ function Floor() {
 }
 
 /** The workbench: the Lumen 64 under a single lamp in a dark workshop. */
-export default function Bench({ os, crt }: { os: LumenOS; crt: THREE.Texture }) {
+export default function Bench({ greeter, crt }: { greeter: Greeter; crt: THREE.Texture }) {
   const scene = useThree((s) => s.scene);
   const screenLight = useRef<THREE.RectAreaLight>(null);
   const key = useRef<THREE.SpotLight>(null);
@@ -107,7 +107,7 @@ export default function Bench({ os, crt }: { os: LumenOS; crt: THREE.Texture }) 
       <rectAreaLight ref={screenLight} color="#ffab55" intensity={0} width={2} height={1.2} />
 
       <Suspense fallback={null}>
-        <Computer os={os} crt={crt} />
+        <Computer greeter={greeter} crt={crt} />
         <ContactShadows position={[0, 0.001, 0]} scale={14} resolution={1024} blur={2.6} opacity={0.9} far={3} frames={1} color="#000000" />
       </Suspense>
       <Floor />

@@ -128,27 +128,4 @@ export const sfx = {
   ratchet() {
     burst(3000 + Math.random() * 1500, 4, 0.02, 0.18);
   },
-  /** the terminal's games and its bell: small square-wave chirps, like the machine's own speaker */
-  blip(kind: 'move' | 'eat' | 'hit' | 'win' | 'lose' | 'bell') {
-    switch (kind) {
-      case 'move':
-        tone(420, 0.03, 0.035, 'square');
-        break;
-      case 'eat':
-        tone(660, 0.05, 0.05, 'square', 990);
-        break;
-      case 'hit':
-        tone(300, 0.04, 0.05, 'square');
-        break;
-      case 'win':
-        [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.09, 0.05, 'square', undefined, i * 0.08));
-        break;
-      case 'lose':
-        [392, 330, 262].forEach((f, i) => tone(f, 0.14, 0.05, 'square', undefined, i * 0.12));
-        break;
-      case 'bell':
-        tone(1200, 0.12, 0.05, 'sine');
-        break;
-    }
-  },
 };

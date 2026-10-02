@@ -49,8 +49,14 @@ export const rig = {
   dive: 0,
   /** Scroll-driven exit at the end of the page: 0 = inside, 1 = back out at the bench. */
   exit: 0,
-  /** Terminal → works world cross-over on the tube, 0..1. */
+  /** Greeter → works world cross-over on the tube, 0..1. */
   tune: 0,
+  /**
+   * Where the tube's picture shows while the view is still outside the glass, for the page's own
+   * glass (its grain) to lie on it: the picture's corners in CSS px (top-left, top-right,
+   * bottom-right, bottom-left) and how round they are. Off once the picture is the whole view.
+   */
+  glass: { on: false, pts: [0, 0, 0, 0, 0, 0, 0, 0], round: 0 },
   /** 0..1: how far the loading really is (downloads, uploads, compiles, the last unseen draw) */
   boot: 0,
 
