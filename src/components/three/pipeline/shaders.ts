@@ -105,8 +105,15 @@ export const crtFrag = /* glsl */ `
   uniform float uDim;
   uniform float uBezel;
   uniform vec2 uRes;
-  // the shape the picture is shown at: the glass's on the machine, the viewport's inside it
+  // the shape of the view's own frame: the viewport's
   uniform float uAspect;
+  // Seen from outside, the picture is the machine's whole glass, and the view's frame the middle
+  // of it. All in frames (the view's own frame is ±1): the glass's half extents, the part of the
+  // picture this pass draws, and the part of the inner world drawn for it (middle xy, half
+  // extents zw). Inside, the frame is all there is: 1, 1 and 0, 0, 1, 1.
+  uniform vec2 uGlass;
+  uniform vec4 uWin;
+  uniform vec4 uSrc;
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -114,17 +121,18 @@ export const crtFrag = /* glsl */ `
     return fract(p.x * p.y);
   }
 
-  // barrel curvature, normalised so the four corners stay on the viewport's corners: the picture
+  // barrel curvature, normalised so the four corners stay on the frame's corners: the picture
   // bows like thick glass, and nothing from outside it is ever shown at the edges
-  vec2 bend(vec2 c, float k) {
-    float a = uAspect;
+  // (past those corners, on the rest of the machine's glass, the bow eases off)
+  vec2 bend(vec2 c, float k, float a) {
     float a2 = a * a;
     float r2 = (c.x * c.x * a2 + c.y * c.y) / (a2 + 1.0);
+    if (r2 > 1.0) r2 = 2.0 - 1.0 / r2;
     return c * (1.0 + k * r2) / (1.0 + k);
   }
 
-  float roundedMask(vec2 uv, out float sd) {
-    vec2 css = vec2(uAspect, 1.0) * (uRes.y / uDpr);
+  float roundedMask(vec2 uv, float aspect, out float sd) {
+    vec2 css = vec2(aspect, 1.0) * (uRes.y / uDpr);
     vec2 px = (uv - 0.5) * css;
     vec2 halfSize = 0.5 * css;
     vec2 d = abs(px) - (halfSize - uRadius);
@@ -145,15 +153,19 @@ export const crtFrag = /* glsl */ `
       c.y += fract(uTime * 1.7) * 0.18 * tune * tune;
     }
 
-    vec2 q = bend(c, uCurve);
-    float r2 = dot(c, c) * 0.5;
+    // where this is on the picture (in frames), and across the machine's glass (±1)
+    vec2 p = uWin.xy + c * uWin.zw;
+    vec2 g = p / uGlass;
+    float glass = uAspect * uGlass.x / uGlass.y;
+    vec2 q = bend(p, uCurve, uAspect);
+    float r2 = min(dot(p, p) * 0.5, 1.0);
 
     // convergence error grows towards the rim
     vec2 qr = q * (1.0 + uCA * r2);
     vec2 qb = q * (1.0 - uCA * r2);
-    vec2 uv = q * 0.5 + 0.5;
-    vec2 uvr = qr * 0.5 + 0.5;
-    vec2 uvb = qb * 0.5 + 0.5;
+    vec2 uv = (q - uSrc.xy) / uSrc.zw * 0.5 + 0.5;
+    vec2 uvr = (qr - uSrc.xy) / uSrc.zw * 0.5 + 0.5;
+    vec2 uvb = (qb - uSrc.xy) / uSrc.zw * 0.5 + 0.5;
 
     vec3 world = vec3(0.0);
     if (uHasScene > 0.5) {
@@ -182,10 +194,13 @@ export const crtFrag = /* glsl */ `
       world += texture2D(tBloom, uv).rgb * uBloom;
     }
 
+    // the greeter is the glass's own picture: it fills it, bowed to its shape
+    vec2 qg = bend(g, uCurve, glass);
+    float rg = dot(g, g) * 0.5;
     vec3 os;
-    os.r = texture2D(tOS, uvr).r;
-    os.g = texture2D(tOS, uv).g;
-    os.b = texture2D(tOS, uvb).b;
+    os.r = texture2D(tOS, qg * (1.0 + uCA * rg) * 0.5 + 0.5).r;
+    os.g = texture2D(tOS, qg * 0.5 + 0.5).g;
+    os.b = texture2D(tOS, qg * (1.0 - uCA * rg) * 0.5 + 0.5).b;
     os *= 1.55;
 
     vec3 col = mix(world, os, uOS);
@@ -197,10 +212,11 @@ export const crtFrag = /* glsl */ `
     // phosphor field: rounded, darkening into the bezel (the glass never tears, only the image);
     // only on the machine's own screen, seen from outside: inside, the picture runs to the edges
     float sd;
-    float mask = mix(1.0, roundedMask(bend(vUv * 2.0 - 1.0, uCurve) * 0.5 + 0.5, sd), uBezel);
+    vec2 still = (uWin.xy + (vUv * 2.0 - 1.0) * uWin.zw) / uGlass;
+    float mask = mix(1.0, roundedMask(bend(still, uCurve, glass) * 0.5 + 0.5, glass, sd), uBezel);
     float rim = smoothstep(-46.0, 0.0, sd) * uBezel;
     col *= 1.0 - rim * rim * 0.72;
-    col *= 1.0 - 0.28 * pow(r2, 1.6) * uBezel;
+    col *= 1.0 - 0.28 * pow(rg, 1.6) * uBezel;
 
     // scanlines on a 3 CSS px pitch, anchored to the viewport so the DOM glass can match them
     float y = gl_FragCoord.y / uDpr;
@@ -214,7 +230,7 @@ export const crtFrag = /* glsl */ `
 
     // powering up: the beam draws a bright line across the middle, then opens the picture
     if (uPower < 0.999) {
-      vec2 cc = vUv * 2.0 - 1.0;
+      vec2 cc = still;
       float line = smoothstep(0.0, 0.4, uPower);
       float open = smoothstep(0.35, 1.0, uPower);
       float h = max(open, 0.006);
@@ -287,10 +303,14 @@ export const finalFrag = /* glsl */ `
 /** How strongly the tube bows the picture: a clear fish-eye, like looking through thick glass. */
 export const CURVE = 0.13;
 
-/** The same curvature as the tube, for turning pointer coordinates into raycasts. */
+/**
+ * The same curvature as the tube (crtFrag's bend), for turning pointer coordinates into raycasts,
+ * and for finding what part of the inner world a part of the machine's glass shows.
+ */
 export function bendPointer(x: number, y: number, k: number, aspect: number): [number, number] {
   const a2 = aspect * aspect;
-  const r2 = (x * x * a2 + y * y) / (a2 + 1);
+  let r2 = (x * x * a2 + y * y) / (a2 + 1);
+  if (r2 > 1) r2 = 2 - 1 / r2;
   const g = (1 + k * r2) / (1 + k);
   return [x * g, y * g];
 }

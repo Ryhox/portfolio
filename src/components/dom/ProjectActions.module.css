@@ -11,7 +11,9 @@
   gap: 12px;
 }
 
-/* A machined nameplate: chamfered corners, two rivets, a bevel. */
+/* A machined nameplate: chamfered corners, two rivets, a bevel. Its size can be set from outside
+   (--act-h, --act-pad, --act-size, --act-track, --act-rivet): the film's plates on a phone are a
+   size smaller, see ReelDeck. */
 .act {
   --x: 50%;
   --y: 50%;
@@ -21,8 +23,9 @@
   isolation: isolate;
   display: inline-flex;
   align-items: center;
-  height: 46px;
-  padding: 0 24px;
+  justify-content: center;
+  height: var(--act-h, 46px);
+  padding: 0 var(--act-pad, 24px);
   overflow: hidden;
   clip-path: polygon(
     var(--c) 0,
@@ -35,9 +38,9 @@
     0 var(--c)
   );
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--act-size, 11px);
   font-weight: 500;
-  letter-spacing: 0.16em;
+  letter-spacing: var(--act-track, 0.16em);
   text-transform: uppercase;
   font-variation-settings: 'wdth' 112.5;
   user-select: none;
@@ -53,8 +56,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 9px 50%, rgba(255, 244, 220, 0.9) 0 1px, rgba(40, 26, 12, 0.9) 1.6px 2.4px, transparent 2.9px),
-    radial-gradient(circle at calc(100% - 9px) 50%, rgba(255, 244, 220, 0.9) 0 1px, rgba(40, 26, 12, 0.9) 1.6px 2.4px, transparent 2.9px);
+    radial-gradient(circle at var(--act-rivet, 9px) 50%, rgba(255, 244, 220, 0.9) 0 1px, rgba(40, 26, 12, 0.9) 1.6px 2.4px, transparent 2.9px),
+    radial-gradient(circle at calc(100% - var(--act-rivet, 9px)) 50%, rgba(255, 244, 220, 0.9) 0 1px, rgba(40, 26, 12, 0.9) 1.6px 2.4px, transparent 2.9px);
 }
 .act[data-on='1'] {
   --r: 320px;
@@ -99,6 +102,8 @@
   z-index: 1;
   display: flex;
   align-items: center;
+  /* (in the middle of the plate, when the plate is made wider than its words) */
+  justify-content: center;
   gap: 0.75em;
   white-space: nowrap;
 }
@@ -108,7 +113,7 @@
   position: absolute;
   inset: 0;
   z-index: 2;
-  padding: 0 24px;
+  padding: 0 var(--act-pad, 24px);
   color: var(--wet);
   text-shadow: none;
   clip-path: circle(var(--r) at var(--x) var(--y));

@@ -5,6 +5,7 @@ import Flourish from '@/components/dom/Flourish';
 import Footer from '@/components/dom/Footer';
 import Prepaint from '@/components/dom/Prepaint';
 import LocalTime from '@/components/dom/LocalTime';
+import { Words } from '@/components/dom/Rise';
 import ReelDeck from '@/components/dom/ReelDeck';
 import SayHi from '@/components/dom/SayHi';
 import { capabilities } from '@/content/capabilities';
@@ -19,6 +20,8 @@ export const metadata: Metadata = {
 };
 
 const d = (v: string) => ({ '--d': v }) as React.CSSProperties;
+/** (a piece's turn among those that arrive with it: see components/dom/Reveals) */
+const turn = (v: string) => ({ '--rv-d': v }) as React.CSSProperties;
 
 export default function Home() {
   return (
@@ -64,16 +67,25 @@ export default function Home() {
           <div className={s.aboutArt}>
             <div className={s.stageFill} data-stage="about-art" data-pin="maker" aria-hidden="true" />
           </div>
-          <div className={s.aboutBio} data-about="bio">
-            <h2 id="maker-title" className={`t-display ${s.h2} ${s.h2Small}`}>
-              I build <em>playful, tactile</em> things for the web.
+          {/* (its words come up, one after another, as it comes into view) */}
+          <div className={s.aboutBio} data-about="bio" data-rvs>
+            <h2 id="maker-title" className={`t-display ${s.h2} ${s.h2Small}`} aria-label="I build playful, tactile things for the web.">
+              <span aria-hidden="true">
+                <Words text="I build" />{' '}
+                <em>
+                  <Words text="playful, tactile" from={0.14} />
+                </em>{' '}
+                <Words text="things for the web." from={0.28} />
+              </span>
             </h2>
-            <Flourish className={s.flourish} />
-            <p className={`t-text ${s.statement}`}>
+            <Flourish className={s.flourish} arrive={0.5} />
+            <p className={`t-text ${s.statement}`} data-rv style={turn('0.62s')}>
               Ryhox is a web developer and Three.js engineer. Real-time 3D worlds, everyday apps, private AI and Minecraft mods,
               all built by hand.
             </p>
-            <p className={`t-label ${s.hint}`}>Hover the portrait. A loupe finds what is under the paint.</p>
+            <p className={`t-label ${s.hint}`} data-rv style={turn('0.8s')}>
+              Hover the portrait. A loupe finds what is under the paint.
+            </p>
           </div>
 
           {/* the trades: the clock in the middle and the five set out round it, each with its tools

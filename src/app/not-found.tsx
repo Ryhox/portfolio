@@ -46,9 +46,9 @@ export default function NotFound() {
         <Stopped />
         <span>4</span>
       </h1>
-      <Flourish className={s.flourish} />
-      <p className={s.lead}>This page stopped at 4:04 and nobody wound it. Whatever was here has come loose from the mechanism.</p>
-      <div className={s.links}>
+      <Flourish className={s.flourish} arrive={0.2} />
+      <p className={s.lead} data-rv style={{ '--rv-d': '0.3s' } as React.CSSProperties}>This page stopped at 4:04 and nobody wound it. Whatever was here has come loose from the mechanism.</p>
+      <div className={s.links} data-rv style={{ '--rv-d': '0.45s' } as React.CSSProperties}>
         <TransitionLink href="/" className={s.home}>
           Back to the machine
         </TransitionLink>

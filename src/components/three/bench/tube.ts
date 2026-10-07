@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clamp, easeInOutCubic, lerp, smootherstep, smoothstep } from '@/lib/math';
 import { rig } from '@/lib/rig';
+import { CURVE, bendPointer } from '../pipeline/shaders';
 
 /**
  * Geometry of the Lumen 64's picture tube in world space, plus the camera choreography
@@ -15,14 +16,28 @@ export const tube = {
   N: new THREE.Vector3(0, 0, 1),
   hw: 1.2,
   hh: 0.75,
-  /** half extents of the viewport-aspect image drawn inside the glass */
+  /**
+   * half extents of the view's own frame on the glass: the part of the picture with the viewport's
+   * shape, which is all the view sees once it is inside
+   */
   cw: 1.2,
   ch: 0.675,
   /**
-   * 1 = the picture fills the machine's whole glass (the greeter, at the bench); 0 = it has the
-   * viewport's shape (the works, seen through the glass and then from inside it)
+   * The picture is always the machine's whole glass, a window onto the inner world: the view's
+   * frame is the middle of it, and the rest of the glass shows what lies round that. So nothing
+   * changes shape on the way in (or out). Only the part of the glass in sight is drawn, at the
+   * view's full sharpness: `win` is that part of the picture, and `src` the part of the inner
+   * world drawn for it (the glass bows the picture, so it is not the same part). Both in frames:
+   * the middle and half extents, the view's own frame being ±1. See `sight`.
    */
-  fill: 1,
+  win: { x: 0, y: 0, hx: 1, hy: 1 },
+  src: { x: 0, y: 0, hx: 1, hy: 1 },
+  /** the glass's half extents in frames (1, 1 once the view is inside: there the frame is all there is) */
+  gx: 1,
+  gy: 1,
+  /** the mesh the picture is shown on, and where it sits on the lid when it is the whole glass */
+  screen: null as THREE.Mesh | null,
+  rest: new THREE.Vector3(),
   /** a point near the middle of the machine, for framing */
   focus: new THREE.Vector3(),
   /** the middle of the closed case */
@@ -44,6 +59,124 @@ export function fitContent(aspect: number) {
     tube.ch = tube.hh;
     tube.cw = tube.hh * aspect;
   }
+}
+
+export type Part = typeof tube.win;
+
+const VIEW = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+];
+const _eye = new THREE.Vector3();
+const _ray = new THREE.Vector3();
+/** a little more than is in sight, so the edge of what is drawn is never the edge of what is seen */
+const MARGIN = 0.03;
+
+/**
+ * What a camera at the bench sees of the machine's glass: that part of the picture is what gets
+ * drawn (tube.win, tube.src), and the mesh it is shown on is laid there. Far off that is all of the
+ * glass; as the view goes in it closes on the view's own frame, so the picture is as sharp as the
+ * view by the time it fills it. `camera` null: the view is inside, and its frame is the picture.
+ * `whole`: all of the glass whatever the camera sees (the lid is still swinging open).
+ */
+export function sight(camera: THREE.PerspectiveCamera | null, aspect: number, whole = false) {
+  const { win, src, C, R, U, N } = tube;
+  if (!camera) {
+    tube.gx = tube.gy = 1;
+    win.x = win.y = src.x = src.y = 0;
+    win.hx = win.hy = src.hx = src.hy = 1;
+    return;
+  }
+  const gx = (tube.gx = tube.hw / tube.cw);
+  const gy = (tube.gy = tube.hh / tube.ch);
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  // the corners of the view, where they meet the glass's plane
+  _eye.setFromMatrixPosition(camera.matrixWorld);
+  const depth = (C.x - _eye.x) * N.x + (C.y - _eye.y) * N.y + (C.z - _eye.z) * N.z;
+  let found = !whole && depth < -1e-4;
+  for (let i = 0; found && i < 4; i++) {
+    _ray.set(VIEW[i][0], VIEW[i][1], 0.5).unproject(camera).sub(_eye);
+    const along = _ray.dot(N);
+    // (a corner that looks past the plane: there is no saying how much of the glass is in sight)
+    if (along > -1e-6) {
+      found = false;
+      break;
+    }
+    _ray.multiplyScalar(depth / along).add(_eye).sub(C);
+    const x = _ray.dot(R) / tube.cw;
+    const y = _ray.dot(U) / tube.ch;
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+    y0 = Math.min(y0, y);
+    y1 = Math.max(y1, y);
+  }
+  if (found) {
+    const mx = (x1 - x0) * MARGIN;
+    const my = (y1 - y0) * MARGIN;
+    x0 = Math.max(-gx, x0 - mx);
+    x1 = Math.min(gx, x1 + mx);
+    y0 = Math.max(-gy, y0 - my);
+    y1 = Math.min(gy, y1 + my);
+  }
+  // (none of it in sight, the view turned away to the radio: all of it, as it does not matter)
+  if (!found || x1 - x0 < 1e-4 || y1 - y0 < 1e-4) {
+    x0 = -gx;
+    x1 = gx;
+    y0 = -gy;
+    y1 = gy;
+  }
+  win.x = (x0 + x1) / 2;
+  win.y = (y0 + y1) / 2;
+  win.hx = (x1 - x0) / 2;
+  win.hy = (y1 - y0) / 2;
+
+  // the glass bows the picture: what it shows at a point comes from a little nearer the middle, or
+  // (far out) from further off. So the part of the world to draw is the picture's own part taken
+  // through the same curve; the curve keeps things in their order from the middle outward, so the
+  // part's corners, and the points of its edges nearest the middle, say how far it reaches
+  const nx = clamp(0, x0, x1);
+  const ny = clamp(0, y0, y1);
+  let a0 = Infinity;
+  let a1 = -Infinity;
+  let b0 = Infinity;
+  let b1 = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    const x = i < 6 ? (i & 1 ? x1 : x0) : nx;
+    const y = i < 4 ? (i & 2 ? y1 : y0) : i < 6 ? ny : i & 1 ? y1 : y0;
+    const [bx, by] = bendPointer(x, y, CURVE, aspect);
+    a0 = Math.min(a0, bx);
+    a1 = Math.max(a1, bx);
+    b0 = Math.min(b0, by);
+    b1 = Math.max(b1, by);
+  }
+  src.x = (a0 + a1) / 2;
+  src.y = (b0 + b1) / 2;
+  src.hx = (a1 - a0) / 2;
+  src.hy = (b1 - b0) / 2;
+
+  const s = tube.screen;
+  if (s) {
+    s.position.set(tube.rest.x + win.x * tube.cw, tube.rest.y + win.y * tube.ch, tube.rest.z);
+    s.scale.set(win.hx * tube.cw * 2, win.hy * tube.ch * 2, 1);
+  }
+}
+
+/**
+ * Have a camera draw only a part of what it sees, or more than it does (`part` in views: its
+ * middle and half extents, the camera's own view being ±1). Undone by updateProjectionMatrix().
+ */
+export function crop(camera: THREE.PerspectiveCamera, part: Part) {
+  const e = camera.projectionMatrix.elements;
+  for (let c = 0; c < 16; c += 4) {
+    e[c] = (e[c] - part.x * e[c + 3]) / part.hx;
+    e[c + 1] = (e[c + 1] - part.y * e[c + 3]) / part.hy;
+  }
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 }
 
 /** Distance at which the content rectangle exactly fills the viewport vertically. */

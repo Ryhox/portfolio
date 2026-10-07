@@ -47,7 +47,6 @@
   position: relative;
   margin: 0;
   font-size: clamp(52px, 10vw, 170px);
-  animation: rise 1.1s var(--ease-out) both;
 }
 .flourish {
   display: block;
@@ -62,19 +61,11 @@
   line-height: 1.25;
   color: var(--bone);
   max-width: 30ch;
-  animation: rise 1.1s var(--ease-out) 0.12s both;
-}
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 24px, 0);
-  }
 }
 
-/* the recording, in a brass plate frame */
+/* the recording, in a brass plate frame (how the page's pieces arrive: see the arrivals in globals.css) */
 .plate {
   margin: 0 0 9vh;
-  animation: rise 1.2s var(--ease-out) 0.22s both;
 }
 .frame {
   position: relative;
@@ -105,12 +96,16 @@
 .frame::after {
   right: 3px;
 }
+/* (the recording settles into its frame as that is uncovered: this keeps it inside) */
+.screen {
+  overflow: hidden;
+  border-radius: 3px;
+}
 .video {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 3px;
   background: #0a0806;
 }
 .caption {

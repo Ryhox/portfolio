@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Flourish from './Flourish';
+import { Letters } from './Rise';
 import TransitionLink from './TransitionLink';
 import s from './LegalPage.module.css';
 
@@ -17,12 +18,18 @@ export default function LegalPage({
 }) {
   return (
     <article className={s.sheet}>
-      <header className={s.head}>
-        <h1 className={`t-display ${s.title}`}>{title}</h1>
-        <Flourish className={s.flourish} />
-        <p className={s.lead}>{lead}</p>
+      <header className={s.head} data-rvs>
+        <h1 className={`t-display ${s.title}`} aria-label={title}>
+          <Letters text={title} from={0.05} />
+        </h1>
+        <Flourish className={s.flourish} arrive={0.4} />
+        <p className={s.lead} data-rv style={{ '--rv-d': '0.5s' } as React.CSSProperties}>
+          {lead}
+        </p>
       </header>
-      <div className={s.body}>{children}</div>
+      <div className={s.body} data-rv style={{ '--rv-d': '0.65s' } as React.CSSProperties}>
+        {children}
+      </div>
       <footer className={s.foot}>
         <span>Last updated {updated}</span>
         <nav aria-label="Legal">

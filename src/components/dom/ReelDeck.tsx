@@ -66,6 +66,15 @@ function Knob({ dir, onTurn }: { dir: 1 | -1; onTurn: (dir: 1 | -1) => void }) {
 }
 
 /**
+ * The row of buttons under the film, as the stylesheet lays it out (`data-fit='under'`): how tall
+ * (in lines of its type, whose size goes with the window's width), the gap to the film above it,
+ * and what must stay clear over the film and between the row and the knobs. And how far past a
+ * limit the buttons stay where they are (px).
+ */
+const UNDER = { rows: 4, min: 8.5, vw: 0.026, max: 10, gap: 12, clear: 10 };
+const SLACK = 6;
+
+/**
  * The page over the spiral of film: every plate is in the document (and indexable), one is shown.
  * Its title sits at the top; its buttons sit on the picture at the gate, sheared to its slope (the
  * 3D says where it is), and change the picture while the pointer is on them. The knobs and the
@@ -86,7 +95,7 @@ export default function ReelDeck({ projects }: { projects: Project[] }) {
   useEffect(() => {
     let active = -1;
     let at = 0;
-    const last = { gate: '', rest: '', fx: '', fit: '' };
+    const last = { gate: '', rest: '', fx: '', fit: '', width: '' };
     const px = (v: number) => `${v.toFixed(1)}px`;
     const actions = Array.from(root.current?.querySelectorAll<HTMLElement>(`.${s.actions}`) ?? []);
     // what a button does to the picture: a browser's bar drops over the top of it with the address
@@ -119,17 +128,44 @@ export default function ReelDeck({ projects }: { projects: Project[] }) {
       const key = !near ? last.gate : g.ok ? [g.left, g.right, g.bottom, g.film, ...g.tl, ...g.tr, ...g.bl, ...g.br].map((v) => v.toFixed(1)).join(',') : '';
       if (key !== last.gate) {
         last.gate = key;
-        // the buttons go inside the picture's corner when it is wide enough for them, else under the
-        // film; a short screen has no room under it, so there they sit inside, a size smaller
-        const fit = g.right - g.left > 430 ? 'in' : rig.vh < 620 ? 'small' : 'under';
         // the slope of the picture's bottom edge: what sits on it is sheared to match
-        const skew = `${((Math.atan2(g.br[1] - g.bl[1], g.br[0] - g.bl[0]) * 180) / Math.PI).toFixed(2)}deg`;
+        const slope = Math.atan2(g.br[1] - g.bl[1], g.br[0] - g.bl[0]);
+        const skew = `${((slope * 180) / Math.PI).toFixed(2)}deg`;
         const pad = Math.min(20, Math.max(12, rig.vw * 0.013));
+        // the buttons go inside the picture's corner when it is wide enough for them; else under the
+        // film, side by side, but only where the row really fits between the film and the knobs
+        // (measured, whatever the window's shape); where it does not, they sit inside, smaller.
+        // Under the film, the film is raised until it and the row sit in the middle of their box
+        // together, so the row needs only half its height of room there. What is free over the
+        // film and under the row is taken as it would be with the film not raised (`g.lift`), and
+        // with a little slack toward where the buttons are now: the film leans with the pointer
+        // and the picture's size with it, so at the limit they would hop to and fro
+        const w = g.right - g.left;
+        const stage = rig.stages.get('reel');
+        const edge = g.bottom + g.film;
+        const row = UNDER.rows * Math.min(UNDER.max, Math.max(UNDER.min, rig.vw * UNDER.vw));
+        const over = g.top - (edge - g.br[1]) + g.lift - (stage ? stage.y : 0);
+        const under = (stage ? stage.y + stage.h : rig.vh) - (edge + UNDER.gap + row + (w / 2) * Math.abs(Math.tan(slope)) + g.lift);
+        const stay = (at: string) => (last.fit === at ? SLACK : 0);
+        const fit = w > 430 - stay('in') ? 'in' : Math.max(under, (over + under) / 2) >= UNDER.clear - stay('under') ? 'under' : 'small';
+        const lift = fit === 'under' ? Math.max(0, (over - under) / 2) : 0;
+        if (fit !== last.fit || Math.abs(lift - reel.lift) > 2) reel.lift = Math.round(lift);
+        // (inside and smaller, the row is laid on the middle of the picture's bottom edge: it is as
+        // wide as the picture, or as the pair where that is wider: see the stylesheet)
         const place =
           fit === 'under'
-            ? `translate3d(${px((g.left + g.right) / 2)}, ${px(g.bottom + g.film + 12)}, 0) translateX(-50%) skewY(${skew})`
-            : `translate3d(${px(g.br[0] - pad)}, ${px(g.br[1] - pad)}, 0) translate(-100%, -100%) skewY(${skew})`;
+            ? `translate3d(${px((g.left + g.right) / 2)}, ${px(edge + UNDER.gap)}, 0) translateX(-50%) skewY(${skew})`
+            : fit === 'small'
+              ? `translate3d(${px((g.bl[0] + g.br[0]) / 2)}, ${px((g.bl[1] + g.br[1]) / 2 - pad * 0.6)}, 0) translate(-50%, -100%) skewY(${skew})`
+              : `translate3d(${px(g.br[0] - pad)}, ${px(g.br[1] - pad)}, 0) translate(-100%, -100%) skewY(${skew})`;
         for (const a of actions) a.style.transform = place;
+        // where the picture is too narrow for the plates as they are, they are sized by its width
+        // (to the whole px: they are only laid out again when that changes)
+        const width = fit === 'in' ? '' : `${Math.round(w)}px`;
+        if (width !== last.width) {
+          last.width = width;
+          for (const a of actions) a.style.setProperty('--gate-w', width);
+        }
         stamp.current?.style.setProperty('--gate-cx', px((g.tl[0] + g.br[0]) / 2));
         stamp.current?.style.setProperty('--gate-cy', px((g.tl[1] + g.br[1]) / 2));
         const shown = g.ok ? '1' : '0';

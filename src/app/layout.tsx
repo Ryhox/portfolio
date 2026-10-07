@@ -8,6 +8,7 @@ import MusicConsent from '@/components/dom/MusicConsent';
 import Nav from '@/components/dom/Nav';
 import PerfOverlay from '@/components/dom/PerfOverlay';
 import Radio from '@/components/dom/Radio';
+import Reveals from '@/components/dom/Reveals';
 import Runtime from '@/components/dom/Runtime';
 import ExperienceLoader from '@/components/three/ExperienceLoader';
 import { site } from '@/content/site';
@@ -109,12 +110,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: jsonLdString(graph(personJsonLd(), websiteJsonLd())) }}
         />
         <noscript>
-          <style>{`.boot{display:none!important}`}</style>
+          <style>{`.boot{display:none!important}[data-rv],[data-rv]>span{opacity:1!important;transform:none!important;clip-path:none!important}`}</style>
         </noscript>
         <a className="skip-link" href="#main">
           Skip to content
         </a>
         <Runtime />
+        <Reveals />
         <ExperienceLoader />
         <Nav />
         <main id="main">{children}</main>

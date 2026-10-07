@@ -226,15 +226,113 @@ html.crt-dark #main {
     transform: scale(0, 0.006);
   }
 }
+/* (coming on, the picture opens a hair past its size and settles, as a tube's does while its
+   brightness is still finding its level) */
 @keyframes crt-on {
   0% {
     transform: scale(0, 0.006);
   }
-  35% {
+  30% {
     transform: scale(1, 0.006);
+  }
+  78% {
+    transform: scale(1, 1.014);
   }
   100% {
     transform: none;
+  }
+}
+
+/* ── Arrivals: the page's type comes up into its place when it comes into view, or when the
+   picture comes on over it (components/dom/Reveals marks each piece data-in). Each is an
+   animation from where it starts to whatever the piece itself is at rest, so nothing here stays
+   on it afterwards. --rv-d: its turn, in seconds ─── */
+[data-rv]:not([data-in]) {
+  opacity: 0;
+}
+[data-rv][data-in] {
+  animation: rv-rise 1.15s var(--ease-out) var(--rv-d, 0s) backwards;
+}
+@keyframes rv-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+}
+
+/* display type, a word at a time: each comes up from under its own line, as the landing's letters
+   do (the room round it keeps the tops and tails of the letters from being cut) */
+[data-rv='word'],
+[data-rv='letters'] {
+  display: inline-block;
+  overflow: clip;
+  padding: 0.1em 0.05em 0.07em;
+  margin: -0.1em -0.05em -0.07em;
+}
+[data-rv='word']:not([data-in]),
+[data-rv='letters']:not([data-in]) {
+  opacity: 1;
+}
+[data-rv='word'][data-in],
+[data-rv='letters'][data-in] {
+  animation: none;
+}
+[data-rv='word'] > span,
+[data-rv='letters'] > span {
+  display: inline-block;
+}
+[data-rv='word']:not([data-in]) > span,
+[data-rv='letters']:not([data-in]) > span {
+  transform: translate3d(0, 116%, 0);
+}
+[data-rv='word'][data-in] > span,
+[data-rv='letters'][data-in] > span {
+  animation: rv-up 1.2s var(--ease-out) calc(var(--rv-d, 0s) + var(--i, 0) * 36ms) backwards;
+}
+@keyframes rv-up {
+  from {
+    transform: translate3d(0, 116%, 0);
+  }
+}
+
+/* an engraved rule: drawn out from its cog */
+[data-rv='rule'][data-in] {
+  animation: rv-rule 1.3s var(--ease-out) var(--rv-d, 0s) backwards;
+  transform-origin: 0 50%;
+}
+@keyframes rv-rule {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+/* a framed picture: uncovered from its foot upward as it comes up, the picture in it settling */
+[data-rv='plate']:not([data-in]) {
+  opacity: 1;
+  clip-path: inset(100% -100px -140px -100px);
+}
+[data-rv='plate'][data-in] {
+  animation: rv-plate 1.35s var(--ease-in-out) var(--rv-d, 0s) backwards;
+}
+@keyframes rv-plate {
+  from {
+    clip-path: inset(100% -100px -140px -100px);
+    transform: translate3d(0, 48px, 0);
+  }
+  to {
+    clip-path: inset(-100px -100px -140px -100px);
+  }
+}
+[data-rv='plate']:not([data-in]) [data-rv-in] {
+  transform: scale(1.12);
+}
+[data-rv='plate'][data-in] [data-rv-in] {
+  animation: rv-settle 1.9s var(--ease-out) var(--rv-d, 0s) backwards;
+}
+@keyframes rv-settle {
+  from {
+    transform: scale(1.12);
   }
 }
 

@@ -165,6 +165,8 @@ function assemble(scene: THREE.Group, animations: THREE.AnimationClip[], crt: TH
   screen.position.copy(screenLocal).add(new THREE.Vector3(0, 0, 0.004));
   screen.renderOrder = 2;
   lid.add(screen);
+  // (it is laid on the part of the glass in sight, see the tube's `sight`: this is its middle)
+  const screenRest = screen.position.clone();
 
   // ── keycaps: sorted into rows by depth, columns by x, then given a QWERTY layout
   const capsRaw: { node: THREE.Object3D; x: number; z: number }[] = [];
@@ -221,6 +223,7 @@ function assemble(scene: THREE.Group, animations: THREE.AnimationClip[], crt: TH
     hh,
     glass,
     screen,
+    screenRest,
     screenMat,
     caps,
     capByNode,
@@ -298,8 +301,12 @@ export default function Computer({ greeter, crt }: { greeter: Greeter; crt: THRE
    */
   const onPicture = (e: ThreeEvent<PointerEvent>) => {
     const uv = e.intersections.find((i) => i.object === m.screen)?.uv;
-    if (!uv || tube.fill < 1) return null;
-    const [x, y] = bendPointer(uv.x * 2 - 1, uv.y * 2 - 1, CURVE, tube.hw / tube.hh);
+    if (!uv) return null;
+    // (the mesh is the part of the glass in sight: from a point of it to a point of the whole glass)
+    const { win } = tube;
+    const gx = (win.x + (uv.x * 2 - 1) * win.hx) / tube.gx;
+    const gy = (win.y + (uv.y * 2 - 1) * win.hy) / tube.gy;
+    const [x, y] = bendPointer(gx, gy, CURVE, tube.hw / tube.hh);
     return [(x + 1) / 2, (1 - y) / 2] as const;
   };
 
@@ -452,9 +459,10 @@ export default function Computer({ greeter, crt }: { greeter: Greeter; crt: THRE
       const b = m.caseBox;
       tube.box[i].set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(g.matrixWorld);
     }
+    tube.screen = m.screen;
+    tube.rest.copy(m.screenRest);
     tube.ready = true;
 
-    m.screen.scale.set((tube.cw + (tube.hw - tube.cw) * tube.fill) * 2, (tube.ch + (tube.hh - tube.ch) * tube.fill) * 2, 1);
     m.screenMat.uniforms.uSheen.value = 0.06 * (1 - dive);
   });
 

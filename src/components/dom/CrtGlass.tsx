@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { noiseTile } from '@/lib/grain';
 import { onFrame } from '@/lib/loop';
 import { rig } from '@/lib/rig';
 import { smoothstep } from '@/lib/math';
@@ -10,27 +11,10 @@ import s from './CrtGlass.module.css';
  * The glass in front of everything once you are inside the tube: a fine, living film grain over
  * the type (the WebGL picture has its own), a faint window reflection, and the dark rim where
  * the picture meets the bezel. On the way in it is there as soon as the inner world shows on the
- * machine's screen, laid on that screen (and growing with it), so the world does not stand on
- * plain black until the view is through the glass.
- * Also hosts the beam used when the channel changes.
+ * machine's screen, laid on as much of that screen as is in sight (and growing with it), so the
+ * world does not stand on plain black until the view is through the glass.
+ * Also hosts the beam used when the channel changes, and the spot it leaves on the glass.
  */
-/** A small tile of monochrome noise, made once. */
-function noiseTile() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 180;
-  const g = c.getContext('2d')!;
-  const img = g.createImageData(180, 180);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = Math.random() * 255;
-    img.data[i] = v;
-    img.data[i + 1] = v * 0.94;
-    img.data[i + 2] = v * 0.84;
-    img.data[i + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  return c.toDataURL('image/png');
-}
-
 type M3 = number[];
 const adj = (m: M3): M3 => [
   m[4] * m[8] - m[5] * m[7],
@@ -84,7 +68,8 @@ export default function CrtGlass() {
       const on = rig.glass.on && inside > 0;
       // (its own box is the viewport's: taken from there, not measured, so nothing is laid out for it)
       const transform = on ? onto(rig.vw, window.innerHeight, rig.glass.pts) : '';
-      const round = on && rig.glass.round > 0.5 ? `${rig.glass.round.toFixed(1)}px` : '';
+      const [rx, ry] = rig.glass.round;
+      const round = on && ry > 0.5 ? `${rx.toFixed(1)}px / ${ry.toFixed(1)}px` : '';
       if (transform !== last.transform) g.style.transform = last.transform = transform;
       if (round !== last.round) g.style.borderRadius = last.round = round;
     }, 'after');
@@ -97,6 +82,7 @@ export default function CrtGlass() {
         <div className={s.sheen} />
       </div>
       <div className={s.beam} aria-hidden="true" />
+      <div className={s.spot} aria-hidden="true" data-crt-spot />
     </>
   );
 }

@@ -67,6 +67,23 @@
   animation: beam-on 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* the spot left in the middle of the glass when the tube has gone dark: phosphor, still lit for a
+   moment (played from lib/transition) */
+.spot {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 70;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, #fffaf0 0%, #ffd9a4 38%, rgba(255, 168, 80, 0) 72%);
+  box-shadow: 0 0 22px 6px rgba(255, 190, 120, 0.38);
+}
+
 @keyframes beam-off {
   0% {
     opacity: 0;
@@ -90,7 +107,7 @@
     opacity: 1;
     transform: scale(0.004, 0.006);
   }
-  35% {
+  30% {
     opacity: 1;
     transform: scale(1, 0.006);
   }

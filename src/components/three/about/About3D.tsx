@@ -197,9 +197,12 @@ export default function About3D() {
   useFrame((_, dt) => {
     const g = root.current;
     if (!g) return;
-    g.visible = rig.route === 'home' && sectionVisible('maker', 0.5);
-    if (spot.current) spot.current.intensity = g.visible ? 90 : 0;
-    if (!g.visible) return;
+    const near = rig.route === 'home' && sectionVisible('maker', 0.5);
+    // (while the view is still outside the machine, the glass shows more of this world than the
+    // view's own frame will: the way in and its gears, not what waits further down the page)
+    g.visible = near && rig.dive >= 0.9995;
+    if (spot.current) spot.current.intensity = near ? 90 : 0;
+    if (!near) return;
     const L = layout();
     const e = easeInOutCubic(about.phase);
     // 0 = in the box, ±1 = slid out of it

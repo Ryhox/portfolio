@@ -45,9 +45,14 @@ export const reel = {
   /**
    * the frame at the gate, on screen in CSS px, as the curved glass shows it (written by the 3D):
    * the picture's box, its corners (the strip climbs, so its top and bottom slope while its sides
-   * stay upright), and the bottom of the film under it
+   * stay upright), the bottom of the film under it, and how far the film stood raised (see `lift`)
    */
-  gate: { left: 0, top: 0, right: 0, bottom: 0, tl: [0, 0], tr: [0, 0], bl: [0, 0], br: [0, 0], film: 0, ok: false },
+  gate: { left: 0, top: 0, right: 0, bottom: 0, tl: [0, 0], tr: [0, 0], bl: [0, 0], br: [0, 0], film: 0, lift: 0, ok: false },
+  /**
+   * how far (CSS px) the film is raised out of the middle of its box, where the buttons go under
+   * it: the film and the row then sit in the box together (written by the page; the 3D eases there)
+   */
+  lift: 0,
   /** 0..1: the way out, over the section's last stretch: into the frame at the gate and through it; 1 = on the last screen */
   leave: 0,
   /** under way: the page's type has let go of the film, and the last screen shows behind it */

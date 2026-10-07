@@ -3,6 +3,8 @@
   position: absolute;
   inset: 0;
   display: grid;
+  /* (one column, as wide as the window leaves it and no wider: whatever is in it has to fit) */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding: calc(var(--nav-h) + 1.2vh) var(--gutter) calc(2.6vh + var(--bar) + var(--safe) * 0.4);
   pointer-events: none;
@@ -10,6 +12,7 @@
 
 .plates {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   padding: 0;
   margin: 0;
@@ -168,8 +171,9 @@
 }
 
 /* the buttons sit in the bottom-right corner of the picture at the gate (the 3D says where it is);
-   when the picture is too narrow for them, they go under the film, centred. Their place (and the
-   shear to the picture's sloping bottom edge) is written onto them, see ReelDeck */
+   when the picture is too narrow for them, they go under the film, side by side, if the row fits
+   between the film and the knobs, and inside the picture, smaller, if it does not. Which it is,
+   their place and the shear to the picture's sloping bottom edge are written by ReelDeck */
 .actions {
   position: absolute;
   left: 0;
@@ -184,13 +188,46 @@
     opacity 0.45s var(--ease-out) 0.15s,
     translate 0.6s var(--ease-out) 0.15s;
 }
-.root[data-fit='small'] .actions {
-  scale: 0.72;
-}
+/* where the picture is too narrow for them as they are: always one row, never one plate on top of
+   the other, and a size smaller (--gate-w is the picture's width, written onto the row: see ReelDeck) */
+.root[data-fit='small'] .actions,
 .root[data-fit='under'] .actions {
+  --act-h: 4em;
+  --act-pad: 1.4em;
+  --act-track: 0.1em;
+  --act-rivet: 0.6em;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+/* no room under the film (a short screen, a window of no particular shape): still inside the
+   picture, as small as it takes for the pair to fit across it. The row is as wide as the picture
+   (less the corner's inset) and the pair is at its right end: in the corner, as on a wide screen.
+   Where even the smallest pair is wider than that, the row is as wide as the pair, and since it
+   sits on the middle of the picture's bottom edge, what does not fit hangs over evenly */
+.root[data-fit='small'] .actions {
+  --act-size: clamp(7.5px, calc((var(--gate-w, 320px) - 28px) / 31), 10px);
+  --act-h: 3.6em;
+  gap: 6px;
+  width: calc(var(--gate-w, 320px) - 20px);
+  min-width: max-content;
+  transform-origin: 50% 100%;
+}
+/* under the film (a phone): the two share out the picture's width between them, so the pair ends
+   where the picture does; a plate on its own keeps its own width. (ReelDeck's UNDER is this row's
+   height and type size, to know whether it fits: change them together) */
+.root[data-fit='under'] .actions {
+  --act-size: clamp(8.5px, 2.6vw, 10px);
+  width: var(--gate-w);
+  min-width: max-content;
   justify-content: center;
   text-align: center;
   transform-origin: 50% 0;
+}
+.root[data-fit='under'] .actions > * {
+  flex: 1 1 auto;
+}
+.root[data-fit='under'] .actions > :only-child {
+  flex: 0 0 auto;
 }
 .plate:not([data-state='in']) .actions,
 .root[data-rest='0'] .actions,
@@ -254,6 +291,7 @@
 }
 .knob {
   position: relative;
+  flex: none;
   width: clamp(48px, 4.2vw, 62px);
   aspect-ratio: 1;
   border-radius: 50%;
@@ -321,6 +359,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  /* (the knobs keep their size; where the row is too narrow for all of it, the holes give) */
+  min-width: 0;
   pointer-events: auto;
 }
 /* each one a perforation in the film: the plate at the gate is lit through */
@@ -381,6 +421,22 @@
   }
   .dot[aria-current='true'] {
     width: 20px;
+  }
+}
+
+/* the narrowest phones: the foot closes up, so it still ends clear of the radio's record */
+@media (max-width: 379px) {
+  .foot {
+    gap: 8px;
+  }
+  .dots {
+    gap: 5px;
+  }
+  .dot {
+    width: 10px;
+  }
+  .dot[aria-current='true'] {
+    width: 16px;
   }
 }
 

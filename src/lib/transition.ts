@@ -7,6 +7,8 @@ import { projects } from '@/content/projects';
 
 const OFF_MS = 560;
 const ON_MS = 720;
+/** the least the tube stays dark between the two: long enough for the spot it leaves behind to be seen going out */
+const DARK_MS = 170;
 
 let pending: ((path: string) => void) | null = null;
 /** the path the site is on (to know, on arriving, where it came from) */
@@ -78,6 +80,24 @@ const frames = (n: number) =>
     requestAnimationFrame(step);
   });
 
+const wait = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
+
+/**
+ * What a tube leaves behind when it is switched off: the spot in the middle of the glass, still
+ * lit for a moment after the picture has gone, shrinking as it fades (the element is CrtGlass's).
+ */
+function afterglow() {
+  if (rig.reducedMotion) return;
+  document.querySelector<HTMLElement>('[data-crt-spot]')?.animate(
+    [
+      { opacity: 1, transform: 'scale(1)' },
+      { opacity: 0.55, transform: 'scale(0.7)', offset: 0.3 },
+      { opacity: 0, transform: 'scale(0.25)' },
+    ],
+    { duration: 520, easing: 'cubic-bezier(0.2, 0.5, 0.3, 1)' },
+  );
+}
+
 /** The tube collapses to a line, then a point, and is dark. */
 async function powerOff() {
   const st = useApp.getState();
@@ -90,6 +110,7 @@ async function powerOff() {
   // collapsed to nothing: now simply off, and no longer squeezed, so the page behind measures true
   document.documentElement.classList.replace('crt-off', 'crt-dark');
   rig.dark = true;
+  afterglow();
 }
 
 /** The picture comes back on wherever the page now is. */
@@ -121,6 +142,7 @@ export const channelSwitch = {
     const from = at;
     if (rig.route === 'home') remember();
     await powerOff();
+    const dark = wait(DARK_MS);
 
     const arrived = new Promise<void>((res) => {
       pending = () => res();
@@ -142,6 +164,7 @@ export const channelSwitch = {
       lenis.scrollTo(placeOf(`#${hash}`), { immediate: true, force: true });
       await frames(2);
     }
+    await dark;
     await powerOn();
   },
 
@@ -160,7 +183,7 @@ export const channelSwitch = {
     lenis.scrollTo(top, { immediate: true, force: true });
     // the film is simply at its frame, and whatever eases toward the scroll gets there unseen
     settleReel();
-    await frames(4);
+    await Promise.all([frames(4), wait(DARK_MS)]);
     await powerOn();
   },
 

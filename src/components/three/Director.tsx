@@ -4,14 +4,14 @@ import { createPortal, useFrame, useThree } from '@react-three/fiber';
 import { perf, startingTier } from '@/lib/perf';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { clamp, invLerp, smootherstep, smoothstep, spring } from '@/lib/math';
+import { clamp, damp, invLerp, smootherstep, smoothstep, spring } from '@/lib/math';
 import { office } from '@/lib/office';
 import { anchor, rig } from '@/lib/rig';
 import { useApp } from '@/lib/store';
 import { warmup } from '@/lib/warmup';
 import Bench from './bench/Bench';
 import { Greeter } from './bench/Greeter';
-import { applyPose, benchPose, bump, fitContent, heroAnchor, makePose, openingPose, tube } from './bench/tube';
+import { applyPose, benchPose, bump, crop, fitContent, heroAnchor, makePose, openingPose, sight, tube } from './bench/tube';
 import { HeroWords, WORDS_DEPTH } from './bench/words';
 import { Pipeline } from './pipeline/Pipeline';
 import { CURVE, bendPointer } from './pipeline/shaders';
@@ -27,7 +27,7 @@ const LANDING = 3.6; // seconds of the landing: lamp, lid, camera, tube
 const _swayQ = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 1, 0);
 const _corner = new THREE.Vector3();
-/** the corners of the tube's picture, as rig.glass keeps them: top-left, top-right, bottom-right, bottom-left */
+/** the corners of a part of the tube's picture, as rig.glass keeps them: top-left, top-right, bottom-right, bottom-left */
 const CORNERS = [
   [-1, 1],
   [1, 1],
@@ -106,7 +106,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       window.clearTimeout(id);
     };
   }, []);
-  const clock = useRef({ office: 'wait' as 'wait' | 'warming' | 'ready', officeCompiled: false, officeDraw: null as null | (() => boolean), reel: 'wait' as 'wait' | 'warming' | 'ready', reelCompiled: false, reelDraw: null as null | (() => boolean), compiled: false, worksCompiled: false, frames: 0, perfT: 0, perfN: 0, good: 0, primed: false, tiered: false, skip: false, checkT: 0, sig: '', stable: 0, dirty: true, still: 0 });
+  const clock = useRef({ office: 'wait' as 'wait' | 'warming' | 'ready', officeCompiled: false, officeDraw: null as null | (() => boolean), reel: 'wait' as 'wait' | 'warming' | 'ready', reelCompiled: false, reelDraw: null as null | (() => boolean), compiled: false, worksCompiled: false, frames: 0, perfT: 0, perfN: 0, good: 0, primed: false, tiered: false, skip: false, checkT: 0, sig: '', stable: 0, dirty: true, still: 0, rush: 0 });
 
   useEffect(() => () => pipeline.dispose(), [pipeline]);
 
@@ -153,6 +153,10 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
     const c = clock.current;
 
     pipeline.setSize(w, h, dpr);
+    // the lens: the faster the page is wound through, the further its colours part toward the rim
+    // (a thick glass does), and they close again as the scroll settles
+    c.rush = damp(c.rush, rig.reducedMotion ? 0 : clamp(Math.abs(rig.velocity) / 5200), c.rush < Math.abs(rig.velocity) / 5200 ? 9 : 4, dt);
+    const fringe = 0.0035 + 0.0062 * c.rush * c.rush;
     // the greeter is drawn to the shape of the machine's glass, which it fills
     greeter.setAspect(tube.hw / tube.hh);
     fitContent(aspect);
@@ -303,7 +307,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
         power: 1,
         time: t,
         curve: CURVE,
-        ca: 0.0035,
+        ca: fringe,
         scan: 0,
         radius: Math.min(38, Math.max(20, w * 0.024)),
         flicker: rig.reducedMotion ? 0 : 1,
@@ -322,6 +326,20 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       else tPose = 1;
       const benchVisible = home && tube.ready && tPose < 0.9995;
 
+      // ── the camera at the bench, first: the machine's glass is a window onto the inner world,
+      //    and what the camera sees of it is the part of the picture that gets drawn (inside, the
+      //    view's own frame is the picture)
+      if (benchVisible) {
+        if (rig.intro < 1) {
+          openingPose(rig.intro, aspect, rig.pointer.sx, rig.pointer.sy, t, pose);
+        } else {
+          benchPose(tPose, aspect, rig.pointer.sx, rig.pointer.sy, t, pose);
+        }
+        applyPose(benchCam, pose, w, h);
+        sway(benchCam, pan);
+      }
+      sight(benchVisible ? benchCam : null, aspect, rig.intro < 1);
+
       // ── what the tube shows: the greeter at the bench, the works once inside
       let osMix = 0;
       let tune = rig.tune;
@@ -338,9 +356,8 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       }
       // (with reduced motion it stands still, its arm up, until it is touched)
       if (osMix > 0) greeter.update(t, rig.reducedMotion);
-      // the greeter fills the whole glass; the works keep the viewport's shape, so the picture
-      // changes shape on the way in (and out), under the tuning static
-      tube.fill = !home ? 0 : rig.exit > 0 ? smoothstep(0.38, 0.55, rig.exit) : 1 - smoothstep(0.14, 0.3, rig.dive);
+      // (the greeter and the works both fill the whole glass: one gives way to the other under the
+      // tuning static, and nothing changes shape)
       tune = Math.min(1, tune);
 
       // during the boot the inner world is rendered too, unseen, so its first real frame is free
@@ -350,7 +367,13 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
       const sceneNeeded = (osMix < 1 && !(inOffice && office.full)) || priming;
       // (inside the tube the inner world is the view and turns with it; seen on the machine's screen it does not)
       if (!benchVisible) sway(worksCam, pan);
-      if (sceneNeeded) pipeline.renderWorks(worksScene, worksCam);
+      if (sceneNeeded) {
+        // (on the machine's glass: as much of the world as the part of the glass in sight shows,
+        // which round the view's own frame is more than the view itself will see)
+        if (benchVisible) crop(worksCam, tube.src);
+        pipeline.renderWorks(worksScene, worksCam);
+        if (benchVisible) worksCam.updateProjectionMatrix();
+      }
       let beam = 0;
       if (inOffice || priming) {
         if (office.shadowDirty) {
@@ -390,7 +413,7 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
         power: home ? rig.power : 1,
         time: t,
         curve: CURVE,
-        ca: 0.0035,
+        ca: fringe,
         scan: 0,
         radius,
         flicker: rig.reducedMotion ? 0 : 1,
@@ -399,27 +422,29 @@ export default function Director({ setDpr }: { setDpr: (d: number) => void }) {
         portal: office.portal,
         beam,
         bezel,
-        aspect: (tube.cw + (tube.hw - tube.cw) * tube.fill) / (tube.ch + (tube.hh - tube.ch) * tube.fill),
+        aspect,
+        glass: [tube.gx, tube.gy],
+        win: tube.win,
+        src: tube.src,
       }, officeView ? 2.2 : 1.1);
 
       if (benchVisible) {
-        if (rig.intro < 1) {
-          openingPose(rig.intro, aspect, rig.pointer.sx, rig.pointer.sy, t, pose);
-        } else {
-          benchPose(tPose, aspect, rig.pointer.sx, rig.pointer.sy, t, pose);
-        }
-        applyPose(benchCam, pose, w, h);
-        sway(benchCam, pan);
-        // where the picture on the machine's glass shows: the page's own glass (the grain over
-        // the inner world) lies on it there, so the world has its grain before the view is inside
-        const gw = tube.cw + (tube.hw - tube.cw) * tube.fill;
-        const gh = tube.ch + (tube.hh - tube.ch) * tube.fill;
+        // where the picture on the machine's glass shows (as much of it as is in sight): the page's
+        // own glass (the grain over the inner world) lies on it there, so the world has its grain
+        // before the view is inside
+        const { win } = tube;
         CORNERS.forEach(([sx, sy], i) => {
-          _corner.copy(tube.C).addScaledVector(tube.R, sx * gw).addScaledVector(tube.U, sy * gh).project(benchCam);
+          _corner
+            .copy(tube.C)
+            .addScaledVector(tube.R, (win.x + sx * win.hx) * tube.cw)
+            .addScaledVector(tube.U, (win.y + sy * win.hy) * tube.ch)
+            .project(benchCam);
           rig.glass.pts[i * 2] = ((_corner.x + 1) / 2) * w;
           rig.glass.pts[i * 2 + 1] = ((1 - _corner.y) / 2) * h;
         });
-        rig.glass.round = radius * bezel;
+        // (as round as the tube's own corners, in the px of a box laid on that part of the glass)
+        rig.glass.round[0] = (radius * bezel * tube.gy) / win.hx;
+        rig.glass.round[1] = (radius * bezel * tube.gy) / win.hy;
         rig.glass.on = true;
         pipeline.renderBench(benchScene, benchCam);
         const e = smoothstep(0.7, 1, tPose);

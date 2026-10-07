@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Part } from '../bench/tube';
 import { beamFrag, bloomDownFrag, bloomUpFrag, crtFrag, finalFrag, fullscreenVert } from './shaders';
 
 const MIPS = 5;
@@ -137,9 +138,19 @@ export type CrtParams = {
   beam: number;
   /** 1 = the tube's rounded, darkening rim (its screen seen from outside), 0 = none (inside) */
   bezel: number;
-  /** the shape the picture is shown at (width / height): the glass's, or the viewport's */
+  /** the shape of the view's own frame (width / height): the viewport's */
   aspect: number;
+  /**
+   * Seen from outside, on the machine: the glass's half extents, the part of the picture to draw
+   * and the part of the inner world drawn for it, all in frames (see the tube's `sight`). Left
+   * out inside, where the view's frame is the whole picture.
+   */
+  glass?: [number, number];
+  win?: Part;
+  src?: Part;
 };
+
+const WHOLE: Part = { x: 0, y: 0, hx: 1, hy: 1 };
 
 /** What the beams need from the office: its camera, the sun, and the room it lights. */
 export type BeamParams = {
@@ -265,6 +276,9 @@ export class Pipeline {
         uDim: { value: 1 },
         uBezel: { value: 1 },
         uAspect: { value: 1.6 },
+        uGlass: { value: new THREE.Vector2(1, 1) },
+        uWin: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uSrc: { value: new THREE.Vector4(0, 0, 1, 1) },
         uRes: { value: new THREE.Vector2(1, 1) },
       },
       depthTest: false,
@@ -423,6 +437,11 @@ export class Pipeline {
     u.uDim.value = p.dim;
     u.uBezel.value = p.bezel;
     u.uAspect.value = p.aspect;
+    const win = p.win ?? WHOLE;
+    const src = p.src ?? WHOLE;
+    u.uGlass.value.set(p.glass?.[0] ?? 1, p.glass?.[1] ?? 1);
+    u.uWin.value.set(win.x, win.y, win.hx, win.hy);
+    u.uSrc.value.set(src.x, src.y, src.hx, src.hy);
     u.uOffice.value = p.office;
     u.uBeam.value = p.beam;
     u.uPortal.value.set(p.portal[0], p.portal[1], p.portal[2]);

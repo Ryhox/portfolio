@@ -323,8 +323,10 @@ export default function Reel() {
     camera.updateProjectionMatrix();
     // the gate in the middle of its box: shift the picture (not the view), through the glass's curve
     // (on the way out the view's own middle comes to the middle of the screen, where the last screen's is)
+    // (and a little higher than the middle where the page has its buttons under the film: `lift`)
+    reel.gate.lift = rig.dark ? reel.lift : damp(reel.gate.lift, reel.lift, 10, rig.dt);
     const cx = (((box.x + box.w / 2) / vw) * 2 - 1) * (1 - go);
-    const cy = (1 - ((box.y + box.h * 0.5) / vh) * 2) * (1 - go);
+    const cy = (1 - ((box.y + box.h * 0.5 - reel.gate.lift) / vh) * 2) * (1 - go);
     const [sx, sy] = bendPointer(cx, cy, CURVE, aspect);
     const e = camera.projectionMatrix.elements;
     e[8] = -sx;
