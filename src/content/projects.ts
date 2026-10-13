@@ -90,6 +90,18 @@ export const projects: Project[] = [
       },
     },
   },
+  {
+    slug: 'little-elsewhere',
+    index: 'VI',
+    title: 'Little Elsewhere',
+    kicker: 'A whole world from one spring',
+    description: 'A cozy pixel-art idle game about growing a tiny world from a single spring. Every sprite and sound is made in code.',
+    stack: ['TypeScript', 'React', 'Canvas 2D'],
+    video: '/work/elsewhere.mp4',
+    poster: '/work/elsewhere.webp',
+    focus: '0% 50%',
+    links: { demo: 'https://elsewhere.ryhox.dev', source: 'https://github.com/Ryhox/little-elsewhere' },
+  },
 ];
 
 export const hasDemo = (l: ProjectLinks): l is ProjectLinks & { demo: string } => !!l.demo;
